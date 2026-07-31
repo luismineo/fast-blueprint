@@ -19,13 +19,14 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   ...svelte.configs['flat/recommended'],
   {
-    files: ['**/*.cjs'],
+    files: ['**/*.cjs', 'scripts/**/*.mjs'],
     languageOptions: {
       globals: {
         module: 'writable',
         require: 'readonly',
         process: 'readonly',
         __dirname: 'readonly',
+        console: 'readonly',
       },
     },
   },

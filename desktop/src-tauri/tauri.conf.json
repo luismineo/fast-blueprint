@@ -1,0 +1,28 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Planta",
+  "version": "0.0.0",
+  "identifier": "dev.planta.app",
+  "build": {
+    "frontendDist": "../../packages/app/dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "pnpm --filter @planta/app dev",
+    "beforeBuildCommand": "pnpm --filter @planta/app build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Planta",
+        "width": 1280,
+        "height": 800
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": false,
+    "targets": []
+  }
+}

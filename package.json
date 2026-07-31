@@ -13,7 +13,9 @@
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --build && pnpm --filter @planta/app run typecheck",
     "lint": "eslint .",
-    "depcruise": "depcruise --config .dependency-cruiser.cjs packages"
+    "depcruise": "depcruise --config .dependency-cruiser.cjs packages",
+    "version:sync": "node scripts/version-sync.mjs",
+    "version:check": "node scripts/version-check.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
