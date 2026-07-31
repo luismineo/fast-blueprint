@@ -25,6 +25,16 @@ mundo = (tela − t) / scale
 
 Aplicada via `ctx.setTransform` uma vez por frame. Coordenadas de desenho ficam em milímetros dentro dos passes de geometria; passes de UI (handles, rótulos, guias) resetam a transformação e desenham em pixels.
 
+### Zoom ancorado no cursor
+
+Cada passo de zoom segue três operações, nesta ordem:
+
+1. **Deriva o ponto de mundo** `P_world` sob o cursor: `P_world = (cursor_px − t) / scale`, usando a câmera atual.
+2. **Define a nova escala** `scale' = scale × factor`, limitada a [0,05, 20] px/mm.
+3. **Resolve a translação** `t'` para que `P_world` caia no mesmo pixel: `t' = cursor_px − P_world × scale'`.
+
+O passo é autocorretivo: a posição de mundo é recalculada da câmera atual a cada evento, e a nova translação é derivada analiticamente. Nada é acumulado entre passos, portanto não há acúmulo de erro de ponto flutuante. A precisão é limitada apenas pela representação `float64` de `tx`, `ty` e `scale`, e o erro de round-trip é menor que 1 px de tela para qualquer sequência de zooms dentro dos limites da câmera.
+
 ### Espessura constante
 
 Elementos de contorno e handles devem ter tamanho constante em pixels, independente do zoom. Com a transformação aplicada, isso significa `lineWidth = px / scale`.
@@ -58,21 +68,22 @@ interface RenderContext {
 | # | Pass | Conteúdo |
 |---|---|---|
 | 1 | `clear` | Fundo |
-| 2 | `underlay` | Imagem de referência, com opacidade (no-op no M1; ver § Underlay) |
-| 3 | `grid` | Grid adaptativo |
-| 4 | `roomFills` | Preenchimento dos cômodos |
-| 5 | `furnitureClearance` | Faixas de circulação (abaixo dos móveis) |
-| 6 | `furniture` | Retângulos de móveis, rótulos, hachura de colisão |
-| 7 | `walls` | Arestas de cômodos e paredes avulsas |
-| 8 | `openings` | Portas e janelas, com arco de abertura (no-op no M1: itera array vazio; implementação entra em M6) |
-| 9 | `dimensions` | Cotas de aresta |
-| 10 | `roomLabels` | Nome e área no centroide |
-| 11 | `snapGuides` | Guias de alinhamento e eixo |
-| 12 | `toolOverlay` | Traço em andamento da ferramenta ativa |
-| 13 | `selection` | Contornos de seleção e handles |
-| 14 | `hud` | HUD de entrada numérica, escala gráfica |
+| 2 | `grid` | Grid adaptativo |
+| 3 | `roomFills` | Preenchimento dos cômodos |
+| 4 | `furnitureClearance` | Faixas de circulação (abaixo dos móveis) |
+| 5 | `furniture` | Retângulos de móveis, rótulos, hachura de colisão |
+| 6 | `walls` | Arestas de cômodos e paredes avulsas |
+| 7 | `openings` | Portas e janelas, com arco de abertura (no-op no M1: itera array vazio; implementação entra em M6) |
+| 8 | `dimensions` | Cotas de aresta |
+| 9 | `roomLabels` | Nome e área no centroide |
+| 10 | `snapGuides` | Guias de alinhamento e eixo |
+| 11 | `toolOverlay` | Traço em andamento da ferramenta ativa |
+| 12 | `selection` | Contornos de seleção e handles |
+| 13 | `hud` | HUD de entrada numérica, escala gráfica |
 
-Passes 1–10 desenham conteúdo do documento. Passes 11–14 desenham estado efêmero de interação.
+Passes 1–9 desenham conteúdo do documento. Passes 10–13 desenham estado efêmero de interação.
+
+O underlay (imagem de referência) não está na lista de passes: ele usa um elemento canvas de fundo separado, sobreposto por z-index atrás do canvas principal, redesenhado apenas quando a câmera muda (ver § Orçamento de performance, regra 6). No M1 é no-op porque `doc.underlay` é sempre `null`.
 
 ## Grid adaptativo
 

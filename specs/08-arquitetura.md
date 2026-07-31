@@ -176,9 +176,12 @@ Regras:
 
 - Undo ilimitado dentro da sessão. Limite duro de 500 entradas, descartando as mais antigas.
 - Câmera, seleção e ferramenta ativa **não** entram no histórico.
-- Comandos contínuos (arrastar um nó) emitem um comando por frame durante o arraste, mas coalescem numa entrada única ao soltar. A coalescência é por `type` + alvo + janela de tempo de 400 ms.
+- Comandos contínuos (arrastar um nó) usam o mecanismo de **comando transiente**:
+  - Durante o arraste, a ferramenta emite comandos com `transient: true`. Eles são aplicados ao documento e desenhados pelo renderer, mas **não entram no histórico**.
+  - Ao soltar, a ferramenta emite um único comando com `transient: false` (ou sem o campo, default `false`) representando a mudança do estado inicial ao estado final.
+  - O histórico recebe exatamente uma entrada.
 - Undo restaura o documento; a seleção é restaurada por "melhor esforço" (ids que ainda existem).
-- Qualquer comando novo limpa a pilha de redo.
+- Qualquer comando novo (não-transiente) limpa a pilha de redo.
 
 ### Store
 

@@ -196,13 +196,11 @@ A face traseira é a que encosta porque é a convenção de catálogo — cama, 
 
 ## Precisão de fechamento
 
-Ao desenhar um cômodo, se o traço voltar a menos de 12 px do nó inicial, o polígono fecha reusando o nó inicial. Não há tolerância de fechamento em milímetros — o fechamento é sempre exato, por reuso de nó.
+A aresta de fechamento (do último nó confirmado ao nó inicial) nunca é digitada — ela assume o comprimento que a geometria der. A fusão com o nó inicial via âncora de snap (Classe 1, nó existente) é o único mecanismo de fechamento. Se o usuário digitou também o último trecho, a âncora de nó dispara sobre o nó inicial, o `merged` funde os nós, e o comprimento digitado é sobrescrito pela fusão. A UI informa a diferença:
 
-Isso significa que a soma das medidas digitadas pode não fechar perfeitamente. Nesse caso, o último segmento é ajustado para fechar, e a UI avisa o desvio:
+> O último trecho ficou com X cm. Você digitou Y cm — a diferença é de Z cm.
 
-> Fechou com 4 cm de diferença do que você digitou. O último trecho foi ajustado.
-
-O aviso desaparece sozinho após 6 segundos e não bloqueia nada.
+A mensagem é informativa, sem limiar de recusa, sem algoritmo de ajuste, sem nó movido. Desaparece sozinha após 6 segundos.
 
 ## Critérios de aceitação
 

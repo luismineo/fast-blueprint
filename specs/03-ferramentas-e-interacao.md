@@ -105,7 +105,7 @@ A direção usada com entrada numérica é a direção **após snap de eixo**. S
 | `Enter` com campo vazio | Fecha |
 | Duplo clique | Confirma o segmento e fecha |
 
-Ao fechar, emite `CreateRoom`. O nome default é `Cômodo N`, e o campo de nome entra em modo de edição inline sobre o centroide, já selecionado, para o usuário digitar "Quarto" e dar Enter.
+Ao fechar, emite `CreateRoom`. O nome default é `Cômodo N`, onde N é o menor inteiro positivo tal que "Cômodo N" não está em uso no documento atual. Exemplo: se existem Cômodo 1 e Cômodo 3, o próximo é Cômodo 2. Determinístico e sem dependência de histórico de sessão. O campo de nome entra em modo de edição inline sobre o centroide, já selecionado, para o usuário digitar "Quarto" e dar Enter.
 
 Fechamento com menos de 3 nós é ignorado.
 
