@@ -40,31 +40,76 @@ interface ToolTransition<S> {
 
 `overlay` devolve o que a ferramenta quer desenhar sobre a cena (traço em andamento, guias, HUD). Ferramentas não têm acesso ao canvas.
 
-## Atalhos globais
+## Atalhos
 
-| Tecla | Ação |
-|---|---|
-| `V` | Ferramenta Selecionar |
-| `R` | Ferramenta Cômodo |
-| `W` | Ferramenta Parede |
-| `F` | Ferramenta Mobília |
-| `M` | Ferramenta Medir |
-| `Espaço` (segurar) | Pan temporário |
-| `Ctrl/Cmd + Z` | Desfazer |
-| `Ctrl/Cmd + Shift + Z` | Refazer |
-| `Ctrl/Cmd + S` | Salvar |
-| `Ctrl/Cmd + O` | Abrir |
-| `Ctrl/Cmd + D` | Duplicar seleção |
-| `Delete` / `Backspace` | Excluir seleção |
-| `Esc` | Cancelar operação em andamento; se ociosa, limpa seleção; se ociosa e sem seleção, volta para Selecionar |
-| `Scroll` | Zoom ancorado no cursor |
-| `Botão do meio` (arrastar) | Pan |
-| `0` | Enquadrar tudo |
-| `G` | Alternar grid |
-| `L` | Alternar cotas |
-| `?` | Painel de atalhos |
+Esta é a única tabela de atalhos do projeto. specs/07 e demais specs referenciam atalhos daqui; nenhuma outra spec declara tecla. Adicionar atalho sem passar por esta tabela é erro de processo.
 
-Modificadores: `Shift` = ângulos de 45°, `Alt` = desligar snap, `Ctrl/Cmd` = adicionar à seleção.
+Atalhos são especificados por `KeyboardEvent.key`, não por posição física (`code`). O critério de aceitação inclui verificação em teclado ABNT2.
+
+### Regra de precedência: campo com foco vence atalho
+
+Enquanto um campo de texto ou número tem foco, **nenhum atalho global dispara.** As únicas exceções são `Esc` e combinações com `Ctrl/Cmd`. O campo consome a tecla; o atalho não é avaliado.
+
+Campos que disparam esta regra: campo de comprimento e de ângulo do HUD, edição inline de nome de cômodo, todo campo do painel de propriedades, busca do catálogo.
+
+### Restrição permanente sobre dígitos
+
+Dígitos (`0`–`9`) sem modificador são **reservados para entrada numérica** em todo contexto, permanentemente. Nenhum atalho global usa dígito sozinho, nem agora nem em milestones futuros.
+
+### Tabela unificada
+
+| Tecla (`key`) | Contexto | Ação | Spec |
+|---|---|---|---|
+| `v` | Global | Ferramenta Selecionar | 03 § Selecionar |
+| `r` | Global, incondicional | Ferramenta Cômodo | 03 § Cômodo |
+| `w` | Global | Ferramenta Parede | 03 § Parede |
+| `f` | Global | Ferramenta Mobília | 03 § Mobília |
+| `m` | Global | Ferramenta Medir | 03 § Medir |
+| `q` | Seleção contém mobília (qualquer ferramenta) | Rotaciona 90° anti-horário | 03 § Mobília |
+| `e` | Seleção contém mobília (qualquer ferramenta) | Rotaciona 90° horário | 03 § Mobília |
+| `Shift+q` | Seleção contém mobília | Rotaciona 15° anti-horário | 03 § Mobília |
+| `Shift+e` | Seleção contém mobília | Rotaciona 15° horário | 03 § Mobília |
+| ` ` (Espaço, segurar) | Global | Pan temporário | 03 |
+| `Ctrl/Cmd+z` | Global | Desfazer | 08 § Histórico |
+| `Ctrl/Cmd+Shift+z` | Global | Refazer | 08 § Histórico |
+| `Ctrl/Cmd+s` | Global | Salvar | 05 § Persistência |
+| `Ctrl/Cmd+o` | Global | Abrir | 05 § Persistência |
+| `Ctrl/Cmd+d` | Global (seleção contém entidades) | Duplicar seleção | 03 § Selecionar, 03 § Mobília |
+| `Ctrl/Cmd+0` | Global | Enquadrar tudo | 03 § Câmera |
+| `Ctrl/Cmd+b` | Global | Recolher/expandir painel direito | 07 § Layout |
+| `Backspace` | Ferramenta Cômodo em Drawing, campo de comprimento vazio | Remove último segmento | 03 § Cômodo/Cancelar |
+| `Backspace` | Qualquer outro estado com seleção | Excluir seleção | 03 § Selecionar |
+| `Backspace` | Foco em campo de texto | Apaga caractere (regra de precedência D0) | — |
+| `Delete` | Com seleção, fora de campo de texto | Excluir seleção | 03 § Selecionar |
+| `Delete` | Foco em campo de texto | Apaga caractere (regra de precedência D0) | — |
+| `Escape` | Ferramenta Cômodo em Anchored ou Drawing | Remove último segmento; em Anchored volta para Idle | 03 § Cômodo/Cancelar |
+| `Escape` | Ferramenta Medir ativa | Limpa medição | 03 § Medir |
+| `Escape` | Qualquer ferramenta, com seleção | Limpa seleção | 03 |
+| `Escape` | Ociosa, sem seleção | Volta para Ferramenta Selecionar | 03 |
+| `Escape` | HUD com armadilha de foco ativa | Sai da armadilha de foco | 03 § Cômodo/HUD |
+| `c` | Ferramenta Cômodo em Drawing | Fecha polígono ligando último nó ao inicial | 03 § Cômodo/Fechar |
+| `Enter` | Ferramenta Cômodo em Anchored/Drawing, campo de comprimento preenchido | Confirma segmento | 03 § Cômodo |
+| `Enter` | Ferramenta Cômodo em Drawing, campo vazio | Fecha polígono | 03 § Cômodo/Fechar |
+| `Enter` | Campo numérico do painel de propriedades | Aplica valor | 07 § Painel |
+| `Tab` | Ferramenta Cômodo em Anchored ou Drawing | Circula entre campos do HUD (armadilha de foco; não escapa do HUD) | 03 § Cômodo/HUD |
+| `Tab` | Fora do HUD | Travessia de foco padrão (a11y) | 07 § Acessibilidade |
+| `g` | Global | Alternar grid | 04 § Grid |
+| `l` | Global | Alternar cotas | 04 § Cotas |
+| `?` | Global | Painel de atalhos | 07 |
+| `ArrowUp/ArrowDown/ArrowLeft/ArrowRight` | Mobília selecionada | Move 10 mm; com `Shift`, 100 mm | 03 § Mobília |
+| `Scroll` | Canvas | Zoom ancorado no cursor | 04 § Câmera |
+| Botão do meio (arrastar) | Canvas | Pan | 04 § Câmera |
+
+### Modificadores
+
+| Tecla | Contexto | Efeito |
+|---|---|---|
+| `Shift` (segurar) | Qualquer arraste com snap ativo | Inclui múltiplos de 45° nos eixos do snap | 02 § Snap |
+| `Shift` (segurar) | Arraste de handle de rotação de mobília | Trava em múltiplos de 15° | 03 § Mobília |
+| `Shift` (segurar) | Arraste de handle de canto de mobília | Mantém proporção | 03 § Mobília |
+| `Shift` (segurar) | Setas com mobília selecionada | Move 100 mm em vez de 10 mm | 03 § Mobília |
+| `Alt` (segurar) | Qualquer arraste | Desliga todos os snaps | 02 § Snap |
+| `Ctrl/Cmd` (segurar) | Clique | Adiciona/remove da seleção | 03 § Selecionar |
 
 ## Ferramenta Cômodo (`R`)
 
@@ -128,6 +173,8 @@ Ancorado ao cursor, deslocado 16 px à direita e abaixo. Contém:
 ```
 
 O campo de comprimento é editável e recebe foco automático ao digitar. O campo de ângulo é **somente leitura no M1** — exibe a direção pós-snap de eixo, mas não aceita entrada. Entrada de ângulo arbitrário entra no M2 (ver `09-roadmap.md`). A terceira linha só aparece a partir de 3 segmentos e mostra a área caso fechasse agora.
+
+**Armadilha de foco.** Enquanto a Ferramenta Cômodo está em Anchored ou Drawing, o HUD é uma armadilha de foco: `Tab` circula apenas entre os campos do HUD e não escapa. `Esc` é a saída documentada (remove o último segmento e sai da armadilha). Isso é compatível com o piso de acessibilidade de `07-ui-e-layout.md`: armadilha de foco em interação modal é o padrão esperado (WCAG 2.1.2), desde que haja saída documentada por teclado. Fora dos estados Anchored/Drawing, `Tab` segue a travessia de foco padrão.
 
 ### Exemplo: reproduzir um quarto de 3,20 × 2,50
 
@@ -197,12 +244,16 @@ Item inserido nasce selecionado, com snap a parede ativo.
 | Ação | Resultado |
 |---|---|
 | Arrastar | Move. Snap a parede a menos de 150 mm |
-| `R` com móvel selecionado | Rotaciona 90° horário |
-| `Shift + R` | Rotaciona 90° anti-horário |
+| `Q` (seleção contém mobília) | Rotaciona 90° anti-horário |
+| `E` (seleção contém mobília) | Rotaciona 90° horário |
+| `Shift + Q` | Rotaciona 15° anti-horário |
+| `Shift + E` | Rotaciona 15° horário |
 | Arrastar handle de rotação | Rotação livre; `Shift` trava em múltiplos de 15° |
 | Arrastar handle de canto | Redimensiona; `Shift` mantém proporção |
 | `Ctrl/Cmd + D` | Duplica, deslocado 200 mm |
 | Setas | Move 10 mm; com `Shift`, 100 mm |
+
+Rotação por teclado (`Q`/`E`) é escopada à seleção, não à ferramenta ativa. Se a seleção contém mobília, `Q` e `E` rotacionam — funciona tanto na Ferramenta Selecionar quanto na Ferramenta Mobília, cobrindo o estado mais comum (mobília inserida, ferramenta voltou para Selecionar).
 
 Dimensões exatas se editam no painel de propriedades, em centímetros.
 
@@ -228,7 +279,7 @@ Mostra também a distância projetada em X e Y quando o traço não é axial.
 
 **Pan.** Botão do meio, `Espaço` + arrastar, ou dois dedos no trackpad.
 
-**Enquadrar.** `0` ajusta a câmera para caber toda a geometria com 10% de margem. Documento vazio enquadra uma área de 10 × 10 m.
+**Enquadrar.** `Ctrl/Cmd + 0` ajusta a câmera para caber toda a geometria com 10% de margem. Documento vazio enquadra uma área de 10 × 10 m.
 
 Zoom e pan nunca entram no histórico de undo.
 

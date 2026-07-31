@@ -128,7 +128,7 @@ Abaixo de 1280 px, o painel direito recolhe por default. Abaixo de 900 px, vira 
 
 ## Critérios de aceitação
 
-- [ ] `Tab` recolhe e expande o painel direito
+- [ ] Painel direito recolhe e expande com o atalho definido em `03-ferramentas-e-interacao.md` (tabela unificada)
 - [ ] Todo campo numérico aceita `158+40` e resolve para 198
 - [ ] Nenhum controle depende exclusivamente de mouse
 - [ ] Anel de foco visível em todos os controles interativos
@@ -137,3 +137,4 @@ Abaixo de 1280 px, o painel direito recolhe por default. Abaixo de 900 px, vira 
 - [ ] Canvas não anima em mudança de câmera
 - [ ] `prefers-reduced-motion: reduce` remove todas as transições
 - [ ] Estado vazio menciona o atalho `R`
+- [ ] Tabela de atalhos de `03-ferramentas-e-interacao.md` verificada em teclado ABNT2 (todas as teclas de pontuação como `?` testadas)
