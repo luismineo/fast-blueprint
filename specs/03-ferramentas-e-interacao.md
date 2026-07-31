@@ -31,10 +31,13 @@ interface ToolTransition<S> {
   state: S
   commands: Command[]
   cursor?: CursorStyle
+  historyBoundary?: 'commit' | 'abort'
 }
 ```
 
 `ToolContext` não inclui `dispatch`. Ferramentas retornam comandos, não os executam — isso garante que sejam funções puras e testáveis sem mock de store.
+
+`historyBoundary` sinaliza o fim de uma interação contínua (comandos `transient: true`) para o mecanismo de entrada pendente (`08-arquitetura.md` § Histórico). Ferramentas emitem `'commit'` no `onPointerUp` que finaliza um arraste e `'abort'` no `onKey` que trata o `Esc` de cancelamento. Ausente (`undefined`) em toda transição que não conclui nem cancela uma interação transiente — inclusive em toda transição de ferramentas sem interação contínua, como a Ferramenta Cômodo no M1.
 
 `OverlayPrimitive` é definido em `core/` como geometria declarativa pura (sem dependência de canvas). O renderer as interpreta para pixels. Exemplos: `{ kind: 'polyline'; points: Point[]; color: HexColor }`, `{ kind: 'label'; position: Point; text: string }`.
 
@@ -46,11 +49,23 @@ Esta é a única tabela de atalhos do projeto. specs/07 e demais specs referenci
 
 Atalhos são especificados por `KeyboardEvent.key`, não por posição física (`code`). O critério de aceitação inclui verificação em teclado ABNT2.
 
-### Regra de precedência: campo com foco vence atalho
+### Regra de precedência: elemento com foco vence atalho (D0)
 
-Enquanto um campo de texto ou número tem foco, **nenhum atalho global dispara.** As únicas exceções são `Esc` e combinações com `Ctrl/Cmd`. O campo consome a tecla; o atalho não é avaliado.
+Enquanto o foco está em um campo de entrada **ou em um widget que gerencia a própria navegação por teclado** (barra de ferramentas com roving tabindex, e qualquer outro composto do mesmo tipo que vier a existir — listbox, menu, árvore), **nenhum atalho global dispara.** As únicas exceções são `Esc` e combinações com `Ctrl/Cmd`. O elemento focado consome a tecla; o atalho não é avaliado.
+
+Isso cobre o caso de campo de texto e o caso de widget composto pela mesma regra, sem tratamento especial: um widget composto **é** o elemento com foco enquanto gerencia sua própria navegação, exatamente como um campo de texto é o elemento com foco enquanto recebe caracteres.
 
 Campos que disparam esta regra: campo de comprimento e de ângulo do HUD, edição inline de nome de cômodo, todo campo do painel de propriedades, busca do catálogo.
+
+Widgets compostos que disparam esta regra hoje:
+
+| Widget | Padrão | Teclas que ele reivindica enquanto tem foco |
+|---|---|---|
+| Barra de ferramentas (5 ícones, `07-ui-e-layout.md` § Layout) | ARIA toolbar, roving tabindex | `ArrowUp`/`ArrowDown` (navegação), `Home`/`End` (primeiro/último botão) |
+
+Nenhum outro widget composto existe no M1. O catálogo (busca + lista de categorias) usa campo de texto padrão e botões simples sem roving tabindex — não se qualifica; cada botão segue a travessia de foco padrão (`Tab`/`Shift+Tab`).
+
+**Por que isso importa para `Home`:** a barra de ferramentas implementa o padrão ARIA de toolbar completo, `Home`/`End` inclusos — não há razão para economizar nisso; o piso de acessibilidade do projeto já é baixo por decisão (canvas sem leitor de tela na v1) e não deve ser reduzido ainda mais só para acomodar um atalho de câmera. Com foco na barra de ferramentas, `Home` move o foco para o primeiro botão. Com foco no canvas ou em qualquer lugar fora de campo/widget composto, `Home` enquadra tudo (§ Câmera). D0 resolve os dois sem conflito porque é a regra de precedência, não a tecla, que decide.
 
 ### Restrição permanente sobre dígitos
 
@@ -75,7 +90,7 @@ Dígitos (`0`–`9`) sem modificador são **reservados para entrada numérica** 
 | `Ctrl/Cmd+s` | Global | Salvar | 05 § Persistência |
 | `Ctrl/Cmd+o` | Global | Abrir | 05 § Persistência |
 | `Ctrl/Cmd+d` | Global (seleção contém entidades) | Duplicar seleção | 03 § Selecionar, 03 § Mobília |
-| `Ctrl/Cmd+0` | Global | Enquadrar tudo | 03 § Câmera |
+| `Home` | Global (regra D0: fora de campo/widget composto) | Enquadrar tudo | 03 § Câmera |
 | `Ctrl/Cmd+b` | Global | Recolher/expandir painel direito | 07 § Layout |
 | `Backspace` | Ferramenta Cômodo em Drawing, campo de comprimento vazio | Remove último segmento | 03 § Cômodo/Cancelar |
 | `Backspace` | Qualquer outro estado com seleção | Excluir seleção | 03 § Selecionar |
@@ -99,6 +114,12 @@ Dígitos (`0`–`9`) sem modificador são **reservados para entrada numérica** 
 | `ArrowUp/ArrowDown/ArrowLeft/ArrowRight` | Mobília selecionada | Move 10 mm; com `Shift`, 100 mm | 03 § Mobília |
 | `Scroll` | Canvas | Zoom ancorado no cursor | 04 § Câmera |
 | Botão do meio (arrastar) | Canvas | Pan | 04 § Câmera |
+
+### Interceptação pelo navegador
+
+`Ctrl/Cmd+0`, `Ctrl/Cmd++` e `Ctrl/Cmd+-` (zoom do navegador) são confirmados como não-canceláveis via `preventDefault` em Chrome e Firefox — é por isso que "enquadrar tudo" saiu dessa família e foi para `Home` (§ Câmera).
+
+Para `Ctrl/Cmd+z`, `Shift+z`, `s`, `o`, `d`, `a`, `b`: eliminação documental feita por consulta a fonte primária (mensagem de um engenheiro do Chromium na lista `public-webapps` do W3C, enumerando as combinações que o Chrome deixa de despachar para JS — `Ctrl+N`, `Ctrl+W`, `Ctrl+T`, `Ctrl+PageUp/PageDown`, `Ctrl+Tab`, `Ctrl+Shift+Tab` no Windows; `Cmd+N`, `Cmd+W`, `Cmd+Q`, `Cmd+T` mais os mesmos de paginação/tab no Mac). Nenhuma das teclas da tabela unificada consta nessa lista. Isso elimina a hipótese de que alguma delas tenha o mesmo problema do `Ctrl/Cmd+0`, mas **não substitui** o teste manual em um Chrome e um Firefox reais — ver critério de aceitação, marcado como pendente.
 
 ### Modificadores
 
@@ -279,7 +300,7 @@ Mostra também a distância projetada em X e Y quando o traço não é axial.
 
 **Pan.** Botão do meio, `Espaço` + arrastar, ou dois dedos no trackpad.
 
-**Enquadrar.** `Ctrl/Cmd + 0` ajusta a câmera para caber toda a geometria com 10% de margem. Documento vazio enquadra uma área de 10 × 10 m.
+**Enquadrar.** `Home` ajusta a câmera para caber toda a geometria com 10% de margem. Documento vazio enquadra uma área de 10 × 10 m. `Home` só dispara fora de campo de entrada e de widget composto (regra D0) — com foco na barra de ferramentas, `Home` move o foco em vez de enquadrar.
 
 Zoom e pan nunca entram no histórico de undo.
 
@@ -297,3 +318,5 @@ Zoom e pan nunca entram no histórico de undo.
 - [ ] `Alt` durante qualquer arraste desativa todos os snaps
 - [ ] Zoom no cursor mantém a coordenada de mundo sob o cursor invariante dentro de 1 px
 - [ ] Nenhuma ferramenta acessa o objeto documento fora de `ToolContext`
+- [ ] Com foco na barra de ferramentas, `Home` move o foco para o primeiro botão e não aciona Enquadrar tudo; com foco no canvas, `Home` enquadra tudo
+- [ ] **Pendente de execução manual** (não satisfeito pela eliminação documental): tabela de atalhos completa testada em um Chrome e um Firefox reais, confirmando que nenhuma combinação além da família `Ctrl/Cmd+0/+/-` é interceptada, além da verificação em teclado ABNT2 já registrada
