@@ -11,11 +11,12 @@
     "dev": "pnpm --filter @planta/app dev",
     "build": "pnpm --filter @planta/app build",
     "test": "vitest run --passWithNoTests",
-    "typecheck": "tsc --build && pnpm --filter @planta/app run typecheck",
+    "typecheck": "tsc --build tsconfig.build.json && pnpm --filter @planta/app run typecheck",
     "lint": "eslint .",
     "depcruise": "depcruise --config .dependency-cruiser.cjs packages",
     "version:sync": "node scripts/version-sync.mjs",
-    "version:check": "node scripts/version-check.mjs"
+    "version:check": "node scripts/version-check.mjs",
+    "e2e": "playwright test"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
