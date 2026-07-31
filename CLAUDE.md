@@ -26,6 +26,18 @@ Se uma spec estiver ambígua ou conflitante, **pare e pergunte**. Não resolva a
 
 Decisões arquiteturais vão para `specs/adr/` como ADR numerada. ADR aceita não se edita: cria-se uma nova que a supersede.
 
+## Revisão de listas e decisões de spec
+
+**Checklist de dono de lista.** Antes de adicionar entrada a qualquer lista (atalho, mensagem, comando, invariante, chave de tema, fixture), localize a spec dona da lista. Se duas specs declaram a lista, pare: escolha o dono antes de adicionar.
+
+**Formato de veredito ao revisar uma decisão de spec.** Uma decisão não é só aprovada ou rejeitada — o caso mais comum é o do meio, e o formato de veredito precisa admitir isso:
+
+- **SUSTENTA** — decisão correta, aplicar como escrita.
+- **SUSTENTA COM ADENDO** — decisão correta, mas a spec está incompleta; o adendo é obrigatório e entra listado junto do veredito, não como observação solta.
+- **NÃO SUSTENTA** — decisão não se sustenta; propor alternativa.
+
+**Método de verificação.** Verificar uma decisão de spec por simulação ou consulta a fonte primária, nunca só por leitura. Simular a sequência concreta que o mecanismo vai enfrentar (ex.: aplicar patches inversos passo a passo, numa ordem específica, e comparar o resultado) encontra em poucas linhas bugs que reler o texto da spec não encontra. Quando a dúvida é sobre comportamento de plataforma externa (navegador, SO, biblioteca), buscar a fonte primária em vez de assumir por memória.
+
 ## Estrutura
 
 ```
