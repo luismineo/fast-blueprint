@@ -47,34 +47,11 @@ Geradores em `core/testing/arbitraries.ts`: `arbNode`, `arbSimplePolygon`, `arbD
 
 ## Fixtures
 
-Em `specs/fixtures/`, versionadas, usadas por testes e por desenvolvimento manual.
+Fixtures vivem em `specs/fixtures/`, versionadas, usadas por testes e por desenvolvimento manual. O inventário — quais arquivos existem, o que cada um contém, como é gerado, a tabela por cômodo do apartamento de referência — é mantido em `specs/fixtures/README.md`, ao lado dos artefatos, não aqui. Esta seção é dona da **estratégia** de uso das fixtures em teste, não do inventário.
 
-| Arquivo | Conteúdo |
-|---|---|
-| `empty.planta.json` | Documento vazio válido |
-| `single-room.planta.json` | Um retângulo 3200 × 2500 |
-| `apto-44m2.planta.json` | Apartamento de referência completo, 7 cômodos |
-| `shared-nodes.planta.json` | Dois cômodos com aresta compartilhada |
-| `concave.planta.json` | Cômodo em L, para centroide e ponto-em-polígono |
-| `furnished.planta.json` | `apto-44m2` com 40 móveis, para teste de performance |
-| `invalid-orphan-node.planta.json` | Referência a nó inexistente, para teste de erro |
-| `legacy/v0.planta.json` | Formato antigo, para teste de migração |
+### Apartamento de referência: tolerância de teste
 
-### Apartamento de referência
-
-`apto-44m2` reproduz o apartamento que motivou o projeto. Envelope 5900 × 7900 mm, sete cômodos:
-
-| Cômodo | Medida cotada | Área esperada |
-|---|---|---|
-| Estar/jantar | 2400 × 4900 (mais hall) | 12,25 m² |
-| Cozinha / área de serviço | 3400 × 1800 (mais avanço de 1000) | 6,75 m² |
-| Dormitório 01 | 3200 × 2500 | 8,30 m² |
-| Dormitório 02 | 3200 × 2300 | 7,04 m² |
-| Banheiro | 2200 × 1200 | 2,55 m² |
-| Circulação | — | 0,99 m² |
-| Sacada | 2400 × 900 | 2,25 m² |
-
-As áreas da planta legal não batem exatamente com o produto das medidas cotadas, porque a planta legal considera espessura de parede e o Planta não. **A tolerância de teste é 0,30 m² por cômodo e 0,50 m² no total.** Essa divergência é esperada e documentada — não é bug, é consequência direta da decisão da ADR-0002.
+`apto-44m2` (tabela por cômodo e disposição em `specs/fixtures/README.md`) reproduz o apartamento que motivou o projeto. As áreas da planta legal não batem exatamente com o produto das medidas cotadas, porque a planta legal considera espessura de parede e o Planta não. **A tolerância de teste é 0,30 m² por cômodo e 0,50 m² no total.** Essa divergência é esperada e documentada — não é bug, é consequência direta da decisão da ADR-0002.
 
 Área útil esperada excluindo sacada: aproximadamente 37,9 m².
 
