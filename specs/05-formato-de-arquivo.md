@@ -72,9 +72,7 @@ export type PlanDocument = z.infer<typeof PlanDocumentSchema>
 
 Na leitura: parse com Zod → aplica migrações → valida invariantes (`01-modelo-de-dominio.md`) → carrega.
 
-Falha de parse mostra o erro de forma acionável, não um stack trace:
-
-> Não foi possível abrir o arquivo. O cômodo "Quarto" aponta para um ponto que não existe (linha 34).
+Falha de parse mostra o erro de forma acionável, não um stack trace. `core/io` não produz esse texto — devolve um erro estruturado por código (ex.: `{ code: 'ORPHAN_NODE_REF', roomName }`); o app mapeia o código para a mensagem em `messages.ioErrors` (`07-ui-e-layout.md` § Textos de interface, § Erros de `core`).
 
 Se as invariantes de nível `error` falharem mas o parse tiver passado, o app oferece reparo automático (remover referências órfãs, deduplicar nós) e mostra o que foi alterado.
 
@@ -106,15 +104,13 @@ Filesystem nativo via plugin `tauri-plugin-fs` e `tauri-plugin-dialog`. Grava di
 
 File System Access API quando disponível (Chromium): `showSaveFilePicker` devolve um handle persistível em IndexedDB, e `Ctrl+S` grava no mesmo arquivo sem novo diálogo.
 
-Fallback (Firefox, Safari): download de blob no salvar, `<input type=file>` no abrir. O app avisa uma vez, discretamente, que nesse navegador cada salvamento gera um novo download.
+Fallback (Firefox, Safari): download de blob no salvar, `<input type=file>` no abrir. O app avisa uma vez, discretamente, com a mensagem `firefoxDownloadNotice` (`07-ui-e-layout.md` § Textos de interface), que nesse navegador cada salvamento gera um novo download.
 
 ### Autosave
 
 O documento atual é gravado em IndexedDB a cada 5 segundos após qualquer mudança, sob a chave `planta:autosave:current`. Guarda também os últimos 3 snapshots, rotacionados.
 
-Ao abrir, se existe autosave mais recente que o último salvamento explícito, oferece restauração:
-
-> Você tem alterações não salvas de 30/07 às 15:12. Restaurar ou descartar?
+Ao abrir, se existe autosave mais recente que o último salvamento explícito, oferece restauração com a mensagem `unsavedChanges` mais os botões `restoreLabel`/`discardLabel` (`07-ui-e-layout.md` § Textos de interface).
 
 Autosave não substitui salvar. Nunca grava por cima do arquivo do usuário.
 

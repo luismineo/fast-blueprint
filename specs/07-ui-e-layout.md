@@ -91,23 +91,68 @@ O contraste entre a interface proporcional e os números monoespaçados é o ele
 
 ## Textos de interface
 
-Registro: direto, segunda pessoa, sentence case, sem ponto final em rótulos e botões.
+`packages/app/src/messages.ts` é a fonte da verdade de todo texto de interface visível ao usuário. Nenhum literal de texto aparece em componente `.svelte`. Specs de comportamento (`02`, `03`, `05`) citam a **chave** da mensagem, nunca o texto entre aspas — o texto pode mudar sem tocar a spec de comportamento, e não fica órfão quando o comportamento muda. Foi isso que quebrou quando C3 mudou o algoritmo de fechamento e a tabela desta spec não acompanhou; uma tabela central de strings apodrece pelo mesmo motivo que changelog manual apodrece.
 
-| Situação | Texto |
-|---|---|
-| Canvas vazio | **Desenhe o primeiro cômodo**<br>Pressione `R`, clique para começar e digite a medida da parede em centímetros. |
-| Catálogo sem resultado | Nenhum móvel com esse nome. Você pode criar um item com as medidas que quiser. |
-| Sem seleção no painel | Selecione um cômodo ou móvel para ver as propriedades |
-| Fechamento com desvio | Fechou com 4 cm de diferença do que você digitou. O último trecho foi ajustado. |
-| Móvel fora de cômodo | Este móvel está fora de qualquer cômodo |
-| Sobreposição de móveis | Cama queen e Criado-mudo estão sobrepostos |
-| Alterações não salvas | Você tem alterações não salvas de 30/07 às 15:12 · **Restaurar** · **Descartar** |
-| Erro ao abrir | Não foi possível abrir o arquivo. O cômodo "Quarto" aponta para um ponto que não existe. |
-| Salvar no Firefox | Neste navegador, cada salvamento baixa um novo arquivo |
+### Registro e tom
 
-Erros dizem o que aconteceu e o que fazer. Não pedem desculpa. Estado vazio é convite para agir, com o atalho exato.
+- Direto, segunda pessoa, sentence case.
+- Sem ponto final em rótulo e botão.
+- Erro diz o que aconteceu e o que fazer. Não pede desculpa.
+- Estado vazio é convite para agir, com o atalho exato quando existe um.
+- Nomes de ação são constantes ao longo do fluxo: o botão diz "Exportar PNG", o resultado diz "PNG exportado".
 
-Nomes de ação são constantes ao longo do fluxo: o botão diz "Exportar PNG", o resultado diz "PNG exportado".
+### Convenção de nomeação de chave
+
+`camelCase`, nomeando a situação, não o texto: `closeDeviation`, não `mensagemDeFechamentoComDesvio`. Erros de I/O são agrupados por código, sob um só objeto: `ioErrors.orphanNodeRef`, não uma chave solta por mensagem de erro.
+
+### Mensagens com dado interpolado
+
+`messages.ts` guarda **função**, não string, sempre que a mensagem depende de um valor em tempo de execução. Sem mini-linguagem de template, sem placeholder textual, sem parser — a assinatura da função é o contrato, e o compilador rejeita uma chamada com o tipo errado. Mensagens sem dado interpolado são string simples, não função.
+
+```ts
+export const messages = {
+  emptyCanvas: `...`,
+  closeDeviation: (actualCm: number, typedCm: number) => `...`,
+  furnitureOverlap: (nameA: string, nameB: string) => `...`,
+  unsavedChanges: (formattedTimestamp: string) => `...`,
+  restoreLabel: `Restaurar`,
+  discardLabel: `Descartar`,
+  ioErrors: {
+    orphanNodeRef: (roomName: string) => `...`,
+  },
+} as const
+```
+
+Todas as mensagens com dado interpolado que hoje aparecem nas specs de comportamento seguem essa forma:
+
+| Chave | Onde o comportamento é definido | Parâmetros |
+|---|---|---|
+| `closeDeviation` | `02-unidades-e-geometria.md` § Precisão de fechamento | comprimento real do último trecho e comprimento digitado, em centímetros — a diferença é calculada dentro da função, não recebida pronta |
+| `furnitureOverlap` | `03-ferramentas-e-interacao.md` § Mobília | nome dos dois móveis sobrepostos |
+| `unsavedChanges` | `05-formato-de-arquivo.md` § Autosave | timestamp já formatado por `core/format` — a função só compõe o texto, não formata data |
+| `ioErrors.orphanNodeRef` | `05-formato-de-arquivo.md` § Validação | nome do cômodo com a referência órfã |
+
+Mensagens sem dado interpolado (`emptyCanvas`, `catalogNoResults`, `noSelection`, `furnitureOutsideRoom`, `firefoxDownloadNotice`, `restoreLabel`, `discardLabel`, `underlayTooLarge`, entre outras) são string simples. A lista completa de chaves vive só no código — esta spec não mantém inventário, pelo mesmo motivo que `specs/fixtures/README.md` e não `10-testes.md` é quem mantém o inventário de fixtures.
+
+### Elementos interativos embutidos numa mensagem
+
+Uma mensagem que embute um controle — o botão "Restaurar" e o botão "Descartar" dentro do aviso de alterações não salvas — não vira uma única string com marcação embutida. Cada controle tem sua **própria chave** de rótulo (`restoreLabel`, `discardLabel`, strings simples, sem interpolação). O componente Svelte monta a composição de texto e botões; o glifo separador entre eles (`·`) é estrutura de layout do componente, não texto de mensagem.
+
+### Exceção à regra "nenhum literal em componente"
+
+A regra de lint (§ Acessibilidade e critérios) não é violada por:
+
+- Glifos estruturais/decorativos sem significado lexical próprio: separadores (`·`), setas (`→`), multiplicação de dimensão (`×`).
+- Saída de `core/format` (número, unidade, data já formatados — `02-unidades-e-geometria.md`). Isso é dado formatado, não mensagem de interface.
+
+### Erros de `core`
+
+`core/io` não produz texto em pt-BR. Produz erro estruturado com código e dados — `{ code: 'ORPHAN_NODE_REF', roomName }`. O app mapeia o código para a função correspondente em `messages.ioErrors`. Isso mantém `core` testável sem string de idioma embutida e respeita a direção de dependência de `08-arquitetura.md`.
+
+### Estado vazio e erro
+
+- Estado vazio: convite a agir, menciona o atalho exato quando existe um (ex.: `emptyCanvas` cita `R`).
+- Erro: nomeia o que quebrou e o que fazer a respeito, nunca um stack trace.
 
 ## Acessibilidade
 
@@ -118,6 +163,10 @@ Piso, não meta:
 - Contraste mínimo 4,5:1 em texto, 3:1 em elementos de interface
 - `prefers-reduced-motion` respeitado
 - Painéis com marcação semântica e `aria-label` nos ícones da barra de ferramentas
+- Barra de ferramentas implementa o padrão ARIA de toolbar completo (roving tabindex, `Home`/`End`, ver `03-ferramentas-e-interacao.md` § Regra de precedência) — não é reduzida para acomodar atalho de câmera
+- Armadilha de foco do HUD de desenho (`03-ferramentas-e-interacao.md` § Cômodo/HUD): enquanto ativa, o HUD inteiro recebe o mesmo anel de foco de 2 px em `accent` usado nos demais controles. Não é um tratamento visual novo — é a aplicação do mesmo token a um container em vez de a um controle único, sinalizando que o `Tab` está contido ali antes que o usuário precise descobrir isso tentando escapar
+- Nenhum literal de texto visível ao usuário em componente `.svelte` (regra de lint, `eslint-plugin` a definir na implementação). Exceções em § Textos de interface
+- Teste automatizado garante que toda chave referenciada em componente existe em `messages.ts` e que toda chave de `messages.ts` é referenciada por algum componente (nenhuma chave órfã nos dois sentidos)
 - O canvas não é acessível a leitor de tela na v1. Isso é uma limitação assumida e documentada, não um esquecimento
 
 ## Responsividade
@@ -138,3 +187,7 @@ Abaixo de 1280 px, o painel direito recolhe por default. Abaixo de 900 px, vira 
 - [ ] `prefers-reduced-motion: reduce` remove todas as transições
 - [ ] Estado vazio menciona o atalho `R`
 - [ ] Tabela de atalhos de `03-ferramentas-e-interacao.md` verificada em teclado ABNT2 (todas as teclas de pontuação como `?` testadas)
+- [ ] Lint falha se houver literal de texto visível ao usuário em componente `.svelte`, exceto glifo estrutural e saída de `core/format`
+- [ ] Nenhuma chave órfã em `messages.ts` (definida e não usada, ou usada e não definida)
+- [ ] Com foco na barra de ferramentas, `Home`/`End` movem o foco para o primeiro/último botão; fora dela, `Home` enquadra tudo
+- [ ] HUD com armadilha de foco ativa exibe o anel de foco de `accent` no container

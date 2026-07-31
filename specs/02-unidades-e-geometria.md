@@ -196,9 +196,7 @@ A face traseira é a que encosta porque é a convenção de catálogo — cama, 
 
 ## Precisão de fechamento
 
-A aresta de fechamento (do último nó confirmado ao nó inicial) nunca é digitada — ela assume o comprimento que a geometria der. A fusão com o nó inicial via âncora de snap (Classe 1, nó existente) é o único mecanismo de fechamento. Se o usuário digitou também o último trecho, a âncora de nó dispara sobre o nó inicial, o `merged` funde os nós, e o comprimento digitado é sobrescrito pela fusão. A UI informa a diferença:
-
-> O último trecho ficou com X cm. Você digitou Y cm — a diferença é de Z cm.
+A aresta de fechamento (do último nó confirmado ao nó inicial) nunca é digitada — ela assume o comprimento que a geometria der. A fusão com o nó inicial via âncora de snap (Classe 1, nó existente) é o único mecanismo de fechamento. Se o usuário digitou também o último trecho, a âncora de nó dispara sobre o nó inicial, o `merged` funde os nós, e o comprimento digitado é sobrescrito pela fusão. A UI informa a diferença emitindo a mensagem `closeDeviation` (texto e parâmetros em `07-ui-e-layout.md` § Textos de interface) com o comprimento real do último trecho e o comprimento digitado.
 
 A mensagem é informativa, sem limiar de recusa, sem algoritmo de ajuste, sem nó movido. Desaparece sozinha após 6 segundos.
 
