@@ -68,6 +68,14 @@ ESCOPO
   grid adaptativo e escala gráfica.
   Um CLAUDE.md de 5 a 10 linhas em cada pacote, cobrindo só o que é local
   àquele pacote. Não repita o CLAUDE.md da raiz.
+  Versionamento conforme specs/adr/0004-versionamento.md:
+    version 0.0.0 no package.json da raiz, fonte única.
+    Pacotes do workspace private: true, sem versão própria.
+    Scripts version:sync e version:check; version:check entra na sequência
+    de CI e falha se package.json, tauri.conf.json e Cargo.toml divergirem.
+    Escreva a tabela de compatibilidade schemaVersion → versão do app em
+    specs/05, e reformule o critério de round-trip de specs/10 para excluir
+    metadados voláteis, com VOLATILE_META_FIELDS em um só lugar.
 
 FORA DE ESCOPO
   Nenhuma entidade de domínio. Nenhuma ferramenta. Nenhum comando.
