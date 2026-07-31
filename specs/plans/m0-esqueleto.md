@@ -54,3 +54,15 @@ pnpm não estava instalado neste sistema (nem `corepack`). Instalado via `npm in
 **T11 — Fechamento: verificação de performance.** Navegação do grid infinito com `?debug=perf`, confirmar <8ms/frame durante pan/zoom. Resultado anexado a este arquivo.
 
 Cada CLAUDE.md de pacote (5-10 linhas, só o que é local) é criado junto da tarefa que cria o pacote correspondente (T3-T7).
+
+## Resultado da verificação de performance (T11)
+
+Medido com `?debug=perf` (overlay do `Profiler`), servidor de desenvolvimento local, via Playwright/Chromium, em três cenários — zoom próximo (grid denso, células de 100 mm), zoom bem afastado (grid esparso, células de 5000 mm) e pan contínuo por 180 frames em escala intermediária:
+
+| Cenário | `clear` | `grid` | `hud` | Total |
+|---|---|---|---|---|
+| Zoom próximo, grid denso | 0,00 ms | 0,12 ms | 0,14 ms | 0,26 ms |
+| Zoom bem afastado, grid esparso | 0,00 ms | 0,10 ms | 0,02 ms | 0,12 ms |
+| Escala intermediária, pan contínuo (180 frames) | 0,00 ms | 0,04 ms | 0,01 ms | 0,05 ms |
+
+Orçamento de `04-renderizacao.md`: 8 ms por frame. Pior caso medido (0,26 ms) fica cerca de 30× abaixo do orçamento — folga suficiente para o crescimento de passes dos próximos milestones. Nenhum erro de console durante a sequência de zoom/pan contínuo. Critério de M0 ("navegar num grid infinito a 60 fps") cumprido com margem larga.
