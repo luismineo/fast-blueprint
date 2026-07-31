@@ -94,6 +94,14 @@ Regras:
 - Migração é testada com um arquivo fixture real da versão antiga, versionado em `specs/fixtures/legacy/`
 - `schemaVersion` sobe apenas em mudança incompatível. Adicionar campo opcional não sobe versão
 
+## Compatibilidade
+
+`meta.schemaVersion` é independente da versão do app (`adr/0004-versionamento.md` Decisão 4). A tabela abaixo rastreia qual foi a primeira versão do app a escrever cada `schemaVersion`, mantida a cada bump. É o que se consulta quando um usuário reporta que um arquivo não abre.
+
+| schemaVersion | Primeira versão do app que escreveu |
+|---|---|
+| 1 | 0.1.0 |
+
 ## Persistência
 
 ### Desktop (Tauri)
@@ -139,7 +147,7 @@ O CSV existe para quem quer levar as áreas para uma planilha de orçamento. É 
 
 ## Critérios de aceitação
 
-- [ ] Round-trip: salvar e reabrir a fixture `apto-44m2` produz documento estruturalmente idêntico
+- [ ] Round-trip: salvar e reabrir a fixture `apto-44m2` produz documento idêntico ao original, exceto os campos em `VOLATILE_META_FIELDS` (`packages/core/src/io/volatileMetaFields.ts`, `adr/0004-versionamento.md` Decisão 5)
 - [ ] Arquivo com campo desconhecido em `meta` sobrevive ao round-trip com o campo intacto
 - [ ] Arquivo com `loop` referenciando nó inexistente produz mensagem de erro nomeando o cômodo
 - [ ] Arquivo sem `walls` e sem `openings` carrega com arrays vazios

@@ -92,6 +92,7 @@ E2E não cobre variação de comportamento. Isso é trabalho dos testes de unida
 ## CI
 
 ```
+pnpm version:check
 pnpm typecheck
 pnpm lint
 pnpm depcruise
@@ -99,6 +100,8 @@ pnpm test --coverage
 pnpm build
 pnpm e2e
 ```
+
+`version:check` roda primeiro porque é o mais barato dos passes e existe para pegar divergência de configuração antes de gastar tempo com o resto — ver `adr/0004-versionamento.md` Decisão 1.
 
 Cobertura mínima em `core`: 90% de linhas. Nos demais pacotes não há mínimo — cobertura de UI é métrica enganosa.
 
