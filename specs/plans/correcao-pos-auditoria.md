@@ -121,3 +121,54 @@ A auditoria inicial analisou coerência conceitual entre specs (o que elas afirm
 2. **Verificação de dono único por namespace.** A pergunta "quem é o dono dos atalhos?" teria exposto que specs/03 e specs/07 estavam brigando antes mesmo de listar as teclas. A mesma pergunta aplicada a textos de interface teria encontrado o segundo problema.
 
 Esses dois métodos — tabulação de namespaces e verificação de dono único — deveriam entrar no processo de revisão de spec. Sugestão: adicionar ao `CLAUDE.md` uma instrução para que, ao adicionar qualquer entrada a uma lista (atalho, mensagem, comando, invariante, chave de tema), o agente verifique se a lista já tem dono em outra spec.
+
+---
+
+## Rodada 2 — resposta às correções do autor sobre a rodada 1
+
+A rodada 1 registrou "decisões do autor que discordo: nenhuma" sem tentativa documentada de atacar as cinco rejeições originais — método que falhou em pegar dois erros reais do autor (Ctrl/Cmd+0 não-cancelável pelo navegador; comando não-transiente ao soltar aplicado sobre documento já mutado, quebrando undo). Esta rodada aplica veredito de três saídas, não duas, e verificação por simulação/fonte primária em vez de leitura — ambos agora registrados em `CLAUDE.md`.
+
+### Formato de veredito
+
+- **SUSTENTA** — decisão correta, aplicada como escrita.
+- **SUSTENTA COM ADENDO** — decisão correta, spec incompleta sem o adendo listado.
+- **NÃO SUSTENTA** — decisão não se sustenta, alternativa proposta.
+
+### Item 1 — Enquadrar tudo: Ctrl/Cmd+0 → Home (specs/03)
+
+**Veredito: SUSTENTA COM ADENDO — adendo revisado pelo autor.**
+
+Achado por simulação/pesquisa: `Ctrl/Cmd+0`/`+`/`-` são confirmadamente não-canceláveis em Chrome e Firefox (fonte: múltiplas referências sobre a família de zoom do navegador). As demais combinações Ctrl/Cmd da tabela (`Z`, `Shift+Z`, `S`, `O`, `D`, `A`, `B`) foram eliminadas por consulta a fonte primária (lista de um engenheiro do Chromium na thread `public-webapps` do W3C das combinações que o Chrome não despacha para JS), não por memória — registrado em specs/03 como eliminação documental, não como teste empírico satisfeito.
+
+Achado novo: `Home` colide com o padrão ARIA de toolbar (`Home`/`End` movem foco para primeiro/último botão de uma `role="toolbar"` com roving tabindex) quando a barra de ferramentas tem foco — D0 só cobria campo de texto, não widget composto.
+
+O adendo proposto nesta análise — a barra de ferramentas não implementar `Home`/`End` no roving tabindex, para não colidir com o atalho global — foi **rejeitado pelo autor**: paga o conserto com acessibilidade num projeto cujo piso já é baixo por decisão, para acomodar um atalho de câmera. Correção aplicada em vez disso: **D0 foi reescrita** para cobrir "campo de entrada OU widget que gerencia a própria navegação por teclado" — a barra de ferramentas implementa o padrão ARIA completo, `Home` inclusos, sem sacrifício e sem conflito, porque a regra de precedência (e não a tecla) decide qual dos dois vence.
+
+### Item 2 — Histórico: entrada pendente (specs/08)
+
+**Veredito: SUSTENTA COM ADENDO — política de `Ctrl/Cmd+Z` revisada pelo autor.**
+
+O mecanismo central (`PendingEntry`, commit/abort via `ToolTransition.historyBoundary`, undo em ordem reversa à acumulação, compactação restrita a `replace` em caminho idêntico) foi validado por simulação numérica de um arraste de 3 passos — aplicar os inversos na ordem de acumulação produz um documento diferente do início do arraste; em ordem reversa, correto. Confirma que a exigência de ordem reversa não é estética.
+
+A lacuna identificada — o que `Ctrl/Cmd+Z` faz com uma entrada pendente aberta — foi aceita como o melhor achado da rodada, com a resposta de propriedade (`DocumentStore.undo()` é quem verifica, não a ferramenta) aceita como escrita. A política escolhida nesta análise — reusar o mecanismo de Abort — foi **rejeitada pelo autor**: só é fisicamente possível ter uma entrada pendente aberta com o botão do ponteiro ainda pressionado, e abortar exigiria `DocumentStore.undo()` (código de `core/history`, sem DOM) alcançar `app/` para liberar `pointer capture` e resetar o estado da ferramenta — cruzando a fronteira core/app sem mecanismo de sinalização existente, e sem definir o que um `pointerup` órfão faz depois. Decisão final: **ignorar** — `Ctrl/Cmd+Z` é consumido sem efeito enquanto a entrada está aberta, a interação continua até o `pointerup` normal, e um segundo `Ctrl/Cmd+Z` depois de soltar desfaz o arraste inteiro.
+
+### Item 3 — Textos de interface: messages.ts (specs/07, com referências em 02/05)
+
+**Veredito: SUSTENTA COM ADENDO — escopo do adendo ampliado pelo autor.**
+
+O achado da mensagem composta (aviso de alterações não salvas, com dois botões embutidos) foi aceito, junto com as duas convenções propostas (chave própria por elemento interativo embutido; exceção de lint para glifo estrutural e saída de `core/format`). Correção de escopo do autor: a convenção de interpolação não é caso isolado da mensagem de autosave — toda mensagem com dado interpolado (`closeDeviation`, `ioErrors.orphanNodeRef`, `furnitureOverlap`, `unsavedChanges`) segue a mesma forma. `messages.ts` guarda **função**, não string, quando há dado — sem mini-linguagem de template, sem placeholder textual; o tipo da função é o contrato, mantendo o paralelo com a decisão já aceita para o schema Zod.
+
+### Item 4 — Fixtures: README como dono (specs/10, specs/fixtures/README.md)
+
+**Veredito: SUSTENTA COM ADENDO — aceito integralmente.**
+
+A distinção proposta — tolerância de teste e área útil agregada são regra de estratégia (ficam em specs/10), a tabela por cômodo e a narrativa de disposição são inventário/autoria (vão para o README) — foi aceita sem alteração, por já decorrer do próprio critério que a decisão original invocava ("specs/10 continua dono da estratégia, não do inventário").
+
+### Decisões do autor que discordo desta rodada (registro real, não vazio)
+
+Ao contrário da rodada 1, esta tem conteúdo: as saídas propostas para os itens 1 e 2 foram substituídas pelas do autor, por razões que a simulação/pesquisa desta análise não alcançou sozinha:
+
+- **Item 1:** a análise resolveu a colisão ARIA no lado errado (reduzir o widget) em vez do lado certo (ampliar a regra de precedência). O autor identificou que o defeito estava em D0, não na escolha de tecla.
+- **Item 2:** a análise escolheu a política de `Ctrl/Cmd+Z` por elegância de reuso de código (Abort já existe) em vez de simular o estado físico do ponteiro até o fim. O autor forçou essa simulação (o que acontece no `pointermove` e no `pointerup` seguintes) e isso decidiu a favor de "ignorar".
+
+Isso é o resultado que faltou na rodada 1: tentativa real de discordância, com dois casos em que ela procedeu.
