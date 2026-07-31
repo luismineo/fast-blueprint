@@ -12,7 +12,7 @@
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "paths": {
-      "@fixtures/*": ["specs/fixtures/*"]
+      "@fixtures/*": ["./specs/fixtures/*"]
     }
   }
 }
