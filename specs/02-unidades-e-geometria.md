@@ -69,7 +69,9 @@ Ciclos são normalizados para horário na criação do cômodo. Isso importa par
 
 ## Snap
 
-O resolvedor de snap é a única porta de entrada para criação e movimentação de geometria. Recebe um ponto em coordenadas de mundo e o contexto, e devolve o ponto ajustado mais o alvo que causou o ajuste.
+O resolvedor de snap é a única porta de entrada para criação e movimentação de geometria. Recebe um ponto em coordenadas de mundo e o contexto, e devolve o ponto ajustado mais os alvos que participaram do ajuste.
+
+O modelo completo está em `adr/0003-modelo-de-snap.md`. Esta seção resume o comportamento.
 
 ```ts
 interface SnapResult {
@@ -79,33 +81,76 @@ interface SnapResult {
 }
 ```
 
-`merged` não nulo significa que o ponto coincidiu com um nó existente e deve reusá-lo (invariante E6).
+- `targets` lista toda restrição que participou do resultado (âncora vencedora + retas que restringiram, se houver). Usado para desenhar guias visuais.
+- `merged` é preenchido apenas quando uma âncora de nó existente disparou (invariante E6).
 
-### Ordem de prioridade
+### Três classes, não uma lista linear
 
-Avaliada em ordem; a primeira que casar dentro da tolerância vence. Snaps de eixo e alinhamento podem se combinar com os demais (restringem um eixo cada).
+O resolvedor opera em três classes avaliadas em ordem. Ver `adr/0003-modelo-de-snap.md` para justificativa e alternativas rejeitadas.
 
-| # | Tipo | Tolerância (px de tela) | Comportamento |
-|---|---|---|---|
-| 1 | Nó existente | 12 | Ponto exato do nó; define `merged` |
-| 2 | Ponto médio de aresta | 10 | Ponto médio |
-| 3 | Aresta (projeção perpendicular) | 8 | Projeção sobre a aresta |
-| 4 | Extensão de aresta | 8 | Prolongamento da reta suporte |
-| 5 | Eixo a partir da origem do traço | 8 | Restringe a 0°, 90°, 180°, 270° |
-| 6 | Alinhamento com nó existente | 6 | Restringe X ou Y ao de outro nó, com guia |
-| 7 | Grid | 6 | Múltiplo de `meta.gridSize` |
+#### Classe 1 — Âncora de ponto
 
-Tolerâncias são em pixels de tela e convertidas para mm dividindo pela escala da câmera. Isso mantém o snap com a mesma "pegada" em qualquer zoom.
+Alvos: **nó existente**, **ponto médio de aresta**.
 
-Ângulo de eixo com `Shift` pressionado inclui múltiplos de 45°.
+Produz um ponto exato. **Exclusiva:** se qualquer âncora disparar, a mais próxima do cursor vence e nenhuma restrição de reta é aplicada depois. O ponto retornado é a coordenada exata do alvo.
 
-`Alt` segurado desliga todos os snaps.
+`merged` é preenchido apenas quando a âncora vencedora foi um nó. Ponto médio preenche `targets` mas deixa `merged = null`.
 
-Todas as tolerâncias vivem em `SnapConfig`, exposta nas preferências.
+Tolerância: 12 px de tela, limitada a [2, 30] mm.
+
+#### Classe 2 — Restrição de reta
+
+Alvos: **projeção sobre aresta**, **extensão de aresta**, **eixo a partir da origem do traço**, **alinhamento com nó existente**.
+
+Cada alvo que dispara restringe o ponto a uma reta. O resultado depende de quantas dispararam:
+
+| Restrições | Comportamento |
+|---|---|
+| 0 | Cai para Classe 3 (grid) |
+| 1 | Projeta o ponto do cursor sobre a reta |
+| 2 ou mais | Intercepta as duas de maior prioridade |
+
+Prioridade entre restrições (maior para menor):
+
+1. Eixo a partir da origem do traço
+2. Alinhamento com nó existente
+3. Projeção sobre aresta
+4. Extensão de aresta
+
+Ângulo entre retas < 15° descarta a de menor prioridade (evita instabilidade numérica). Se a interseção cair fora da tolerância de 40 mm do cursor, projeta sobre a restrição de maior prioridade.
+
+Tolerância: 8 px de tela, limitada a [2, 40] mm.
+
+**Fronteira aresta/extensão:** pé da projeção estritamente entre os extremos do segmento é aresta; fora, é extensão. Extensão avalia todas as arestas do documento — com ~30 arestas típicas, projeção ponto-reta é O(arestas) e cabe no orçamento de 8 ms.
+
+#### Classe 3 — Grid
+
+Fallback. Só se **nenhuma** restrição de reta disparou, e só se o grid está ligado.
+
+Arredonda cada coordenada para o múltiplo mais próximo de `meta.gridSize`.
+
+Tolerância: 6 px de tela, limitada a [1, gridSize/2] mm. Distância > gridSize/2 → grid não dispara.
+
+### Modificadores
+
+| Tecla | Efeito |
+|---|---|
+| `Shift` | Inclui múltiplos de 45° nos eixos da Classe 2 |
+| `Alt` | Desliga as três classes; resolvedor devolve o ponto de entrada sem alteração |
+
+Todos os valores de tolerância vivem em `SnapConfig`, exposta nas preferências. Os limites em mm são ponto de partida a validar no protótipo com a fixture `apto-44m2`.
 
 ### Guias visuais
 
-Snap de alinhamento (#6) desenha uma linha tracejada até o nó de referência. Snap de eixo (#5) desenha o traço em cor de eixo. Snap a nó (#1) desenha um marcador quadrado no nó alvo. Ver `04-renderizacao.md`.
+Guias são derivadas de `targets` no `SnapResult`:
+
+- Âncora de nó: marcador quadrado no nó alvo
+- Âncora de ponto médio: losango no ponto médio
+- Restrição de eixo: linha do traço em cor de eixo
+- Restrição de alinhamento: linha tracejada até o nó de referência
+- Restrição de aresta/extensão: highlight da aresta envolvida
+
+Ver `04-renderizacao.md` para os passes de desenho.
 
 ## Hit testing
 
@@ -160,8 +205,10 @@ O aviso desaparece sozinho após 6 segundos e não bloqueia nada.
 - [ ] `parseLength('320')` → 3200; `parseLength('3,20')` → 3200; `parseLength('3200mm')` → 3200
 - [ ] Área de polígono `(0,0) (3200,0) (3200,2500) (0,2500)` é 8.000.000 mm²
 - [ ] Shoelace de ciclo em sentido anti-horário retorna área positiva após normalização
-- [ ] Snap a nó dentro de 12 px devolve `merged` com o id do nó
-- [ ] Tolerância de snap em mm dobra quando a escala da câmera cai pela metade
+- [ ] Snap a nó existente dentro da tolerância devolve `merged` com o id do nó
+- [ ] Ponto médio de aresta preenche `targets` mas deixa `merged = null`
+- [ ] Duas restrições de reta com ângulo < 15° descartam a de menor prioridade
+- [ ] Tolerância de snap respeita clamping em mm, independente da escala da câmera
 - [ ] `Alt` pressionado faz o resolvedor devolver o ponto de entrada sem alteração
 - [ ] SAT detecta sobreposição entre dois retângulos rotacionados 30° e 60° com centros a 400 mm
 - [ ] Property test: para qualquer polígono simples gerado, área calculada por shoelace é igual à soma das áreas dos triângulos da sua triangulação por fan
