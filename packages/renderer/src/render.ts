@@ -3,16 +3,29 @@ import { gridPass } from './passes/grid'
 import { hudPass } from './passes/hud'
 import type { RenderContext } from './renderContext'
 
-const PASSES: ReadonlyArray<{ readonly name: string; readonly run: (ctx: RenderContext) => void }> = [
-  { name: 'clear', run: clearPass },
-  { name: 'grid', run: gridPass },
-  { name: 'hud', run: hudPass },
+type PassSpace = 'world' | 'screen'
+
+interface PassEntry {
+  readonly name: string
+  readonly space: PassSpace
+  readonly run: (ctx: RenderContext) => void
+}
+
+const PASSES: readonly PassEntry[] = [
+  { name: 'clear', space: 'screen', run: clearPass },
+  { name: 'grid', space: 'world', run: gridPass },
+  { name: 'hud', space: 'screen', run: hudPass },
 ]
 
 const loggedErrorSignatures = new Set<string>()
 
 export function render(ctx: RenderContext): void {
   for (const pass of PASSES) {
+    if (pass.space === 'world') {
+      ctx.target.setWorldTransform(ctx.camera)
+    } else {
+      ctx.target.resetTransform()
+    }
     runPass(ctx, pass.name, pass.run)
   }
 }

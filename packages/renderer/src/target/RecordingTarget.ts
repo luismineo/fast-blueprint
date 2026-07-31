@@ -1,3 +1,4 @@
+import type { Camera } from '../camera'
 import type { DrawTarget, LineStyle, TextStyle } from './DrawTarget'
 
 export interface RecordedLine {
@@ -15,13 +16,24 @@ export interface RecordedText {
   readonly style: TextStyle
 }
 
+export type RecordedTransform = { readonly kind: 'world'; readonly camera: Camera } | { readonly kind: 'reset' }
+
 export class RecordingTarget implements DrawTarget {
   readonly clears: string[] = []
+  readonly transforms: RecordedTransform[] = []
   readonly lines: RecordedLine[] = []
   readonly texts: RecordedText[] = []
 
   clear(color: string): void {
     this.clears.push(color)
+  }
+
+  setWorldTransform(camera: Camera): void {
+    this.transforms.push({ kind: 'world', camera })
+  }
+
+  resetTransform(): void {
+    this.transforms.push({ kind: 'reset' })
   }
 
   line(x1: number, y1: number, x2: number, y2: number, style: LineStyle): void {

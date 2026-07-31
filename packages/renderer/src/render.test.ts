@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render } from './render'
 import { lightTheme } from './theme'
+import { RecordingTarget } from './target/RecordingTarget'
 import type { DrawTarget } from './target/DrawTarget'
 
 class ThrowingLineTarget implements DrawTarget {
@@ -10,6 +11,10 @@ class ThrowingLineTarget implements DrawTarget {
     this.clears.push(color)
   }
 
+  setWorldTransform(): void {}
+
+  resetTransform(): void {}
+
   line(): void {
     throw new Error('linha falhou de proposito')
   }
@@ -18,6 +23,18 @@ class ThrowingLineTarget implements DrawTarget {
 }
 
 describe('render', () => {
+  it('aplica a transformacao de mundo nos passes de geometria e reseta antes dos passes de tela (specs/04 secao Camera)', () => {
+    const target = new RecordingTarget()
+    render({
+      camera: { tx: 10, ty: 20, scale: 2 },
+      viewport: { width: 800, height: 600 },
+      theme: lightTheme,
+      target,
+    })
+
+    expect(target.transforms.map((entry) => entry.kind)).toEqual(['reset', 'world', 'reset'])
+  })
+
   it('erro num pass nao interrompe os demais (specs/08-arquitetura.md criterio de aceitacao)', () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const target = new ThrowingLineTarget()

@@ -1,3 +1,5 @@
+import type { Camera } from '../camera'
+
 export interface LineStyle {
   readonly color: string
   readonly width: number
@@ -13,6 +15,8 @@ export interface TextStyle {
 
 export interface DrawTarget {
   clear(color: string): void
+  setWorldTransform(camera: Camera): void
+  resetTransform(): void
   line(x1: number, y1: number, x2: number, y2: number, style: LineStyle): void
   text(x: number, y: number, content: string, style: TextStyle): void
 }

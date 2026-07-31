@@ -1,19 +1,35 @@
+import type { Camera } from '../camera'
 import type { DrawTarget, LineStyle, TextStyle } from './DrawTarget'
 
 export class CanvasTarget implements DrawTarget {
   private readonly ctx: CanvasRenderingContext2D
+  private dpr: number
 
-  constructor(ctx: CanvasRenderingContext2D) {
+  constructor(ctx: CanvasRenderingContext2D, dpr = 1) {
     this.ctx = ctx
+    this.dpr = dpr
+  }
+
+  setDevicePixelRatio(dpr: number): void {
+    this.dpr = dpr
   }
 
   clear(color: string): void {
     const { canvas } = this.ctx
     this.ctx.save()
-    this.ctx.resetTransform()
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0)
     this.ctx.fillStyle = color
     this.ctx.fillRect(0, 0, canvas.width, canvas.height)
     this.ctx.restore()
+  }
+
+  setWorldTransform(camera: Camera): void {
+    const scale = camera.scale * this.dpr
+    this.ctx.setTransform(scale, 0, 0, scale, camera.tx * this.dpr, camera.ty * this.dpr)
+  }
+
+  resetTransform(): void {
+    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
   }
 
   line(x1: number, y1: number, x2: number, y2: number, style: LineStyle): void {
