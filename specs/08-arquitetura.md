@@ -170,18 +170,62 @@ interface History {
   undo: HistoryEntry[]
   redo: HistoryEntry[]
 }
+
+interface PendingEntry {
+  label: string
+  inversePatches: Patch[]
+}
 ```
 
-Regras:
+Regras gerais:
 
 - Undo ilimitado dentro da sessão. Limite duro de 500 entradas, descartando as mais antigas.
 - Câmera, seleção e ferramenta ativa **não** entram no histórico.
-- Comandos contínuos (arrastar um nó) usam o mecanismo de **comando transiente**:
-  - Durante o arraste, a ferramenta emite comandos com `transient: true`. Eles são aplicados ao documento e desenhados pelo renderer, mas **não entram no histórico**.
-  - Ao soltar, a ferramenta emite um único comando com `transient: false` (ou sem o campo, default `false`) representando a mudança do estado inicial ao estado final.
-  - O histórico recebe exatamente uma entrada.
 - Undo restaura o documento; a seleção é restaurada por "melhor esforço" (ids que ainda existem).
-- Qualquer comando novo (não-transiente) limpa a pilha de redo.
+- Qualquer comando novo (não-transiente), e qualquer entrada pendente selada, limpa a pilha de redo.
+
+#### Comando transiente e entrada pendente
+
+Comandos contínuos (arrastar um nó, uma aresta, o interior de um cômodo, um handle) usam `transient: true`. O store mantém no máximo **uma** `PendingEntry` aberta por vez.
+
+Dispatch de um comando transiente:
+
+1. Aplica normalmente com `produceWithPatches`.
+2. Se não há entrada pendente aberta, abre uma, com `label` do comando.
+3. Concatena os `inversePatches` deste comando ao **fim** da entrada pendente, na ordem de chegada.
+4. Não empilha nada no histórico. O documento mutado é o que o renderer desenha.
+
+Não existe um segundo comando emitido ao soltar o ponteiro. A entrada pendente que já foi acumulada durante o arraste é **selada**, não substituída por um novo comando calculado contra o documento já mutado.
+
+#### Fronteira de histórico
+
+A ferramenta sinaliza o fim da interação transiente por `ToolTransition.historyBoundary` (`03-ferramentas-e-interacao.md`), `'commit' | 'abort'`. Emitido no `pointerup` que finaliza a interação (commit) e no `Esc` que a cancela (abort).
+
+**Commit.** A entrada pendente é selada como uma `HistoryEntry` (o mesmo `label` e `inversePatches` acumulados) e empilhada. A pilha de redo é limpa. Nenhum comando novo é emitido — o commit é um evento de histórico, não um comando de domínio.
+
+**Undo de uma entrada selada a partir de comandos transientes.** Aplica os `inversePatches` acumulados **em ordem reversa à ordem de acumulação** — do último ao primeiro. Isso não é opcional: cada patch inverso é relativo ao estado produzido pelo comando anterior, não ao estado inicial do arraste. Aplicar na ordem de acumulação produz um documento diferente do estado em que o arraste começou sempre que a sequência tem mais de um elemento. Um teste com sequência de comprimento 1 passa nos dois sentidos e não expõe esse bug — a suíte precisa cobrir sequência de comprimento ≥ 3 (ver critério de aceitação).
+
+**Abort.** `Esc` durante a interação aplica os `inversePatches` acumulados, na mesma ordem reversa, e descarta a entrada pendente sem empilhar nada. Cancelamento de arraste sai de graça deste mecanismo — não tem código próprio.
+
+#### Compactação (opcional)
+
+Dentro de uma entrada pendente, se todas as operações acumuladas são `replace` sobre o **mesmo caminho**, mantenha apenas o inverso **mais antigo** por caminho e descarte os intermediários. Um `replace` não depende do valor anterior — o inverso mais antigo já carrega o valor pré-arraste, e reaplicá-lo sozinho tem o mesmo efeito que reaplicar toda a cadeia. Um arraste de 5 segundos cai de ~300 patches para poucos.
+
+A restrição a `replace` sobre caminho idêntico não é opcional: com `add`/`remove`, os índices de caminho deslocam a cada operação, e compactar por caminho deixa de corresponder à mesma célula do documento.
+
+#### `Ctrl/Cmd+Z` durante uma entrada pendente aberta
+
+Só é fisicamente possível com o botão do ponteiro ainda pressionado — a única forma de uma entrada pendente estar aberta é uma interação contínua em curso. A resposta certa se decide pelo estado do ponteiro, não pela elegância do mecanismo de patches.
+
+`DocumentStore.undo()` é o único lugar que conhece tanto a pilha quanto a entrada pendente — é ali, e não na ferramenta, que a checagem mora.
+
+**Decisão: ignorar.** Enquanto há entrada pendente aberta, `Ctrl/Cmd+Z` é consumido (previne o comportamento do navegador) e não produz efeito algum: `DocumentStore.undo()` detecta a entrada pendente e retorna sem desfazer, sem abortar, sem tocar a pilha. A interação continua exatamente como se a tecla não tivesse sido pressionada:
+
+- **`pointermove` subsequente:** segue emitindo comandos transientes normalmente, concatenados à mesma entrada pendente.
+- **`pointerup` subsequente:** comporta-se como um commit normal — sela a entrada, empilha, limpa redo.
+- Se o usuário ainda quiser desfazer, pressiona `Ctrl/Cmd+Z` de novo depois de soltar. A entrada já está selada nesse ponto, e o undo funciona normalmente contra ela — desfaz o arraste inteiro, que é o resultado que o usuário queria, só que sob uma segunda tecla em vez da primeira.
+
+**Por que não abortar.** A alternativa — abortar a entrada, liberar a captura do ponteiro e forçar a ferramenta de volta a `Idle` — exigiria que `DocumentStore.undo()`, código de `core/history` sem dependência de DOM, alcançasse a camada de `app/` para liberar `pointer capture` e resetar o estado de uma ferramenta que ele nem conhece. Isso atravessa a fronteira que este documento trata como o erro mais grave possível do repositório (`core` não conhece DOM, canvas ou framework), sem que exista hoje um mecanismo de sinalização para isso. Exigiria também definir o que um `pointerup` órfão — sem `pointerdown` correspondente, porque o estado foi resetado por baixo do usuário enquanto o botão físico ainda estava pressionado — faz numa ferramenta que agora está `Idle`: uma regra nova, sem função clara além de tapar o buraco que a própria escolha abriu. Ignorar não precisa de nada disso: a ferramenta nunca sabe que `Ctrl/Cmd+Z` foi pressionado, o ponteiro nunca perde a captura, e o pior caso é o usuário apertar a tecla duas vezes.
 
 ### Store
 
@@ -247,6 +291,9 @@ Nunca armazene grandeza derivada no documento. Área não é dado, é consequên
 - [ ] Todos os testes de `core` passam em Node puro, sem `jsdom`
 - [ ] Property test: para todo comando e todo documento válido, aplicar e depois aplicar os patches inversos devolve o documento original
 - [ ] Arrastar um nó por 40 frames produz uma única entrada de undo
+- [ ] Arrastar um nó por ao menos 3 frames com posições distintas e desfazer devolve o nó exatamente à posição inicial do arraste (sequência de comprimento 1 não cobre a ordem reversa de aplicação dos patches — o teste precisa de comprimento ≥ 3)
+- [ ] `Esc` durante um arraste em curso reverte para a posição inicial e não empilha entrada de histórico
+- [ ] `Ctrl/Cmd+Z` pressionado com uma entrada pendente aberta não altera o documento nem a pilha; o arraste em curso continua normalmente até o `pointerup`
 - [ ] Undo após criar cômodo restaura documento e limpa seleção sem erro
 - [ ] Nenhum componente `.svelte` importa de `core/geometry`
 - [ ] Erro lançado dentro de um pass não interrompe os demais passes
