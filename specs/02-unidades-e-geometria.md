@@ -67,6 +67,10 @@ O sinal do shoelace antes do valor absoluto dá a orientação. Com Y crescendo 
 
 Ciclos são normalizados para horário na criação do cômodo. Isso importa para: cálculo de normal de aresta (o lado "de dentro" do cômodo), posicionamento de aberturas e snap de mobília a parede.
 
+### Área provisória durante desenho
+
+Durante o estado Drawing da ferramenta Cômodo, a área exibida no HUD é calculada como o shoelace sobre `[n0, n1, ..., nk, n0]` onde `n0..nk` são os nós já confirmados. O segmento de fechamento `nk → n0` é implícito — o polígono é tratado como fechado para o cálculo, mesmo que ainda não tenha sido finalizado.
+
 ## Snap
 
 O resolvedor de snap é a única porta de entrada para criação e movimentação de geometria. Recebe um ponto em coordenadas de mundo e o contexto, e devolve o ponto ajustado mais os alvos que participaram do ajuste.

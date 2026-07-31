@@ -38,6 +38,8 @@ Esta é a fronteira que garante testabilidade. Se um teste de geometria precisa 
 
 Canvas 2D. Lê estado, desenha pixels. Nunca muta documento.
 
+O renderer é composto por múltiplos elementos canvas sobrepostos no DOM, gerenciados pelo scheduler em `app/`. Os passes de desenho (`04-renderizacao.md`) rodam sobre um canvas principal; o underlay (imagem de referência, M7) usa um canvas de fundo separado, redesenhado apenas quando a câmera muda.
+
 ```
 renderer/
   camera.ts
@@ -47,6 +49,8 @@ renderer/
   cache/        bbox, medição de texto
   profiler.ts
 ```
+
+A função de render é pura (`render(doc, camera, selection, overlays): void`). Não mantém estado próprio além dos caches de medição. O loop de `requestAnimationFrame` e a dirty flag vivem no scheduler em `app/`, que assina o `DocumentStore`, marca dirty, e chama `render` no rAF.
 
 ### `catalog`
 
@@ -96,25 +100,66 @@ function applyCommand(doc: PlanDocument, cmd: Command): CommandResult
 
 ### Comandos v1
 
-| Tipo | Efeito |
-|---|---|
-| `CreateRoom` | Cria nós (ou reusa) e o cômodo |
-| `DeleteRoom` | Remove cômodo; nós órfãos permanecem até o GC |
-| `RenameRoom` | |
-| `SetRoomColor` | |
-| `SetRoomUsable` | Alterna `includeInUsableArea` |
-| `MoveNode` | Move um nó |
-| `MergeNodes` | Funde dois nós, reescrevendo referências |
-| `SplitNode` | Desconecta um nó compartilhado, duplicando-o |
-| `SetEdgeLength` | Move nó final ao longo da direção da aresta |
-| `CreateWall` | Segmento avulso |
-| `DeleteWall` | |
-| `AddFurniture` | |
-| `MoveFurniture` | |
-| `TransformFurniture` | Rotação e redimensionamento |
-| `UpdateFurniture` | Nome, cor, circulação, travar |
-| `DeleteFurniture` | |
-| `SetDocumentMeta` | Nome, unidade de exibição, grid |
+Todo comando tem `type: CommandType`, `payload` tipado, e `transient?: boolean`. Comandos com `transient: true` são aplicados ao documento e desenhados pelo renderer, mas **não entram no histórico** — ver § Histórico.
+
+#### Comandos do M1
+
+```ts
+type Command =
+  | { type: 'CreateRoom'; transient?: boolean; payload: CreateRoomPayload }
+  | { type: 'DeleteRoom'; transient?: boolean; payload: DeleteRoomPayload }
+  | { type: 'RenameRoom'; transient?: boolean; payload: RenameRoomPayload }
+```
+
+**CreateRoom:**
+```ts
+interface CreateRoomPayload {
+  nodes: { id: NodeId; x: Millimeters; y: Millimeters }[]
+  loop: NodeId[]
+  name: string
+  includeInUsableArea: boolean
+  color: HexColor | null
+  roomId?: RoomId  // se omitido, gerado
+}
+```
+Cria os nós e o cômodo atomicamente. `loop` referencia ids em `nodes`. Se um nó em `nodes` tem coordenada idêntica a um nó já existente, o comando reusa o existente (invariante E6). O resolvedor de snap já tratou do merge antes de emitir o comando.
+
+**DeleteRoom:**
+```ts
+interface DeleteRoomPayload {
+  roomId: RoomId
+}
+```
+Remove o cômodo. Nós que ficam órfãos (sem referência de nenhum cômodo ou parede) permanecem no documento e são removidos pelo GC ao salvar (W5).
+
+**RenameRoom:**
+```ts
+interface RenameRoomPayload {
+  roomId: RoomId
+  name: string
+}
+```
+
+#### Comandos de milestones posteriores
+
+A lista abaixo está registrada para referência de planejamento. As assinaturas serão especificadas quando o milestone for iniciado.
+
+| Comando | Milestone | Efeito |
+|---|---|---|
+| `SetRoomColor` | M2 | Cor de preenchimento do cômodo |
+| `SetRoomUsable` | M2 | Alterna `includeInUsableArea` |
+| `MoveNode` | M2 | Move um nó (arraste) |
+| `MergeNodes` | M2 | Funde dois nós |
+| `SplitNode` | M2 | Desconecta nó compartilhado |
+| `SetEdgeLength` | M2 | Edita comprimento de aresta |
+| `CreateWall` | M1 | Segmento avulso (a especificar) |
+| `DeleteWall` | M1 | Remove parede avulsa (a especificar) |
+| `AddFurniture` | M3 | Insere móvel |
+| `MoveFurniture` | M3 | Move móvel |
+| `TransformFurniture` | M3 | Rotação e redimensionamento |
+| `UpdateFurniture` | M3 | Nome, cor, circulação, travar |
+| `DeleteFurniture` | M3 | Remove móvel |
+| `SetDocumentMeta` | M4 | Nome, unidade de exibição, grid |
 
 Comandos compostos (mover uma seleção com 3 móveis e 2 nós) são um `BatchCommand` que agrega comandos e produz um único item de histórico.
 
@@ -160,11 +205,13 @@ pointermove no canvas
   → Tool devolve { state, commands, cursor }
   → commands vão para DocumentStore.dispatch
   → store aplica, notifica assinantes
-  → renderer marca dirty
-  → rAF desenha um frame
+  → scheduler (app/) detecta mudança, marca dirty, agenda rAF
+  → rAF chama render(doc, camera, selection, overlays) → função pura
 ```
 
 Nenhum passo desenha sincronamente. Nenhum passo muta documento fora do store.
+
+O scheduler vive em `app/scheduler.ts`. Ele assina o `DocumentStore` e gerencia a dirty flag e o loop de `requestAnimationFrame`. O renderer exporta apenas a função pura `render` e os tipos necessários — não mantém estado de agendamento.
 
 ## Estado derivado
 

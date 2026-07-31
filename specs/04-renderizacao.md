@@ -41,16 +41,30 @@ Reagir a mudança de `dpr` (mover a janela entre monitores) via `matchMedia('(re
 
 Ordem fixa. Cada pass é uma função isolada, testável, que recebe `RenderContext`.
 
+```ts
+interface RenderContext {
+  doc: PlanDocument
+  camera: Camera
+  selection: Selection
+  theme: Theme
+  caches: {
+    bbox: BBoxCache
+    textMetrics: TextMetricsCache
+  }
+  target: DrawTarget
+}
+```
+
 | # | Pass | Conteúdo |
 |---|---|---|
 | 1 | `clear` | Fundo |
-| 2 | `underlay` | Imagem de referência, com opacidade |
+| 2 | `underlay` | Imagem de referência, com opacidade (no-op no M1; ver § Underlay) |
 | 3 | `grid` | Grid adaptativo |
 | 4 | `roomFills` | Preenchimento dos cômodos |
 | 5 | `furnitureClearance` | Faixas de circulação (abaixo dos móveis) |
 | 6 | `furniture` | Retângulos de móveis, rótulos, hachura de colisão |
 | 7 | `walls` | Arestas de cômodos e paredes avulsas |
-| 8 | `openings` | Portas e janelas, com arco de abertura |
+| 8 | `openings` | Portas e janelas, com arco de abertura (no-op no M1: itera array vazio; implementação entra em M6) |
 | 9 | `dimensions` | Cotas de aresta |
 | 10 | `roomLabels` | Nome e área no centroide |
 | 11 | `snapGuides` | Guias de alinhamento e eixo |

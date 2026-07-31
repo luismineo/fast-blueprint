@@ -6,6 +6,8 @@ Esta é a spec central do produto. O diferencial do Planta está aqui, não nas 
 
 Uma ferramenta ativa por vez. Cada ferramenta é uma máquina de estados explícita que consome eventos de ponteiro e teclado e emite comandos de domínio. Nenhuma ferramenta muta o documento diretamente.
 
+Ferramentas **retornam** comandos em `ToolTransition.commands`, nunca os executam. Isso as mantém testáveis como funções puras: dado `(state, event, context)`, produzem `(newState, commands)`. O dispatch é responsabilidade do scheduler em `app/`.
+
 ```ts
 interface Tool<S> {
   id: ToolId
@@ -17,12 +19,24 @@ interface Tool<S> {
   overlay(s: S, ctx: ToolContext): OverlayPrimitive[]
 }
 
+interface ToolContext {
+  doc: PlanDocument
+  camera: Camera
+  snap: (point: Point) => SnapResult
+  hitTest: (point: Point) => HitResult
+  config: ToolConfig
+}
+
 interface ToolTransition<S> {
   state: S
   commands: Command[]
   cursor?: CursorStyle
 }
 ```
+
+`ToolContext` não inclui `dispatch`. Ferramentas retornam comandos, não os executam — isso garante que sejam funções puras e testáveis sem mock de store.
+
+`OverlayPrimitive` é definido em `core/` como geometria declarativa pura (sem dependência de canvas). O renderer as interpreta para pixels. Exemplos: `{ kind: 'polyline'; points: Point[]; color: HexColor }`, `{ kind: 'label'; position: Point; text: string }`.
 
 `overlay` devolve o que a ferramenta quer desenhar sobre a cena (traço em andamento, guias, HUD). Ferramentas não têm acesso ao canvas.
 
@@ -80,6 +94,8 @@ Digitar qualquer dígito em estado Anchored ou Drawing foca automaticamente o ca
 
 A direção usada com entrada numérica é a direção **após snap de eixo**. Se o mouse aponta para 87° e o snap de eixo está ativo, a direção é 90°. Isso é o que permite desenhar um retângulo perfeito digitando quatro números.
 
+**Reuso de nó (merged).** Se o `SnapResult` do ponto confirmado tem `merged` preenchido, o segmento é ancorado no nó existente em vez de criar um novo. Isso é o que permite desenhar cômodos adjacentes compartilhando aresta: o snap a nó dispara sobre o vértice do cômodo vizinho, o nó é reusado, e ao mover esse vértice ambos os cômodos se ajustam (ver invariante E6 em `01-modelo-de-dominio.md` e ADR-0002).
+
 ### Fechar o polígono
 
 | Gatilho | Comportamento |
@@ -111,7 +127,7 @@ Ancorado ao cursor, deslocado 16 px à direita e abaixo. Contém:
 └─────────────────────┘
 ```
 
-O campo focado tem sublinhado de destaque. A terceira linha só aparece a partir de 3 segmentos e mostra a área caso fechasse agora.
+O campo de comprimento é editável e recebe foco automático ao digitar. O campo de ângulo é **somente leitura no M1** — exibe a direção pós-snap de eixo, mas não aceita entrada. Entrada de ângulo arbitrário entra no M2 (ver `09-roadmap.md`). A terceira linha só aparece a partir de 3 segmentos e mostra a área caso fechasse agora.
 
 ### Exemplo: reproduzir um quarto de 3,20 × 2,50
 
@@ -223,6 +239,7 @@ Zoom e pan nunca entram no histórico de undo.
 - [ ] Entrada numérica usa a direção pós-snap de eixo, não a direção bruta do mouse
 - [ ] `Esc` durante desenho remove um segmento por vez, sem cancelar o traço todo
 - [ ] Clicar no nó inicial fecha o polígono reusando o nó (não cria nó duplicado)
+- [ ] Desenhar dois retângulos adjacentes com snap a nó produz documento com 6 nós, não 8 (compartilham aresta)
 - [ ] Arrastar nó compartilhado por dois cômodos atualiza a área dos dois em tempo real
 - [ ] Editar comprimento de aresta com nó compartilhado oferece as duas opções e default é "Mover junto"
 - [ ] Móvel arrastado a 100 mm de uma parede encosta e alinha rotação; a 200 mm, não

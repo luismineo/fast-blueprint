@@ -34,6 +34,7 @@ Este é o momento de testar com gente de verdade. Se o fluxo de desenho não con
 - Snap de ponto médio, aresta, extensão e alinhamento, com guias visuais
 - Painel de propriedades para cômodo, aresta e nó
 - Undo e redo com coalescência
+- **Entrada de ângulo no HUD.** O campo de ângulo do HUD de desenho passa a aceitar entrada numérica (graus, 0–359, referência: eixo X positivo). No M1 o campo é somente leitura e exibe a direção pós-snap de eixo.
 
 **Pronto quando:** dá para corrigir um erro de medida sem redesenhar o cômodo, e mover uma parede compartilhada atualiza os dois cômodos.
 
