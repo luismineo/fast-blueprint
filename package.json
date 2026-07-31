@@ -11,7 +11,7 @@
     "dev": "pnpm --filter @planta/app dev",
     "build": "pnpm --filter @planta/app build",
     "test": "vitest run --passWithNoTests",
-    "typecheck": "tsc --build",
+    "typecheck": "tsc --build && pnpm --filter @planta/app run typecheck",
     "lint": "eslint .",
     "depcruise": "depcruise --config .dependency-cruiser.cjs packages"
   },
@@ -24,6 +24,7 @@
     "eslint": "^10.8.0",
     "eslint-plugin-svelte": "^3.22.0",
     "svelte": "^5.56.8",
+    "svelte-check": "^4.7.4",
     "svelte-eslint-parser": "^1.8.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.65.0",

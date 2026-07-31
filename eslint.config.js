@@ -39,6 +39,12 @@ export default tseslint.config(
     },
   },
   {
+    files: ['**/*.ts', '**/*.svelte'],
+    rules: {
+      'no-undef': 'off',
+    },
+  },
+  {
     rules: {
       'no-restricted-syntax': [
         'error',
