@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "meta": {
+    "name": "Sem título",
+    "createdAt": "2026-07-30T00:00:00.000Z",
+    "modifiedAt": "2026-07-30T00:00:00.000Z",
+    "displayUnit": "m",
+    "gridSize": 100
+  },
+  "nodes": [],
+  "rooms": [],
+  "walls": [],
+  "openings": [],
+  "furniture": [],
+  "underlay": null
+}

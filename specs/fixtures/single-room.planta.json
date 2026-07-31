@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "meta": {
+    "name": "Cômodo único",
+    "createdAt": "2026-07-30T00:00:00.000Z",
+    "modifiedAt": "2026-07-30T00:00:00.000Z",
+    "displayUnit": "m",
+    "gridSize": 100
+  },
+  "nodes": [
+    { "id": "n1", "x": 0, "y": 0 },
+    { "id": "n2", "x": 3200, "y": 0 },
+    { "id": "n3", "x": 3200, "y": 2500 },
+    { "id": "n4", "x": 0, "y": 2500 }
+  ],
+  "rooms": [
+    {
+      "id": "r1",
+      "name": "Quarto",
+      "loop": ["n1", "n2", "n3", "n4"],
+      "color": null,
+      "includeInUsableArea": true
+    }
+  ],
+  "walls": [],
+  "openings": [],
+  "furniture": [],
+  "underlay": null
+}
