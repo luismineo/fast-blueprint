@@ -38,6 +38,13 @@ Este é o momento de testar com gente de verdade. Se o fluxo de desenho não con
 
 **Pronto quando:** dá para corrigir um erro de medida sem redesenhar o cômodo, e mover uma parede compartilhada atualiza os dois cômodos.
 
+**Fora do M2, e para onde foi.** O plano aprovado (`plans/m2-editar.md`) registra a lista completa com o critério de aceitação de cada item. Os desvios que mudam outro milestone:
+
+- **Barra de ferramentas** (5 ícones, roving tabindex, `Home`/`End`, `Ctrl+B`) vai para o M3. Três dos cinco botões apontariam para ferramentas que não existem antes dele. Com isso, os critérios de `03` e `07` sobre foco na barra e recolhimento do painel também caem no M3.
+- **`Ctrl/Cmd+D` duplicar seleção** vai para o M3: não existe comando de duplicação em `08`, e o único caso de uso descrito é mobília.
+- **Regra de lint contra literal de texto em `.svelte`** (`07`) vai para o M3. O teste de chave órfã em `messages.ts` entra no M2 e cobre o caso comum sem plugin novo.
+- **Ferramenta Parede (`W`)** e os comandos `CreateWall`/`DeleteWall`, que `08` marca como M1 e nunca foram feitos, seguem em aberto.
+
 ## M3 — Mobiliar
 
 - Pacote `catalog` com o catálogo default completo

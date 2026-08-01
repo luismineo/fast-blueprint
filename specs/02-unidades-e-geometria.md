@@ -49,6 +49,27 @@ Regra: número sem sufixo e sem separador decimal é centímetro. Número sem su
 
 Essa regra é configurável em `InputConfig.bareNumberUnit`, mas o default é o acima.
 
+### Expressão aritmética
+
+Todo campo numérico aceita soma e subtração de dois ou mais termos (`158+40` → 198 cm;
+`3,20-0,15` → 3,05 m). É o que permite responder "e se eu tirar 15 cm daqui?" sem
+calculadora, que é o gesto mais comum de quem está medindo.
+
+Regras:
+
+- Cada termo segue a tabela acima, e o **primeiro termo** decide a unidade da expressão
+  quando os demais são números nus. `158+40` é 158 cm + 40 cm; `1,58+40` é 1,58 m + 40 cm,
+  porque o `40` nu vale centímetro pela regra default.
+- Sufixo explícito num termo vence para aquele termo: `1,58m+40cm` → 1980 mm.
+- Só `+` e `-`. Sem multiplicação, divisão, parênteses ou precedência — não existe
+  ambiguidade de ordem numa cadeia de somas e subtrações avaliada da esquerda para a
+  direita, e qualquer coisa além disso é uma calculadora, não um campo de medida.
+- Expressão malformada resolve para o mesmo que entrada malformada: o campo mantém o
+  texto e o valor não é aplicado.
+
+Este documento é o dono da regra de entrada numérica. `07-ui-e-layout.md` § Painel de
+propriedades cita o comportamento e o critério de aceitação; a regra é definida aqui.
+
 ## Área
 
 Shoelace (fórmula do cadarço) sobre o ciclo de nós:
@@ -127,6 +148,10 @@ Tolerância: 8 px de tela, limitada a [2, 40] mm.
 
 **Fronteira aresta/extensão:** pé da projeção estritamente entre os extremos do segmento é aresta; fora, é extensão. Extensão avalia todas as arestas do documento — com ~30 arestas típicas, projeção ponto-reta é O(arestas) e cabe no orçamento de 8 ms.
 
+**Retas de alinhamento:** cada nó existente contribui com duas retas, a horizontal e a vertical que passam por ele. Com `Shift`, contribui também com as duas de 45°, pela mesma regra que estende os eixos. É o alinhamento que permite pousar um vértice novo exatamente na altura de um vértice do outro lado da planta, que é o gesto que a guia tracejada anuncia.
+
+**Origem do eixo fora da Ferramenta Cômodo:** "eixo a partir da origem do traço" pressupõe um traço em andamento. Num arraste da Ferramenta Selecionar não há traço, e a origem é a **posição da entidade no início do arraste**: o nó em `pointerdown` ao arrastar um nó, o ponto de agarre ao arrastar uma aresta ou um cômodo. É o que faz "empurrar uma parede" andar reto em vez de derivar.
+
 #### Classe 3 — Grid
 
 Fallback. Só se **nenhuma** restrição de reta disparou, e só se o grid está ligado.
@@ -203,6 +228,7 @@ A mensagem é informativa, sem limiar de recusa, sem algoritmo de ajuste, sem n�
 ## Critérios de aceitação
 
 - [ ] `parseLength('320')` → 3200; `parseLength('3,20')` → 3200; `parseLength('3200mm')` → 3200
+- [ ] `parseLength('158+40')` → 1980; `parseLength('1,58m+40cm')` → 1980; expressão malformada não aplica valor
 - [ ] Área de polígono `(0,0) (3200,0) (3200,2500) (0,2500)` é 8.000.000 mm²
 - [ ] Shoelace de ciclo em sentido anti-horário retorna área positiva após normalização
 - [ ] Snap a nó existente dentro da tolerância devolve `merged` com o id do nó

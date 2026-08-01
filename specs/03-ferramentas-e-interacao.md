@@ -37,6 +37,20 @@ interface ToolTransition<S> {
 
 `ToolContext` não inclui `dispatch`. Ferramentas retornam comandos, não os executam — isso garante que sejam funções puras e testáveis sem mock de store.
 
+`HitResult` é o que `hitTest` devolve: a entidade de maior prioridade sob o ponto, pela ordem de `02-unidades-e-geometria.md` § Hit testing, ou `null` quando não há nenhuma.
+
+```ts
+type HitResult =
+  | { kind: 'node'; nodeId: NodeId }
+  | { kind: 'edge'; edge: EdgeRef }
+  | { kind: 'roomInterior'; roomId: RoomId }
+  | { kind: 'furniture'; furnitureId: FurnitureId }
+  | { kind: 'opening'; openingId: OpeningId }
+  | null
+```
+
+`furniture` e `opening` existem no tipo desde já para que o hit testing não precise trocar de forma em M3 e M6; até lá os dois nunca são produzidos, porque os arrays correspondentes estão vazios.
+
 `historyBoundary` sinaliza o fim de uma interação contínua (comandos `transient: true`) para o mecanismo de entrada pendente (`08-arquitetura.md` § Histórico). Ferramentas emitem `'commit'` no `onPointerUp` que finaliza um arraste e `'abort'` no `onKey` que trata o `Esc` de cancelamento. Ausente (`undefined`) em toda transição que não conclui nem cancela uma interação transiente — inclusive em toda transição de ferramentas sem interação contínua, como a Ferramenta Cômodo no M1.
 
 `OverlayPrimitive` é definido em `core/` como geometria declarativa pura (sem dependência de canvas). O renderer as interpreta para pixels.
@@ -89,6 +103,10 @@ Nenhum outro widget composto existe no M1. O catálogo (busca + lista de categor
 
 Dígitos (`0`–`9`) sem modificador são **reservados para entrada numérica** em todo contexto, permanentemente. Nenhum atalho global usa dígito sozinho, nem agora nem em milestones futuros.
 
+**Para qual campo o dígito vai.** Se o foco já está num campo do HUD, o dígito vai para **esse** campo. Fora do HUD, vai para o campo de comprimento, que também recebe o foco — é a regra "digitar um dígito em estado Anchored foca o campo de comprimento sem clique". Rotear todo dígito para comprimento independentemente do foco tornaria a entrada de ângulo inalcançável, já que o único caminho até o campo de ângulo é `Tab`.
+
+`Ctrl/Cmd+d` continua sem conflito: dígito sozinho é reservado, combinação com modificador não é dígito sozinho.
+
 ### Tabela unificada
 
 | Tecla (`key`) | Contexto | Ação | Spec |
@@ -107,7 +125,8 @@ Dígitos (`0`–`9`) sem modificador são **reservados para entrada numérica** 
 | `Ctrl/Cmd+Shift+z` | Global | Refazer | 08 § Histórico |
 | `Ctrl/Cmd+s` | Global | Salvar | 05 § Persistência |
 | `Ctrl/Cmd+o` | Global | Abrir | 05 § Persistência |
-| `Ctrl/Cmd+d` | Global (seleção contém entidades) | Duplicar seleção | 03 § Selecionar, 03 § Mobília |
+| `Ctrl/Cmd+a` | Global (fora de campo de texto) | Seleciona tudo | 03 § Selecionar |
+| `Ctrl/Cmd+d` | Global (seleção contém entidades) | Duplicar seleção — **M3** | 03 § Mobília |
 | `Home` | Global (regra D0: fora de campo/widget composto) | Enquadrar tudo | 03 § Câmera |
 | `Ctrl/Cmd+b` | Global | Recolher/expandir painel direito | 07 § Layout |
 | `Backspace` | Ferramenta Cômodo em Drawing, campo de comprimento vazio | Remove último segmento | 03 § Cômodo/Cancelar |
@@ -234,7 +253,17 @@ Ancorado ao cursor, deslocado 16 px à direita e abaixo. Contém:
 └─────────────────────┘
 ```
 
-O campo de comprimento é editável e recebe foco automático ao digitar. O campo de ângulo é **somente leitura no M1** — exibe a direção pós-snap de eixo, mas não aceita entrada. Entrada de ângulo arbitrário entra no M2 (ver `09-roadmap.md`).
+O campo de comprimento é editável e recebe foco automático ao digitar.
+
+**Campo de ângulo (M2).** Aceita entrada numérica em graus, `0`–`359`, com referência no eixo X positivo e sentido crescente para baixo — a mesma convenção de `Y` do resto do domínio (`01-modelo-de-dominio.md` § Node). Alcançado por `Tab` a partir do campo de comprimento; com o foco nele, dígitos vão para ele (§ Restrição permanente sobre dígitos).
+
+O valor **congela a direção no `oninput`**, não no `Enter`: o segmento fantasma salta para o ângulo digitado assim que o texto muda, exatamente como já salta para o eixo no primeiro dígito de comprimento. O salto é o retorno visual de que a direção travou.
+
+Isso mantém a tabela de gatilhos intacta — o ângulo é um override da direção, não um gatilho de confirmação. `Enter` continua fazendo o que a tabela diz: confirma o segmento se o campo de **comprimento** está preenchido, fecha o polígono se está vazio. As regras que hoje dependem de "campo vazio" (`c` fecha, `Backspace` remove segmento) continuam olhando o campo de comprimento, independentemente de qual campo do HUD tem o foco.
+
+Valor fora de `0`–`359` é normalizado por módulo. Texto que não resolve para número mantém o campo como está e não altera a direção.
+
+Vazio significa "sem override": a direção volta a vir do arredondamento angular sobre a posição do cursor.
 
 A terceira linha aparece a partir de **3 nós confirmados** e mostra a área caso o polígono fechasse agora. A contagem é de nós, não de segmentos, porque nó é o que a máquina de estados acumula; 3 nós são 2 segmentos confirmados mais o fechamento implícito, o menor polígono com área. O mockup acima mostra `4 lados` porque ilustra um retângulo em andamento, não o limiar de exibição.
 
@@ -260,16 +289,77 @@ Idêntica à ferramenta Cômodo, sem fechamento. Cria segmentos avulsos para div
 
 ## Ferramenta Selecionar (`V`)
 
+### Modelo de seleção
+
+```ts
+type SelectionRef =
+  | { kind: 'room'; roomId: RoomId }
+  | { kind: 'node'; nodeId: NodeId }
+  | { kind: 'edge'; edge: EdgeRef }
+
+type Selection = readonly SelectionRef[]
+```
+
+Vive em `core/selection`, não em `app/`: `renderer` precisa dela para o pass 12
+(`04-renderizacao.md`) e `app` para o painel de propriedades, e a direção de dependência
+de `08-arquitetura.md` só admite `core` como lugar comum. Não é documento e não entra no
+histórico — vive em runes Svelte, como a câmera e a ferramenta ativa.
+
+Aresta é referenciada por `EdgeRef` (`01-modelo-de-dominio.md`), não por par de nós:
+`EdgeRef` é a referência que o resto do domínio já usa, e um par de nós seria ambíguo
+quando dois cômodos compartilham a mesma aresta.
+
+Depois de um undo a seleção é podada por **melhor esforço**: refs cujos ids ainda existem
+permanecem, as demais saem (`08-arquitetura.md` § Histórico).
+
 ### Seleção
 
 | Ação | Resultado |
 |---|---|
 | Clique | Seleciona o alvo de maior prioridade (ver hit testing em `02`) |
+| Clique em área vazia | Limpa a seleção |
 | `Ctrl/Cmd` + clique | Adiciona/remove da seleção |
 | Arrastar em área vazia | Retângulo de seleção; envolve completamente para selecionar |
 | Duplo clique no interior de um cômodo | Entra em edição de nome |
 | Duplo clique numa aresta | Abre campo de comprimento da aresta |
 | `Ctrl/Cmd + A` | Seleciona tudo |
+| `Delete` / `Backspace` | Exclui os **cômodos** da seleção |
+
+**`Delete` exclui cômodo, não nó nem aresta.** A lista de comandos de
+`08-arquitetura.md` não tem `DeleteNode` nem `DeleteEdge`, e não é a tecla que decide
+que eles deveriam existir: apagar um nó de um ciclo fechado ou deixa o cômodo com menos
+de 3 nós (E3) ou muda a forma dele de um jeito que arrastar já resolve melhor. Nó e
+aresta selecionados ignoram a tecla.
+
+### Máquina de estados
+
+```
+Idle → (Marquee | DraggingNode | DraggingEdge | DraggingRoom) → Idle
+```
+
+**Idle.** Sem interação em curso. Hover atualiza `hover` a cada `pointermove`.
+
+**Marquee.** `pointerdown` em área vazia. O retângulo cresce com o cursor; a seleção só
+muda no `pointerup`, com quem estiver **completamente** envolvido.
+
+**DraggingNode / DraggingEdge / DraggingRoom.** `pointerdown` sobre nó, aresta ou
+interior de cômodo. Nada é emitido no `pointerdown`.
+
+| Gatilho | Comportamento |
+|---|---|
+| `pointermove` com deslocamento ≠ 0 | Emite comando transiente. `historyBoundary` ausente |
+| `pointermove` com deslocamento 0 | Nenhum comando |
+| `pointerup` | `historyBoundary: 'commit'` |
+| `Esc` | `historyBoundary: 'abort'`, volta para Idle |
+
+O primeiro `pointermove` é o que separa clique de arraste: um `pointerdown`/`pointerup`
+sem movimento no meio nunca abre entrada pendente, então clicar para selecionar não
+gasta uma entrada de histórico. É também o que permite ao arraste de cômodo emitir
+`SplitNode` já com o destino deslocado, sem estado intermediário que viole E6
+(`08-arquitetura.md` § Comandos do M2).
+
+`Alt` durante qualquer arraste desliga as três classes de snap
+(`02-unidades-e-geometria.md` § Modificadores).
 
 ### Edição de geometria
 
@@ -357,6 +447,11 @@ Zoom e pan nunca entram no histórico de undo.
 - [ ] Desenhar dois retângulos adjacentes com snap a nó produz documento com 6 nós, não 8 (compartilham aresta)
 - [ ] Arrastar nó compartilhado por dois cômodos atualiza a área dos dois em tempo real
 - [ ] Editar comprimento de aresta com nó compartilhado oferece as duas opções e default é "Mover junto"
+- [ ] Digitar `90` no campo de ângulo congela a direção no `oninput`, sem esperar `Enter`
+- [ ] Com o foco no campo de ângulo, dígitos vão para ele e não para o de comprimento
+- [ ] Retângulo de seleção seleciona só quem está completamente envolvido
+- [ ] `pointerdown` seguido de `pointerup` sem movimento não abre entrada pendente nem empilha histórico
+- [ ] `Delete` com nó ou aresta selecionada não altera o documento; com cômodo selecionado, exclui
 - [ ] Móvel arrastado a 100 mm de uma parede encosta e alinha rotação; a 200 mm, não
 - [ ] `Alt` durante qualquer arraste desativa todos os snaps
 - [ ] Zoom no cursor mantém a coordenada de mundo sob o cursor invariante dentro de 1 px

@@ -169,6 +169,8 @@ Validadas por `validateDocument(doc): ValidationIssue[]`. Comandos nunca produze
 
 E6 é o que faz o snap a nó existente ser reuso, não duplicação. Quando um comando produziria nós coincidentes, ele funde (merge) os nós.
 
+**E6 e `SplitNode`.** Desconectar um nó compartilhado cria um segundo nó onde antes havia um só, o que parece contradizer E6. Não contradiz porque `SplitNode` carrega o destino da cópia no payload e desconecta e reposiciona na mesma operação (`08-arquitetura.md` § Comandos do M2). Não existe estado intermediário com dois nós coincidentes: quem arrasta emite o comando no primeiro `pointermove` com deslocamento diferente de zero, nunca no `pointerdown`.
+
 ### Nível warning
 
 Não bloqueiam o comando, aparecem como aviso na UI.

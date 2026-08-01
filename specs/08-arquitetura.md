@@ -140,18 +140,83 @@ interface RenameRoomPayload {
 }
 ```
 
+#### Comandos do M2
+
+```ts
+type Command =
+  | { type: 'MoveNode'; transient?: boolean; payload: MoveNodePayload }
+  | { type: 'MergeNodes'; transient?: boolean; payload: MergeNodesPayload }
+  | { type: 'SplitNode'; transient?: boolean; payload: SplitNodePayload }
+  | { type: 'SetEdgeLength'; transient?: boolean; payload: SetEdgeLengthPayload }
+  | { type: 'SetRoomColor'; transient?: boolean; payload: SetRoomColorPayload }
+  | { type: 'SetRoomUsable'; transient?: boolean; payload: SetRoomUsablePayload }
+  | { type: 'Batch'; transient?: boolean; payload: BatchPayload }
+```
+
+**MoveNode:**
+```ts
+interface MoveNodePayload {
+  nodeId: NodeId
+  x: Millimeters
+  y: Millimeters
+}
+```
+Move um nó. Todo cômodo e parede que o referencia acompanha, porque referenciam o id, não a coordenada. Rejeita se a posição de destino já é ocupada por outro nó (E6) — o merge é `MergeNodes`, e um `MoveNode` que funde em silêncio é reparo silencioso.
+
+**MergeNodes:**
+```ts
+interface MergeNodesPayload {
+  keep: NodeId
+  remove: NodeId
+}
+```
+Reaponta toda referência de `remove` para `keep` e apaga `remove`. Um loop que passe a conter `keep` duas vezes tem a repetição removida (E4). Rejeita se algum loop cairia abaixo de 3 nós (E3), sem tocar no documento.
+
+**SplitNode:**
+```ts
+interface SplitNodePayload {
+  nodeId: NodeId
+  roomId: RoomId
+  to: { x: Millimeters; y: Millimeters }
+}
+```
+Desconecta `nodeId` de `roomId`: o cômodo passa a referenciar uma cópia nova, posicionada em `to`. Os demais cômodos e paredes continuam no nó original.
+
+O destino faz parte do payload porque **desconectar e reposicionar são a mesma operação**. Um `SplitNode` que criasse a cópia sobre o original produziria dois nós com coordenadas idênticas, violando E6, que é invariante de nível `error` — e comandos nunca produzem documento que viole uma invariante de nível `error` (`01-modelo-de-dominio.md` § Invariantes). Quem arrasta não emite `SplitNode` no `pointerdown`, e sim no primeiro `pointermove` com deslocamento diferente de zero. Rejeita se `to` já é ocupado por outro nó.
+
+**SetEdgeLength:**
+```ts
+interface SetEdgeLengthPayload {
+  edge: EdgeRef
+  length: Millimeters
+  mode: 'moveTogether' | 'detach'
+}
+```
+Move o nó final da aresta ao longo da direção dela até que a aresta tenha `length`. O nó final é `loop[(index + 1) % loop.length]` para `kind: 'room'` e `b` para `kind: 'wall'`: o ciclo é normalizado para horário na criação, então a ordem do loop define a direção sem depender de onde o clique caiu.
+
+`mode` só importa quando o nó final é compartilhado. `'moveTogether'` emite `MoveNode` e move os dois cômodos; `'detach'` emite `SplitNode` com o destino já calculado. A UI apresenta a escolha e o default (`03-ferramentas-e-interacao.md` § Editar comprimento de aresta).
+
+**SetRoomColor / SetRoomUsable:**
+```ts
+interface SetRoomColorPayload { roomId: RoomId; color: HexColor | null }
+interface SetRoomUsablePayload { roomId: RoomId; includeInUsableArea: boolean }
+```
+
+**Batch:**
+```ts
+interface BatchPayload {
+  label: string
+  commands: Command[]
+}
+```
+Aplica os comandos em ordem e produz **um** item de histórico — um grupo de patches por comando interno, na mesma estrutura de § Histórico. Se qualquer comando interno é rejeitado, o lote inteiro é rejeitado e o documento fica intacto.
+
 #### Comandos de milestones posteriores
 
 A lista abaixo está registrada para referência de planejamento. As assinaturas serão especificadas quando o milestone for iniciado.
 
 | Comando | Milestone | Efeito |
 |---|---|---|
-| `SetRoomColor` | M2 | Cor de preenchimento do cômodo |
-| `SetRoomUsable` | M2 | Alterna `includeInUsableArea` |
-| `MoveNode` | M2 | Move um nó (arraste) |
-| `MergeNodes` | M2 | Funde dois nós |
-| `SplitNode` | M2 | Desconecta nó compartilhado |
-| `SetEdgeLength` | M2 | Edita comprimento de aresta |
 | `CreateWall` | M1 | Segmento avulso (a especificar) |
 | `DeleteWall` | M1 | Remove parede avulsa (a especificar) |
 | `AddFurniture` | M3 | Insere móvel |
@@ -171,11 +236,30 @@ interface History {
   redo: HistoryEntry[]
 }
 
+interface HistoryEntry {
+  label: string
+  patchGroups: Patch[][]
+  inversePatchGroups: Patch[][]
+}
+
 interface PendingEntry {
   label: string
-  inversePatches: Patch[]
+  patchGroups: Patch[][]
+  inversePatchGroups: Patch[][]
 }
 ```
+
+**A unidade de inversão é o grupo de um comando, não o patch.** Um `produceWithPatches`
+já devolve os inversos de um único comando na ordem em que precisam ser aplicados;
+reordená-los dentro do grupo corrompe o documento sempre que o comando tem `add` ou
+`remove`. Um `CreateRoom` de três nós emite os inversos
+`[remove rooms/0, remove nodes/2, remove nodes/1, remove nodes/0]` — aplicados nessa
+ordem devolvem o documento vazio, e aplicados ao contrário deixam um nó para trás,
+porque cada `remove` desloca os índices seguintes.
+
+Uma entrada de histórico é portanto uma **lista de grupos**, um por comando, e não um
+array achatado de patches. Comando não-transiente produz uma entrada de um grupo só.
+Comando transiente acrescenta um grupo por dispatch à entrada pendente.
 
 Regras gerais:
 
@@ -192,7 +276,7 @@ Dispatch de um comando transiente:
 
 1. Aplica normalmente com `produceWithPatches`.
 2. Se não há entrada pendente aberta, abre uma, com `label` do comando.
-3. Concatena os `inversePatches` deste comando ao **fim** da entrada pendente, na ordem de chegada.
+3. Acrescenta os patches deste comando como um **grupo novo** ao fim da entrada pendente, na ordem de chegada.
 4. Não empilha nada no histórico. O documento mutado é o que o renderer desenha.
 
 Não existe um segundo comando emitido ao soltar o ponteiro. A entrada pendente que já foi acumulada durante o arraste é **selada**, não substituída por um novo comando calculado contra o documento já mutado.
@@ -201,17 +285,28 @@ Não existe um segundo comando emitido ao soltar o ponteiro. A entrada pendente 
 
 A ferramenta sinaliza o fim da interação transiente por `ToolTransition.historyBoundary` (`03-ferramentas-e-interacao.md`), `'commit' | 'abort'`. Emitido no `pointerup` que finaliza a interação (commit) e no `Esc` que a cancela (abort).
 
-**Commit.** A entrada pendente é selada como uma `HistoryEntry` (o mesmo `label` e `inversePatches` acumulados) e empilhada. A pilha de redo é limpa. Nenhum comando novo é emitido — o commit é um evento de histórico, não um comando de domínio.
+**Commit.** A entrada pendente é selada como uma `HistoryEntry` (o mesmo `label`, os mesmos grupos acumulados nos dois sentidos) e empilhada. A pilha de redo é limpa. Nenhum comando novo é emitido — o commit é um evento de histórico, não um comando de domínio.
 
-**Undo de uma entrada selada a partir de comandos transientes.** Aplica os `inversePatches` acumulados **em ordem reversa à ordem de acumulação** — do último ao primeiro. Isso não é opcional: cada patch inverso é relativo ao estado produzido pelo comando anterior, não ao estado inicial do arraste. Aplicar na ordem de acumulação produz um documento diferente do estado em que o arraste começou sempre que a sequência tem mais de um elemento. Um teste com sequência de comprimento 1 passa nos dois sentidos e não expõe esse bug — a suíte precisa cobrir sequência de comprimento ≥ 3 (ver critério de aceitação).
+**Undo de uma entrada selada a partir de comandos transientes.** Aplica os grupos **em ordem reversa à ordem de acumulação** — do último ao primeiro — e cada grupo internamente na ordem em que o Immer o emitiu. Isso não é opcional: cada grupo inverso é relativo ao estado produzido pelo comando anterior, não ao estado inicial do arraste. Aplicar na ordem de acumulação produz um documento diferente do estado em que o arraste começou sempre que a sequência tem mais de um elemento.
 
-**Abort.** `Esc` durante a interação aplica os `inversePatches` acumulados, na mesma ordem reversa, e descarta a entrada pendente sem empilhar nada. Cancelamento de arraste sai de graça deste mecanismo — não tem código próprio.
+Um arraste de três frames que leva um nó de `x = 0` a `x = 300` acumula os inversos
+`[[x=0], [x=100], [x=200]]`. Do último ao primeiro o nó volta a `0`; da primeira à
+última ele para em `200`, um ponto do meio do arraste que o usuário nunca escolheu.
+Um teste com sequência de comprimento 1 passa nos dois sentidos e não expõe esse bug — a suíte precisa cobrir sequência de comprimento ≥ 3 (ver critério de aceitação).
+
+A reversão é **entre** grupos e nunca **dentro** de um: inverter a ordem dentro de um grupo quebra os comandos com `add`/`remove` pelo motivo já dado em § Histórico.
+
+**Redo de uma entrada selada.** Aplica os grupos diretos na ordem de acumulação — do primeiro ao último — cada um internamente na ordem emitida. Uma entrada selada guarda os dois sentidos porque um arraste desfeito precisa ser refazível como qualquer outro comando; guardar só os inversos torna `redo` um no-op silencioso depois de um arraste.
+
+**Abort.** `Esc` durante a interação aplica os grupos inversos acumulados, na mesma ordem reversa, e descarta a entrada pendente sem empilhar nada. Cancelamento de arraste sai de graça deste mecanismo — não tem código próprio.
 
 #### Compactação (opcional)
 
 Dentro de uma entrada pendente, se todas as operações acumuladas são `replace` sobre o **mesmo caminho**, mantenha apenas o inverso **mais antigo** por caminho e descarte os intermediários. Um `replace` não depende do valor anterior — o inverso mais antigo já carrega o valor pré-arraste, e reaplicá-lo sozinho tem o mesmo efeito que reaplicar toda a cadeia. Um arraste de 5 segundos cai de ~300 patches para poucos.
 
 A restrição a `replace` sobre caminho idêntico não é opcional: com `add`/`remove`, os índices de caminho deslocam a cada operação, e compactar por caminho deixa de corresponder à mesma célula do documento.
+
+Aplicada a grupos, a regra é: um grupo elegível é o que contém **só** `replace`. Grupos elegíveis consecutivos colapsam num só, mantendo por caminho o inverso mais antigo e o patch direto mais recente. Um grupo com `add` ou `remove` interrompe a cadeia e não colapsa com vizinho nenhum — é o caso do `SplitNode` que abre o arraste de um cômodo com nós compartilhados.
 
 #### `Ctrl/Cmd+Z` durante uma entrada pendente aberta
 

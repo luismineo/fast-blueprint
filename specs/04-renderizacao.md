@@ -56,6 +56,7 @@ interface RenderContext {
   doc: PlanDocument
   camera: Camera
   selection: Selection
+  hover: SelectionRef | null
   theme: Theme
   caches: {
     bbox: BBoxCache
@@ -64,6 +65,10 @@ interface RenderContext {
   target: DrawTarget
 }
 ```
+
+`Selection` e `SelectionRef` são definidos em `core/selection` (`03-ferramentas-e-interacao.md` § Selecionar). Ficam em `core` porque renderer e `app` precisam dos dois e a direção de dependência não admite outro lugar.
+
+`hover` existe porque `03-ferramentas-e-interacao.md` § Handles distingue "nó selecionado" de "nó sob o cursor", e o pass de seleção precisa dos dois para desenhar handles diferentes. É estado efêmero de interação, como a seleção: não entra no documento nem no histórico.
 
 | # | Pass | Conteúdo |
 |---|---|---|
@@ -170,6 +175,12 @@ const light: Theme = {
 
 Paleta de papel: fundo levemente quente, paredes quase pretas, mobília em azul-cinza dessaturado. O único acento saturado é o azul de seleção e o coral das guias de snap — a planta em si é neutra para que o layout seja o que chama atenção.
 
+### Cor de cômodo não é token de tema
+
+`Room.color` (`01-modelo-de-dominio.md`) é **dado de documento**: o usuário escolhe, o valor é serializado no arquivo, e um tema escuro não o altera. A paleta de cores oferecidas no painel de propriedades vive portanto em `core`, junto do modelo, e não em `renderer/theme.ts`.
+
+O critério "nenhuma string hexadecimal de cor existe fora de `renderer/theme.ts`" continua valendo para **token de apresentação**, que é o que ele sempre quis dizer: o que o tema decide. A regra de lint reconhece os dois arquivos, e nenhum outro.
+
 Tema escuro invertido é v2. Os passes já leem tudo do objeto `Theme`, então é troca de objeto.
 
 ## Orçamento de performance
@@ -209,4 +220,5 @@ Ambos respeitam as alternâncias de grid e cotas no momento do export, e o expor
 - [ ] Nenhum redesenho ocorre quando a aplicação está ociosa (verificável por contador de frames)
 - [ ] Profiler reporta menos de 8 ms com a fixture `apto-44m2` acrescida de 40 móveis
 - [ ] SVG exportado e PNG exportado da mesma cena têm geometria coincidente
-- [ ] Nenhuma string hexadecimal de cor existe fora de `renderer/theme.ts`
+- [ ] Nenhuma string hexadecimal de cor existe fora de `renderer/theme.ts` e da paleta de cor de cômodo em `core` (§ Cor de cômodo não é token de tema)
+- [ ] Pass `selection` desenha handle de 8 px em nó selecionado, handle com contorno em nó sob o cursor, e aresta selecionada com espessura dobrada e rótulo de comprimento
