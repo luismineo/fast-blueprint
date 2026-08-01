@@ -5,7 +5,7 @@
 import { type Patch, applyPatches } from 'immer';
 import type { PlanDocument } from '../model';
 import { createEmptyDocument } from '../model';
-import type { Command } from '../commands';
+import type { Command, CommandError } from '../commands';
 import { applyCommand } from '../commands';
 
 // ============================================================
@@ -35,6 +35,7 @@ export class DocumentStore {
   private _redo: HistoryEntry[] = [];
   private _pending: PendingEntry | null = null;
   private _subscribers = new Set<(doc: PlanDocument) => void>();
+  private _lastError: CommandError | null = null;
 
   private static readonly MAX_HISTORY = 500;
 
@@ -46,8 +47,22 @@ export class DocumentStore {
     return this._doc;
   }
 
+  /** Erro do último dispatch, ou null se ele foi aplicado. */
+  get lastError(): CommandError | null {
+    return this._lastError;
+  }
+
   dispatch(cmd: Command): void {
     const result = applyCommand(this._doc, cmd);
+
+    // Comando rejeitado não altera documento nem consome uma entrada de
+    // histórico — do contrário um Ctrl+Z seria gasto desfazendo um no-op
+    // (spec 08 § Tratamento de erro).
+    if (result.error) {
+      this._lastError = result.error;
+      return;
+    }
+    this._lastError = null;
 
     if (cmd.transient) {
       if (!this._pending) {

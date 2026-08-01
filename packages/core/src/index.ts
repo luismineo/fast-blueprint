@@ -5,3 +5,4 @@ export * from './format';
 export * from './snap';
 export * from './commands';
 export * from './history';
+export * from './overlay';

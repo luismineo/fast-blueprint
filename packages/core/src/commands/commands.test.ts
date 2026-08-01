@@ -344,3 +344,101 @@ describe('commands', () => {
     expect(errors).toEqual([]);
   });
 });
+describe('applyCreateRoom — rejeição de payload malformado', () => {
+  const n = (id: string): NodeId => id as NodeId;
+  const square = [
+    { id: n('a'), x: 0, y: 0 },
+    { id: n('b'), x: 3200, y: 0 },
+    { id: n('c'), x: 3200, y: 2500 },
+    { id: n('d'), x: 0, y: 2500 },
+  ];
+
+  it('rejeita loop com id repetido sem tocar no documento', () => {
+    const doc = createEmptyDocument();
+    const result = applyCommand(doc, {
+      type: 'CreateRoom',
+      payload: { nodes: square, loop: [n('a'), n('b'), n('b'), n('b')], name: '' },
+    });
+
+    expect(result.error?.code).toBe('DUPLICATE_LOOP_NODE');
+    expect(result.document).toBe(doc);
+    expect(result.patches).toEqual([]);
+  });
+
+  it('rejeita nodes com id repetido', () => {
+    const result = applyCommand(createEmptyDocument(), {
+      type: 'CreateRoom',
+      payload: {
+        nodes: [
+          { id: n('a'), x: 0, y: 0 },
+          { id: n('a'), x: 3200, y: 0 },
+          { id: n('c'), x: 3200, y: 2500 },
+        ],
+        loop: [n('a'), n('c'), n('a')],
+        name: '',
+      },
+    });
+
+    expect(result.error?.code).toBe('DUPLICATE_NODE_ID');
+  });
+
+  it('rejeita poligono degenerado (pontos colineares)', () => {
+    const result = applyCommand(createEmptyDocument(), {
+      type: 'CreateRoom',
+      payload: {
+        nodes: [
+          { id: n('a'), x: 0, y: 0 },
+          { id: n('b'), x: 1000, y: 0 },
+          { id: n('c'), x: 2000, y: 0 },
+        ],
+        loop: [n('a'), n('b'), n('c')],
+        name: '',
+      },
+    });
+
+    expect(result.error?.code).toBe('DEGENERATE_POLYGON');
+  });
+
+  it('rejeita loop com menos de 3 nos', () => {
+    const result = applyCommand(createEmptyDocument(), {
+      type: 'CreateRoom',
+      payload: { nodes: square.slice(0, 2), loop: [n('a'), n('b')], name: '' },
+    });
+
+    expect(result.error?.code).toBe('LOOP_TOO_SHORT');
+  });
+
+  it('rejeita loop que referencia no inexistente', () => {
+    const result = applyCommand(createEmptyDocument(), {
+      type: 'CreateRoom',
+      payload: { nodes: square, loop: [n('a'), n('b'), n('zz')], name: '' },
+    });
+
+    expect(result.error?.code).toBe('UNKNOWN_LOOP_NODE');
+    expect(result.error?.ids).toEqual(['zz']);
+  });
+
+  it('loop anti-horario e normalizado invertendo ids, preservando os 4 nos', () => {
+    const result = applyCommand(createEmptyDocument(), {
+      type: 'CreateRoom',
+      payload: { nodes: square, loop: [n('d'), n('c'), n('b'), n('a')], name: '' },
+    });
+
+    expect(result.error).toBeUndefined();
+    const room = result.document.rooms[0]!;
+    expect(new Set(room.loop).size).toBe(4);
+    expect(computeRoomArea(result.document, room.id)).toBe(8_000_000);
+  });
+
+  it('comando rejeitado nao consome entrada de historico', () => {
+    const store = new DocumentStore();
+    store.dispatch({
+      type: 'CreateRoom',
+      payload: { nodes: square, loop: [n('a'), n('b'), n('b'), n('b')], name: '' },
+    });
+
+    expect(store.canUndo).toBe(false);
+    expect(store.current.rooms).toHaveLength(0);
+    expect(store.lastError?.code).toBe('DUPLICATE_LOOP_NODE');
+  });
+});

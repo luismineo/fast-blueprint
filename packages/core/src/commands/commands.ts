@@ -5,7 +5,7 @@
 import { type Patch, produceWithPatches, enablePatches } from 'immer';
 import type { PlanDocument, NodeId, RoomId, Node, Room } from '../model';
 import { generateRoomId, generateDefaultRoomName } from '../model';
-import { orientLoop, polygonArea } from '../geometry';
+import { isClockwise, polygonArea } from '../geometry';
 
 // Habilita suporte a patches no Immer (precisa ser chamado uma vez)
 enablePatches();
@@ -59,11 +59,25 @@ export interface RenameRoomPayload {
 // Resultado
 // ============================================================
 
+export type CommandErrorCode =
+  | 'LOOP_TOO_SHORT'
+  | 'DUPLICATE_NODE_ID'
+  | 'DUPLICATE_LOOP_NODE'
+  | 'UNKNOWN_LOOP_NODE'
+  | 'DEGENERATE_POLYGON'
+  | 'ROOM_NOT_FOUND';
+
+export interface CommandError {
+  code: CommandErrorCode;
+  ids: string[];
+}
+
 export interface CommandResult {
   document: PlanDocument;
   patches: Patch[];
   inversePatches: Patch[];
   label: string;
+  error?: CommandError;
 }
 
 // ============================================================
@@ -92,6 +106,17 @@ function applyCreateRoom(
   doc: PlanDocument,
   payload: CreateRoomPayload,
 ): CommandResult {
+  const rejection = validateCreateRoom(doc, payload);
+  if (rejection) {
+    return {
+      document: doc,
+      patches: [],
+      inversePatches: [],
+      label: `Criar ${payload.name || 'cômodo'}`,
+      error: rejection,
+    };
+  }
+
   const [nextDoc, patches, inversePatches] = produceWithPatches(doc, (draft) => {
     // Merge de nós: se já existe nó com as mesmas coordenadas, reusa (E6)
     const nodeIdMap = new Map<string, NodeId>(); // requested id → actual id
@@ -116,16 +141,13 @@ function applyCreateRoom(
     // Resolve loop com ids mapeados
     const resolvedLoop = payload.loop.map((id) => nodeIdMap.get(id) ?? id);
 
-    // Normaliza orientação para horário
+    // Normaliza orientação para horário invertendo os ids, não os pontos:
+    // reencontrar o id pela coordenada colapsaria nós coincidentes num só.
     const points = resolvedLoop.map((id) => {
       const node = draft.nodes.find((n) => n.id === id)!;
       return { x: node.x, y: node.y };
     });
-    const orientedLoop = orientLoop(points);
-    const finalLoop = orientedLoop.map((p) => {
-      const node = draft.nodes.find((n) => n.x === p.x && n.y === p.y)!;
-      return node.id;
-    });
+    const finalLoop = isClockwise(points) ? resolvedLoop : [...resolvedLoop].reverse();
 
     const roomId = payload.roomId ?? generateRoomId();
     const defaultName = generateDefaultRoomName(
@@ -151,6 +173,62 @@ function applyCreateRoom(
   };
 }
 
+/**
+ * Rejeita payloads malformados antes de tocar no documento.
+ *
+ * Rejeitar em vez de reparar é deliberado (spec 08 § Tratamento de erro).
+ * Um loop com ids repetidos é ambíguo — pode ser quatro vértices distintos
+ * ou erro de quem chamou — e re-gerar ids inventaria nós coincidentes,
+ * violando E6. Reparo silencioso é o que transforma payload errado em
+ * documento plausível: foi assim que um cômodo virou uma linha reta.
+ */
+function validateCreateRoom(
+  doc: PlanDocument,
+  payload: CreateRoomPayload,
+): CommandError | null {
+  if (payload.loop.length < 3) {
+    return { code: 'LOOP_TOO_SHORT', ids: [...payload.loop] };
+  }
+
+  const payloadIds = payload.nodes.map((n) => n.id);
+  const duplicatePayloadIds = findDuplicates(payloadIds);
+  if (duplicatePayloadIds.length > 0) {
+    return { code: 'DUPLICATE_NODE_ID', ids: duplicatePayloadIds };
+  }
+
+  const duplicateLoopIds = findDuplicates(payload.loop);
+  if (duplicateLoopIds.length > 0) {
+    return { code: 'DUPLICATE_LOOP_NODE', ids: duplicateLoopIds };
+  }
+
+  const known = new Set<string>([...payloadIds, ...doc.nodes.map((n) => n.id)]);
+  const unknown = payload.loop.filter((id) => !known.has(id));
+  if (unknown.length > 0) {
+    return { code: 'UNKNOWN_LOOP_NODE', ids: unknown };
+  }
+
+  const coordOf = new Map<string, { x: number; y: number }>();
+  for (const node of doc.nodes) coordOf.set(node.id, { x: node.x, y: node.y });
+  for (const node of payload.nodes) coordOf.set(node.id, { x: node.x, y: node.y });
+
+  const points = payload.loop.map((id) => coordOf.get(id)!);
+  if (polygonArea(points) === 0) {
+    return { code: 'DEGENERATE_POLYGON', ids: [...payload.loop] };
+  }
+
+  return null;
+}
+
+function findDuplicates(ids: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const id of ids) {
+    if (seen.has(id)) duplicates.add(id);
+    seen.add(id);
+  }
+  return [...duplicates];
+}
+
 // ============================================================
 // DeleteRoom
 // ============================================================
@@ -161,7 +239,13 @@ function applyDeleteRoom(
 ): CommandResult {
   const room = doc.rooms.find((r) => r.id === payload.roomId);
   if (!room) {
-    return { document: doc, patches: [], inversePatches: [], label: 'Excluir cômodo' };
+    return {
+      document: doc,
+      patches: [],
+      inversePatches: [],
+      label: 'Excluir cômodo',
+      error: { code: 'ROOM_NOT_FOUND', ids: [payload.roomId] },
+    };
   }
 
   const [nextDoc, patches, inversePatches] = produceWithPatches(doc, (draft) => {
@@ -190,7 +274,13 @@ function applyRenameRoom(
 ): CommandResult {
   const room = doc.rooms.find((r) => r.id === payload.roomId);
   if (!room) {
-    return { document: doc, patches: [], inversePatches: [], label: 'Renomear cômodo' };
+    return {
+      document: doc,
+      patches: [],
+      inversePatches: [],
+      label: 'Renomear cômodo',
+      error: { code: 'ROOM_NOT_FOUND', ids: [payload.roomId] },
+    };
   }
 
   const [nextDoc, patches, inversePatches] = produceWithPatches(doc, (draft) => {
