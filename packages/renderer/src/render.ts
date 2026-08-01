@@ -6,6 +6,7 @@ import { dimensionsPass } from './passes/dimensions'
 import { roomLabelsPass } from './passes/roomLabels'
 import { snapGuidesPass } from './passes/snapGuides'
 import { toolOverlayPass } from './passes/toolOverlay'
+import { selectionPass } from './passes/selection'
 import { hudPass } from './passes/hud'
 import type { RenderContext } from './renderContext'
 
@@ -26,6 +27,7 @@ const PASSES: readonly PassEntry[] = [
   { name: 'roomLabels', space: 'screen', run: roomLabelsPass },
   { name: 'snapGuides', space: 'screen', run: snapGuidesPass },
   { name: 'toolOverlay', space: 'screen', run: toolOverlayPass },
+  { name: 'selection', space: 'screen', run: selectionPass },
   { name: 'hud', space: 'screen', run: hudPass },
 ]
 

@@ -11,8 +11,12 @@ export type OverlayRole =
   | 'draft'
   | 'ghost'
   | 'snapNode'
+  | 'midpoint'
   | 'axisGuide'
-  | 'closeTarget';
+  | 'alignmentGuide'
+  | 'edgeHighlight'
+  | 'closeTarget'
+  | 'marquee';
 
 /**
  * Geometria declarativa que uma ferramenta quer desenhar sobre a cena.

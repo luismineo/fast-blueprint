@@ -46,6 +46,7 @@ describe('render', () => {
     expect(spaces.roomLabels).toBe('screen')
     expect(spaces.snapGuides).toBe('screen')
     expect(spaces.toolOverlay).toBe('screen')
+    expect(spaces.selection).toBe('screen')
     expect(spaces.hud).toBe('screen')
   })
 

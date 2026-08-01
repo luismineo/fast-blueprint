@@ -2,7 +2,7 @@ import type { OverlayPrimitive, OverlayRole } from '@planta/core'
 import type { Camera } from '../camera'
 import { worldToScreenX, worldToScreenY } from '../camera'
 import type { DrawTarget, LineStyle } from '../target/DrawTarget'
-import { MARKER_HALF_PX } from '../overlayStyle'
+import { DIAMOND_ROLES, MARKER_HALF_PX } from '../overlayStyle'
 
 const scratch: { x: number; y: number }[] = []
 
@@ -49,21 +49,37 @@ export function drawOverlay(
     }
 
     case 'marker': {
-      const half = MARKER_HALF_PX[primitive.role as OverlayRole]
+      const role = primitive.role as OverlayRole
+      const half = MARKER_HALF_PX[role]
       const cx = worldToScreenX(camera, primitive.position.x)
       const cy = worldToScreenY(camera, primitive.position.y)
-      const square = buffer(5)
-      square[0]!.x = cx - half
-      square[0]!.y = cy - half
-      square[1]!.x = cx + half
-      square[1]!.y = cy - half
-      square[2]!.x = cx + half
-      square[2]!.y = cy + half
-      square[3]!.x = cx - half
-      square[3]!.y = cy + half
-      square[4]!.x = cx - half
-      square[4]!.y = cy - half
-      target.polyline(square, style)
+      const outline = buffer(5)
+
+      if (DIAMOND_ROLES.has(role)) {
+        outline[0]!.x = cx
+        outline[0]!.y = cy - half
+        outline[1]!.x = cx + half
+        outline[1]!.y = cy
+        outline[2]!.x = cx
+        outline[2]!.y = cy + half
+        outline[3]!.x = cx - half
+        outline[3]!.y = cy
+        outline[4]!.x = cx
+        outline[4]!.y = cy - half
+      } else {
+        outline[0]!.x = cx - half
+        outline[0]!.y = cy - half
+        outline[1]!.x = cx + half
+        outline[1]!.y = cy - half
+        outline[2]!.x = cx + half
+        outline[2]!.y = cy + half
+        outline[3]!.x = cx - half
+        outline[3]!.y = cy + half
+        outline[4]!.x = cx - half
+        outline[4]!.y = cy - half
+      }
+
+      target.polyline(outline, style)
       return
     }
 

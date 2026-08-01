@@ -36,6 +36,18 @@ export interface RecordedTextRotated {
 
 export type RecordedTransform = { readonly kind: 'world'; readonly camera: Camera } | { readonly kind: 'reset' }
 
+/**
+ * Cópia profunda dos pontos.
+ *
+ * Os passes desenham a partir de um buffer de pontos reaproveitado entre
+ * chamadas (spec 04, regra 2: nenhuma alocação no loop de desenho). Copiar só
+ * o array deixaria toda primitiva gravada apontando para os mesmos objetos, e
+ * qualquer teste que comparasse duas primitivas leria os valores da última.
+ */
+function copyPoints(points: readonly { x: number; y: number }[]): { x: number; y: number }[] {
+  return points.map((point) => ({ x: point.x, y: point.y }))
+}
+
 export class RecordingTarget implements DrawTarget {
   readonly clears: string[] = []
   readonly transforms: RecordedTransform[] = []
@@ -62,11 +74,11 @@ export class RecordingTarget implements DrawTarget {
   }
 
   polyline(points: { x: number; y: number }[], style: LineStyle): void {
-    this.polylines.push({ points: [...points], style })
+    this.polylines.push({ points: copyPoints(points), style })
   }
 
   filledPolygon(points: { x: number; y: number }[], fill: FillStyle): void {
-    this.polygons.push({ points: [...points], fill })
+    this.polygons.push({ points: copyPoints(points), fill })
   }
 
   text(x: number, y: number, content: string, style: TextStyle): void {
