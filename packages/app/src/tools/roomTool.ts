@@ -77,7 +77,11 @@ export interface RoomHudModel {
   readonly editing: boolean
   /** Graus digitados. Vazio significa "sem override de direção". */
   readonly angleText: string
-  /** Direção do candidato, mostrada como dica quando o campo está vazio. */
+  /**
+   * Direção do candidato em graus, sem o símbolo — mostrada como dica quando o
+   * campo está vazio. O `°` é span próprio ao lado do campo, como o `cm` do
+   * comprimento; incluí-lo aqui faria a dica aparecer como `0,0° °`.
+   */
   readonly measuredAngleText: string
   readonly nodeCount: number
   readonly areaText: string | null
@@ -435,5 +439,5 @@ function formatCentimeters(lengthMm: number): string {
 
 function formatDegrees(directionRad: number): string {
   const deg = ((directionRad * 180) / Math.PI + 360) % 360
-  return `${deg.toFixed(1).replace('.', ',')}°`
+  return deg.toFixed(1).replace('.', ',')
 }

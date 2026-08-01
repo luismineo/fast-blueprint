@@ -203,11 +203,11 @@ describe('Ferramenta Cômodo — entrada de ângulo no HUD (M2)', () => {
 
     // Cursor apontando para a direita; ângulo digitado aponta para baixo.
     const before = h.drive({ type: 'pointerMove' }, { x: 4000, y: 0 })
-    expect(before.hud?.measuredAngleText).toBe('0,0°')
+    expect(before.hud?.measuredAngleText).toBe('0,0')
 
     const after = h.drive({ type: 'inputChange', value: '90', field: 'angle' }, { x: 4000, y: 0 })
     expect(after.hud?.angleText).toBe('90')
-    expect(after.hud?.measuredAngleText).toBe('90,0°')
+    expect(after.hud?.measuredAngleText).toBe('90,0')
   })
 
   it('o segmento fantasma salta para o ângulo digitado antes de haver comprimento', () => {
@@ -256,7 +256,7 @@ describe('Ferramenta Cômodo — entrada de ângulo no HUD (M2)', () => {
       { x: 4000, y: 0 },
     )
 
-    expect(result.hud?.measuredAngleText).toBe('0,0°')
+    expect(result.hud?.measuredAngleText).toBe('0,0')
   })
 
   it('ângulo fora de 0–359 é normalizado por módulo', () => {
