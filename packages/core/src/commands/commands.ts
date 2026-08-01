@@ -165,6 +165,7 @@ export type CommandErrorCode =
   | 'LOOP_TOO_SHORT'
   | 'DUPLICATE_NODE_ID'
   | 'DUPLICATE_LOOP_NODE'
+  | 'COINCIDENT_LOOP_NODE'
   | 'UNKNOWN_LOOP_NODE'
   | 'DEGENERATE_POLYGON'
   | 'ROOM_NOT_FOUND'
@@ -740,6 +741,16 @@ function validateCreateRoom(
   for (const node of payload.nodes) coordOf.set(node.id, { x: node.x, y: node.y });
 
   const points = payload.loop.map((id) => coordOf.get(id)!);
+
+  // Ids distintos não bastam: o merge por coordenada resolve dois ids para o
+  // mesmo nó, e o loop resultante repetiria um vértice (E4). Acontece quando o
+  // traço volta exatamente sobre um nó já confirmado — a entrada numérica
+  // alcança isso sem passar por nenhum snap.
+  const coincident = findDuplicates(points.map((point) => `${point.x},${point.y}`));
+  if (coincident.length > 0) {
+    return { code: 'COINCIDENT_LOOP_NODE', ids: [...payload.loop] };
+  }
+
   if (polygonArea(points) === 0) {
     return { code: 'DEGENERATE_POLYGON', ids: [...payload.loop] };
   }

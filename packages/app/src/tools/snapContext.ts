@@ -54,6 +54,26 @@ export function resolveToolSnap(point: Point, inputs: SnapInputs): SnapResult {
 }
 
 /**
+ * Nó exatamente nesta coordenada, considerando também o traço em andamento.
+ *
+ * Consulta exata, não resolvedor de snap: quem chama já tem um ponto que não
+ * pode ser movido — o comprimento digitado é exato — e só precisa saber se
+ * aquele lugar já é ocupado.
+ */
+export function exactNodeAt(
+  point: Point,
+  inputs: Pick<SnapInputs, 'doc' | 'draft'>,
+): NodeId | null {
+  for (const node of inputs.draft) {
+    if (node.x === point.x && node.y === point.y) return node.id
+  }
+  for (const node of inputs.doc.nodes) {
+    if (node.x === point.x && node.y === point.y) return node.id
+  }
+  return null
+}
+
+/**
  * Arestas do documento para ponto médio, projeção e extensão.
  *
  * Uma aresta com ponta em nó arrastado é omitida: ela se move junto do cursor,

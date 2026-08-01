@@ -51,6 +51,33 @@ function twoAdjacentRooms(): {
   };
 }
 
+describe('CreateRoom — nós coincidentes no ciclo', () => {
+  it('rejeita loop cujos ids distintos resolvem para a mesma coordenada', () => {
+    const doc = createEmptyDocument();
+
+    // O traço volta exatamente sobre o segundo nó. Ids distintos, coordenadas
+    // repetidas: o merge por coordenada colapsaria os dois e o ciclo passaria
+    // a repetir um vértice (E4).
+    const result = applyCommand(doc, {
+      type: 'CreateRoom',
+      payload: {
+        nodes: [
+          { id: n('a'), x: 0, y: 0 },
+          { id: n('b'), x: 500, y: 0 },
+          { id: n('c'), x: 500, y: 510 },
+          { id: n('d'), x: 500, y: 0 },
+        ],
+        loop: [n('a'), n('b'), n('c'), n('d')],
+        name: '',
+      },
+    });
+
+    expect(result.error?.code).toBe('COINCIDENT_LOOP_NODE');
+    expect(result.document).toBe(doc);
+    expect(validateDocumentErrors(result.document)).toHaveLength(0);
+  });
+});
+
 describe('MoveNode', () => {
   it('mover um nó compartilhado atualiza a área dos dois cômodos', () => {
     const { doc, left, right } = twoAdjacentRooms();

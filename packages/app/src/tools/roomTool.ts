@@ -55,6 +55,16 @@ export interface RoomToolContext {
   readonly cursor: Point
   readonly snap: SnapResult
   readonly shift: boolean
+  /**
+   * Nó exatamente nesta coordenada, ou `null`.
+   *
+   * A entrada numérica calcula o ponto confirmado a partir da direção travada
+   * e do comprimento digitado, sem passar pelo resolvedor de snap — que moveria
+   * o ponto e estragaria o comprimento exato. Sem esta consulta o traço pode
+   * voltar sobre um nó já confirmado e criar um segundo nó na mesma
+   * coordenada, violando E6.
+   */
+  readonly nodeAt: (point: Point) => NodeId | null
   readonly newNodeId: () => NodeId
   readonly newRoomId: () => RoomId
 }
@@ -133,11 +143,12 @@ function candidateOf(
     const length =
       input.value !== '' ? parseLength(input.value) : distance(origin, ctx.snap.point)
     const raw = pointAtDistance(origin, frozen, length)
+    const point = { x: Math.round(raw.x), y: Math.round(raw.y) }
     return {
-      point: { x: Math.round(raw.x), y: Math.round(raw.y) },
+      point,
       direction: frozen,
       length,
-      merged: null,
+      merged: ctx.nodeAt(point),
     }
   }
 

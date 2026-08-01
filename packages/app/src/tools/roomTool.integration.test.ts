@@ -15,7 +15,7 @@ import {
   type RoomToolEvent,
   type RoomToolState,
 } from './roomTool'
-import { resolveToolSnap } from './snapContext'
+import { exactNodeAt, resolveToolSnap } from './snapContext'
 
 /**
  * Dirige a Ferramenta Cômodo de ponta a ponta — tool → DocumentStore — e
@@ -37,16 +37,13 @@ function makeHarness() {
   function context(cursor: Point, shift = false): RoomToolContext {
     // Pelo mesmo resolvedor que `App.svelte` usa: montar o `SnapContext` à mão
     // aqui deixaria o teste passar sobre um caminho que o app não percorre.
+    const doc = store.current
+    const draft = draftNodes()
     return {
       cursor,
-      snap: resolveToolSnap(cursor, {
-        doc: store.current,
-        draft: draftNodes(),
-        scale: 0.1,
-        shift,
-        alt: false,
-      }),
+      snap: resolveToolSnap(cursor, { doc, draft, scale: 0.1, shift, alt: false }),
       shift,
+      nodeAt: (point) => exactNodeAt(point, { doc, draft }),
       newNodeId: () => `n_t${++nodeSeq}` as NodeId,
       newRoomId: () => `r_t${++roomSeq}` as RoomId,
     }
@@ -169,6 +166,33 @@ describe('Ferramenta Cômodo — sequência de aceitação do M1', () => {
     const ids = h.state.kind === 'idle' ? [] : h.state.nodes.map((n) => n.id)
     expect(new Set(ids).size).toBe(ids.length)
     expect(ids).toHaveLength(4)
+  })
+})
+
+describe('Ferramenta Cômodo — entrada numérica que volta sobre um nó', () => {
+  it('reusa o nó existente em vez de criar um segundo na mesma coordenada', () => {
+    const h = makeHarness()
+    h.drive({ type: 'pointerDown', clickCount: 1 }, { x: 0, y: 0 })
+    h.type('50', { x: 4000, y: 0 })
+    h.type('51', { x: 500, y: 4000 })
+    // De volta para cima: o ponto confirmado cai exatamente sobre o segundo nó.
+    h.type('51', { x: 500, y: -4000 })
+
+    const nodes = h.state.kind === 'idle' ? [] : h.state.nodes
+    const ids = nodes.map((node) => node.id)
+    expect(new Set(ids).size).toBeLessThan(ids.length)
+  })
+
+  it('o documento nunca fica com nó coincidente nem ciclo repetido', () => {
+    const h = makeHarness()
+    h.drive({ type: 'pointerDown', clickCount: 1 }, { x: 0, y: 0 })
+    h.type('50', { x: 4000, y: 0 })
+    h.type('51', { x: 500, y: 4000 })
+    h.type('51', { x: 500, y: -4000 })
+    h.type('50', { x: 500, y: -4000 })
+    h.drive({ type: 'close' })
+
+    expect(validateDocumentErrors(h.store.current)).toEqual([])
   })
 })
 

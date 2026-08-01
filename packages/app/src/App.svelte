@@ -57,7 +57,7 @@
     type SelectToolEvent,
     type SelectToolState,
   } from './tools/selectTool'
-  import { resolveToolSnap } from './tools/snapContext'
+  import { exactNodeAt, resolveToolSnap } from './tools/snapContext'
   import { classifyKey, type FocusKind } from './tools/toolShortcuts'
   import PropertiesPanel from './components/PropertiesPanel.svelte'
 
@@ -124,16 +124,18 @@
   function toolContext(shift: boolean): RoomToolContext {
     const world = worldAt(cursorPx)
     const draft = roomState.kind === 'idle' ? [] : roomState.nodes
+    const current = store.current
     return {
       cursor: world,
       snap: resolveToolSnap(world, {
-        doc: store.current,
+        doc: current,
         draft,
         scale: camera.scale,
         shift,
         alt: false,
       }),
       shift,
+      nodeAt: (point) => exactNodeAt(point, { doc: current, draft }),
       newNodeId: generateNodeId,
       newRoomId: generateRoomId,
     }
