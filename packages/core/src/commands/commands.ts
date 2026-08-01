@@ -3,8 +3,21 @@
 // ============================================================
 
 import { type Patch, produceWithPatches, enablePatches } from 'immer';
-import type { PlanDocument, NodeId, RoomId, Node, Room, EdgeRef } from '../model';
-import { generateNodeId, generateRoomId, generateDefaultRoomName } from '../model';
+import type {
+  PlanDocument,
+  NodeId,
+  RoomId,
+  Node,
+  Room,
+  EdgeRef,
+  HexColor,
+} from '../model';
+import {
+  generateNodeId,
+  generateRoomId,
+  generateDefaultRoomName,
+  isRoomColor,
+} from '../model';
 import { isClockwise, polygonArea } from '../geometry';
 
 // Habilita suporte a patches no Immer (precisa ser chamado uma vez)
@@ -22,6 +35,8 @@ export type Command =
   | MergeNodesCommand
   | SplitNodeCommand
   | SetEdgeLengthCommand
+  | SetRoomColorCommand
+  | SetRoomUsableCommand
   | BatchCommand;
 
 export interface CreateRoomCommand {
@@ -109,6 +124,28 @@ export interface SetEdgeLengthPayload {
   newNodeId?: NodeId;
 }
 
+export interface SetRoomColorCommand {
+  type: 'SetRoomColor';
+  transient?: boolean;
+  payload: SetRoomColorPayload;
+}
+
+export interface SetRoomColorPayload {
+  roomId: RoomId;
+  color: HexColor | null;
+}
+
+export interface SetRoomUsableCommand {
+  type: 'SetRoomUsable';
+  transient?: boolean;
+  payload: SetRoomUsablePayload;
+}
+
+export interface SetRoomUsablePayload {
+  roomId: RoomId;
+  includeInUsableArea: boolean;
+}
+
 export interface BatchCommand {
   type: 'Batch';
   transient?: boolean;
@@ -138,7 +175,8 @@ export type CommandErrorCode =
   | 'NODE_NOT_SHARED'
   | 'DEGENERATE_WALL'
   | 'EDGE_NOT_FOUND'
-  | 'INVALID_LENGTH';
+  | 'INVALID_LENGTH'
+  | 'UNKNOWN_COLOR';
 
 export interface CommandError {
   code: CommandErrorCode;
@@ -207,6 +245,10 @@ export function applyCommand(
       return applySplitNode(doc, cmd.payload);
     case 'SetEdgeLength':
       return applySetEdgeLength(doc, cmd.payload);
+    case 'SetRoomColor':
+      return applySetRoomColor(doc, cmd.payload);
+    case 'SetRoomUsable':
+      return applySetRoomUsable(doc, cmd.payload);
     case 'Batch':
       return applyBatch(doc, cmd.payload);
   }
@@ -459,6 +501,49 @@ function isShared(doc: PlanDocument, nodeId: NodeId, roomId: RoomId): boolean {
     if (wall.a === nodeId || wall.b === nodeId) return true;
   }
   return false;
+}
+
+// ============================================================
+// SetRoomColor e SetRoomUsable
+// ============================================================
+
+function applySetRoomColor(
+  doc: PlanDocument,
+  payload: SetRoomColorPayload,
+): CommandResult {
+  const label = 'Trocar cor';
+  const room = doc.rooms.find((candidate) => candidate.id === payload.roomId);
+  if (!room) {
+    return rejected(doc, label, { code: 'ROOM_NOT_FOUND', ids: [payload.roomId] });
+  }
+  if (payload.color !== null && !isRoomColor(payload.color)) {
+    return rejected(doc, label, { code: 'UNKNOWN_COLOR', ids: [payload.roomId] });
+  }
+
+  const [nextDoc, patches, inversePatches] = produceWithPatches(doc, (draft) => {
+    const target = draft.rooms.find((candidate) => candidate.id === payload.roomId);
+    if (target) target.color = payload.color;
+  });
+
+  return applied(nextDoc, patches, inversePatches, label);
+}
+
+function applySetRoomUsable(
+  doc: PlanDocument,
+  payload: SetRoomUsablePayload,
+): CommandResult {
+  const label = 'Contar na área útil';
+  const room = doc.rooms.find((candidate) => candidate.id === payload.roomId);
+  if (!room) {
+    return rejected(doc, label, { code: 'ROOM_NOT_FOUND', ids: [payload.roomId] });
+  }
+
+  const [nextDoc, patches, inversePatches] = produceWithPatches(doc, (draft) => {
+    const target = draft.rooms.find((candidate) => candidate.id === payload.roomId);
+    if (target) target.includeInUsableArea = payload.includeInUsableArea;
+  });
+
+  return applied(nextDoc, patches, inversePatches, label);
 }
 
 // ============================================================
