@@ -362,7 +362,7 @@ describe('applyCreateRoom — rejeição de payload malformado', () => {
 
     expect(result.error?.code).toBe('DUPLICATE_LOOP_NODE');
     expect(result.document).toBe(doc);
-    expect(result.patches).toEqual([]);
+    expect(result.patchGroups).toEqual([]);
   });
 
   it('rejeita nodes com id repetido', () => {

@@ -94,7 +94,8 @@ describe('MoveNode', () => {
       payload: { nodeId: n('b'), x: 4200, y: 1000 },
     });
 
-    expect(applyPatches(moved.document, moved.inversePatches)).toEqual(doc);
+    expect(moved.inversePatchGroups).toHaveLength(1);
+    expect(applyPatches(moved.document, moved.inversePatchGroups[0]!)).toEqual(doc);
   });
 
   it('nó inexistente é rejeitado sem tocar no documento', () => {

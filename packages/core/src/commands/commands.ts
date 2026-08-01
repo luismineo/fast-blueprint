@@ -18,7 +18,8 @@ export type Command =
   | CreateRoomCommand
   | DeleteRoomCommand
   | RenameRoomCommand
-  | MoveNodeCommand;
+  | MoveNodeCommand
+  | BatchCommand;
 
 export interface CreateRoomCommand {
   type: 'CreateRoom';
@@ -68,6 +69,17 @@ export interface MoveNodePayload {
   y: number;
 }
 
+export interface BatchCommand {
+  type: 'Batch';
+  transient?: boolean;
+  payload: BatchPayload;
+}
+
+export interface BatchPayload {
+  label: string;
+  commands: Command[];
+}
+
 // ============================================================
 // Resultado
 // ============================================================
@@ -88,12 +100,43 @@ export interface CommandError {
   ids: string[];
 }
 
+/**
+ * Resultado de um comando, com os patches agrupados **por comando**.
+ *
+ * A unidade de inversão é o grupo, não o patch (spec 08 § Histórico). Os
+ * inversos que o Immer devolve para um comando já vêm na ordem em que
+ * precisam ser aplicados; reordená-los dentro do grupo corrompe qualquer
+ * comando que tenha `add` ou `remove`. Um comando simples devolve um grupo;
+ * um `Batch` devolve um por comando interno; um comando rejeitado, nenhum.
+ */
 export interface CommandResult {
   document: PlanDocument;
-  patches: Patch[];
-  inversePatches: Patch[];
+  patchGroups: Patch[][];
+  inversePatchGroups: Patch[][];
   label: string;
   error?: CommandError;
+}
+
+function rejected(
+  doc: PlanDocument,
+  label: string,
+  error: CommandError,
+): CommandResult {
+  return { document: doc, patchGroups: [], inversePatchGroups: [], label, error };
+}
+
+function applied(
+  document: PlanDocument,
+  patches: Patch[],
+  inversePatches: Patch[],
+  label: string,
+): CommandResult {
+  return {
+    document,
+    patchGroups: [patches],
+    inversePatchGroups: [inversePatches],
+    label,
+  };
 }
 
 // ============================================================
@@ -113,7 +156,38 @@ export function applyCommand(
       return applyRenameRoom(doc, cmd.payload);
     case 'MoveNode':
       return applyMoveNode(doc, cmd.payload);
+    case 'Batch':
+      return applyBatch(doc, cmd.payload);
   }
+}
+
+// ============================================================
+// Batch
+// ============================================================
+
+/**
+ * Aplica os comandos em ordem e produz **um** item de histórico, com um grupo
+ * de patches por comando interno (spec 08 § Comandos do M2).
+ *
+ * Rejeição de qualquer comando interno rejeita o lote inteiro: um lote
+ * parcialmente aplicado é exatamente o "documento em estado parcial" que a
+ * spec 08 § Tratamento de erro proíbe.
+ */
+function applyBatch(doc: PlanDocument, payload: BatchPayload): CommandResult {
+  const patchGroups: Patch[][] = [];
+  const inversePatchGroups: Patch[][] = [];
+  let current = doc;
+
+  for (const inner of payload.commands) {
+    const result = applyCommand(current, inner);
+    if (result.error) return rejected(doc, payload.label, result.error);
+
+    current = result.document;
+    patchGroups.push(...result.patchGroups);
+    inversePatchGroups.push(...result.inversePatchGroups);
+  }
+
+  return { document: current, patchGroups, inversePatchGroups, label: payload.label };
 }
 
 // ============================================================
@@ -126,9 +200,7 @@ function applyMoveNode(
 ): CommandResult {
   const label = 'Mover nó';
   const rejection = validateMoveNode(doc, payload);
-  if (rejection) {
-    return { document: doc, patches: [], inversePatches: [], label, error: rejection };
-  }
+  if (rejection) return rejected(doc, label, rejection);
 
   const [nextDoc, patches, inversePatches] = produceWithPatches(doc, (draft) => {
     const node = draft.nodes.find((n) => n.id === payload.nodeId);
@@ -137,7 +209,7 @@ function applyMoveNode(
     node.y = payload.y as Node['y'];
   });
 
-  return { document: nextDoc, patches, inversePatches, label };
+  return applied(nextDoc, patches, inversePatches, label);
 }
 
 /**
@@ -179,16 +251,9 @@ function applyCreateRoom(
   doc: PlanDocument,
   payload: CreateRoomPayload,
 ): CommandResult {
+  const label = `Criar ${payload.name || 'cômodo'}`;
   const rejection = validateCreateRoom(doc, payload);
-  if (rejection) {
-    return {
-      document: doc,
-      patches: [],
-      inversePatches: [],
-      label: `Criar ${payload.name || 'cômodo'}`,
-      error: rejection,
-    };
-  }
+  if (rejection) return rejected(doc, label, rejection);
 
   const [nextDoc, patches, inversePatches] = produceWithPatches(doc, (draft) => {
     // Merge de nós: se já existe nó com as mesmas coordenadas, reusa (E6)
@@ -238,12 +303,7 @@ function applyCreateRoom(
     draft.rooms.push(room);
   });
 
-  return {
-    document: nextDoc,
-    patches,
-    inversePatches,
-    label: `Criar ${payload.name || 'cômodo'}`,
-  };
+  return applied(nextDoc, patches, inversePatches, label);
 }
 
 /**
@@ -312,13 +372,10 @@ function applyDeleteRoom(
 ): CommandResult {
   const room = doc.rooms.find((r) => r.id === payload.roomId);
   if (!room) {
-    return {
-      document: doc,
-      patches: [],
-      inversePatches: [],
-      label: 'Excluir cômodo',
-      error: { code: 'ROOM_NOT_FOUND', ids: [payload.roomId] },
-    };
+    return rejected(doc, 'Excluir cômodo', {
+      code: 'ROOM_NOT_FOUND',
+      ids: [payload.roomId],
+    });
   }
 
   const [nextDoc, patches, inversePatches] = produceWithPatches(doc, (draft) => {
@@ -329,12 +386,7 @@ function applyDeleteRoom(
     // Nós órfãos são removidos pelo GC ao salvar — invariante W5
   });
 
-  return {
-    document: nextDoc,
-    patches,
-    inversePatches,
-    label: `Excluir ${room.name}`,
-  };
+  return applied(nextDoc, patches, inversePatches, `Excluir ${room.name}`);
 }
 
 // ============================================================
@@ -347,13 +399,10 @@ function applyRenameRoom(
 ): CommandResult {
   const room = doc.rooms.find((r) => r.id === payload.roomId);
   if (!room) {
-    return {
-      document: doc,
-      patches: [],
-      inversePatches: [],
-      label: 'Renomear cômodo',
-      error: { code: 'ROOM_NOT_FOUND', ids: [payload.roomId] },
-    };
+    return rejected(doc, 'Renomear cômodo', {
+      code: 'ROOM_NOT_FOUND',
+      ids: [payload.roomId],
+    });
   }
 
   const [nextDoc, patches, inversePatches] = produceWithPatches(doc, (draft) => {
@@ -363,12 +412,12 @@ function applyRenameRoom(
     }
   });
 
-  return {
-    document: nextDoc,
+  return applied(
+    nextDoc,
     patches,
     inversePatches,
-    label: `Renomear ${room.name} → ${payload.name}`,
-  };
+    `Renomear ${room.name} → ${payload.name}`,
+  );
 }
 
 // ============================================================
