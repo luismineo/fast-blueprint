@@ -5,5 +5,8 @@
   "main": "./src/index.ts",
   "scripts": {
     "test": "vitest run"
+  },
+  "dependencies": {
+    "@planta/core": "workspace:*"
   }
 }

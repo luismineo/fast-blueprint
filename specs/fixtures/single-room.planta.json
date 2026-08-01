@@ -1,23 +1,36 @@
 {
-  "schemaVersion": 1,
-  "meta": {
-    "name": "Cômodo único",
-    "createdAt": "2026-07-30T00:00:00.000Z",
-    "modifiedAt": "2026-07-30T00:00:00.000Z",
-    "displayUnit": "m",
-    "gridSize": 100
-  },
   "nodes": [
-    { "id": "n1", "x": 0, "y": 0 },
-    { "id": "n2", "x": 3200, "y": 0 },
-    { "id": "n3", "x": 3200, "y": 2500 },
-    { "id": "n4", "x": 0, "y": 2500 }
+    {
+      "id": "n_1h55le5d",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "n_o5x4qo3p",
+      "x": 3200,
+      "y": 0
+    },
+    {
+      "id": "n_ikt6nd55",
+      "x": 3200,
+      "y": 2500
+    },
+    {
+      "id": "n_vsea5opn",
+      "x": 0,
+      "y": 2500
+    }
   ],
   "rooms": [
     {
-      "id": "r1",
+      "id": "r_5b3cf858-02cd-4bc7-b176-550e89a4a509",
       "name": "Quarto",
-      "loop": ["n1", "n2", "n3", "n4"],
+      "loop": [
+        "n_1h55le5d",
+        "n_o5x4qo3p",
+        "n_ikt6nd55",
+        "n_vsea5opn"
+      ],
       "color": null,
       "includeInUsableArea": true
     }
@@ -25,5 +38,13 @@
   "walls": [],
   "openings": [],
   "furniture": [],
-  "underlay": null
+  "underlay": null,
+  "meta": {
+    "schemaVersion": 1,
+    "name": "Sem título",
+    "createdAt": "2026-08-01T00:48:02.871Z",
+    "modifiedAt": "2026-08-01T00:48:02.871Z",
+    "displayUnit": "m",
+    "gridSize": 100
+  }
 }

@@ -1,0 +1,72 @@
+{
+  "nodes": [
+    {
+      "id": "n_4fmd7uim",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "n_t73sgwo9",
+      "x": 3200,
+      "y": 0
+    },
+    {
+      "id": "n_k8rjxjrd",
+      "x": 3200,
+      "y": 2500
+    },
+    {
+      "id": "n_myekcubm",
+      "x": 0,
+      "y": 2500
+    },
+    {
+      "id": "n_sdmfzkac",
+      "x": 6400,
+      "y": 0
+    },
+    {
+      "id": "n_xdq0lnu9",
+      "x": 6400,
+      "y": 2500
+    }
+  ],
+  "rooms": [
+    {
+      "id": "r_5235ef9d-1f81-4167-9f58-0c2dda96bd3b",
+      "name": "Quarto 1",
+      "loop": [
+        "n_4fmd7uim",
+        "n_t73sgwo9",
+        "n_k8rjxjrd",
+        "n_myekcubm"
+      ],
+      "color": null,
+      "includeInUsableArea": true
+    },
+    {
+      "id": "r_eca61712-bd31-423e-81ad-4da2661c3edc",
+      "name": "Quarto 2",
+      "loop": [
+        "n_t73sgwo9",
+        "n_sdmfzkac",
+        "n_xdq0lnu9",
+        "n_k8rjxjrd"
+      ],
+      "color": null,
+      "includeInUsableArea": true
+    }
+  ],
+  "walls": [],
+  "openings": [],
+  "furniture": [],
+  "underlay": null,
+  "meta": {
+    "schemaVersion": 1,
+    "name": "Sem título",
+    "createdAt": "2026-08-01T00:48:02.883Z",
+    "modifiedAt": "2026-08-01T00:48:02.883Z",
+    "displayUnit": "m",
+    "gridSize": 100
+  }
+}

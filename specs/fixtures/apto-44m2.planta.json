@@ -1,0 +1,202 @@
+{
+  "nodes": [
+    {
+      "id": "n_nw7pd2ru",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "n_xhqbdn69",
+      "x": 3400,
+      "y": 0
+    },
+    {
+      "id": "n_62lhtbso",
+      "x": 3400,
+      "y": 2100
+    },
+    {
+      "id": "n_jlzntsu3",
+      "x": 0,
+      "y": 2100
+    },
+    {
+      "id": "n_r0naj7bz",
+      "x": 2400,
+      "y": 2100
+    },
+    {
+      "id": "n_n9q4p8u9",
+      "x": 2400,
+      "y": 7000
+    },
+    {
+      "id": "n_udj5smez",
+      "x": 0,
+      "y": 7000
+    },
+    {
+      "id": "n_28dvbhyf",
+      "x": 6600,
+      "y": 0
+    },
+    {
+      "id": "n_kn9oxgz8",
+      "x": 6600,
+      "y": 2500
+    },
+    {
+      "id": "n_p7m8xdsk",
+      "x": 3400,
+      "y": 2500
+    },
+    {
+      "id": "n_9obzfji7",
+      "x": 5600,
+      "y": 2500
+    },
+    {
+      "id": "n_rp9kk8ij",
+      "x": 5600,
+      "y": 3700
+    },
+    {
+      "id": "n_mrnhxp7j",
+      "x": 3400,
+      "y": 3700
+    },
+    {
+      "id": "n_aej66pf8",
+      "x": 6600,
+      "y": 3700
+    },
+    {
+      "id": "n_9wmfdt37",
+      "x": 6600,
+      "y": 6000
+    },
+    {
+      "id": "n_wsmqcc7t",
+      "x": 3400,
+      "y": 6000
+    },
+    {
+      "id": "n_76nttcyk",
+      "x": 2400,
+      "y": 6000
+    },
+    {
+      "id": "n_sg8pzlk4",
+      "x": 3400,
+      "y": 7000
+    },
+    {
+      "id": "n_j24gkc5g",
+      "x": 2400,
+      "y": 7900
+    },
+    {
+      "id": "n_388rp87i",
+      "x": 0,
+      "y": 7900
+    }
+  ],
+  "rooms": [
+    {
+      "id": "r_6e6ee6fb-97fe-48d0-9f2f-a04f5386c136",
+      "name": "Cozinha/A.S.",
+      "loop": [
+        "n_nw7pd2ru",
+        "n_xhqbdn69",
+        "n_62lhtbso",
+        "n_jlzntsu3"
+      ],
+      "color": null,
+      "includeInUsableArea": true
+    },
+    {
+      "id": "r_1d01fb95-087c-492e-ad2f-3d1146997f7f",
+      "name": "Estar/Jantar",
+      "loop": [
+        "n_jlzntsu3",
+        "n_r0naj7bz",
+        "n_n9q4p8u9",
+        "n_udj5smez"
+      ],
+      "color": null,
+      "includeInUsableArea": true
+    },
+    {
+      "id": "r_bb606302-7338-4c30-8743-738d8be55533",
+      "name": "Dormitório 01",
+      "loop": [
+        "n_xhqbdn69",
+        "n_28dvbhyf",
+        "n_kn9oxgz8",
+        "n_p7m8xdsk"
+      ],
+      "color": null,
+      "includeInUsableArea": true
+    },
+    {
+      "id": "r_00fefd7d-f3d5-4291-a632-d6d76d626c24",
+      "name": "Banheiro",
+      "loop": [
+        "n_p7m8xdsk",
+        "n_9obzfji7",
+        "n_rp9kk8ij",
+        "n_mrnhxp7j"
+      ],
+      "color": null,
+      "includeInUsableArea": true
+    },
+    {
+      "id": "r_cbb29ad8-1860-4480-ae06-dea19e0e5a47",
+      "name": "Dormitório 02",
+      "loop": [
+        "n_mrnhxp7j",
+        "n_aej66pf8",
+        "n_9wmfdt37",
+        "n_wsmqcc7t"
+      ],
+      "color": null,
+      "includeInUsableArea": true
+    },
+    {
+      "id": "r_83c762dd-8320-498d-9be0-f00140160c80",
+      "name": "Circulação",
+      "loop": [
+        "n_76nttcyk",
+        "n_wsmqcc7t",
+        "n_sg8pzlk4",
+        "n_n9q4p8u9"
+      ],
+      "color": null,
+      "includeInUsableArea": true
+    },
+    {
+      "id": "r_e0e1099e-1f94-499a-a2b5-03cb2ea5aaea",
+      "name": "Sacada",
+      "loop": [
+        "n_udj5smez",
+        "n_n9q4p8u9",
+        "n_j24gkc5g",
+        "n_388rp87i"
+      ],
+      "color": null,
+      "includeInUsableArea": false
+    }
+  ],
+  "walls": [],
+  "openings": [],
+  "furniture": [],
+  "underlay": null,
+  "meta": {
+    "schemaVersion": 1,
+    "name": "Sem título",
+    "createdAt": "2026-08-01T00:48:02.890Z",
+    "modifiedAt": "2026-08-01T00:48:02.890Z",
+    "displayUnit": "m",
+    "gridSize": 100
+  }
+}

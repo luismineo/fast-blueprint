@@ -1,5 +1,11 @@
 import { clearPass } from './passes/clear'
 import { gridPass } from './passes/grid'
+import { roomFillsPass } from './passes/roomFills'
+import { wallsPass } from './passes/walls'
+import { dimensionsPass } from './passes/dimensions'
+import { roomLabelsPass } from './passes/roomLabels'
+import { snapGuidesPass } from './passes/snapGuides'
+import { toolOverlayPass } from './passes/toolOverlay'
 import { hudPass } from './passes/hud'
 import type { RenderContext } from './renderContext'
 
@@ -14,6 +20,12 @@ interface PassEntry {
 const PASSES: readonly PassEntry[] = [
   { name: 'clear', space: 'screen', run: clearPass },
   { name: 'grid', space: 'world', run: gridPass },
+  { name: 'roomFills', space: 'world', run: roomFillsPass },
+  { name: 'walls', space: 'world', run: wallsPass },
+  { name: 'dimensions', space: 'world', run: dimensionsPass },
+  { name: 'roomLabels', space: 'world', run: roomLabelsPass },
+  { name: 'snapGuides', space: 'world', run: snapGuidesPass },
+  { name: 'toolOverlay', space: 'world', run: toolOverlayPass },
   { name: 'hud', space: 'screen', run: hudPass },
 ]
 

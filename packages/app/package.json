@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@planta/core": "workspace:*",
     "@planta/renderer": "workspace:*"
   },
   "scripts": {

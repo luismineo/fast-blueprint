@@ -3,6 +3,8 @@ import { render } from './render'
 import { lightTheme } from './theme'
 import { RecordingTarget } from './target/RecordingTarget'
 import type { DrawTarget } from './target/DrawTarget'
+import type { Camera } from './camera'
+import type { FillStyle, LineStyle, TextStyle } from './target/DrawTarget'
 
 class ThrowingLineTarget implements DrawTarget {
   readonly clears: string[] = []
@@ -11,7 +13,7 @@ class ThrowingLineTarget implements DrawTarget {
     this.clears.push(color)
   }
 
-  setWorldTransform(): void {}
+  setWorldTransform(_camera: Camera): void {}
 
   resetTransform(): void {}
 
@@ -19,11 +21,17 @@ class ThrowingLineTarget implements DrawTarget {
     throw new Error('linha falhou de proposito')
   }
 
+  polyline(_points: { x: number; y: number }[], _style: LineStyle): void {}
+
+  filledPolygon(_points: { x: number; y: number }[], _fill: FillStyle): void {}
+
   text(): void {}
+
+  textRotated(): void {}
 }
 
 describe('render', () => {
-  it('aplica a transformacao de mundo nos passes de geometria e reseta antes dos passes de tela (specs/04 secao Camera)', () => {
+  it('aplica a transformacao de mundo nos passes de geometria e reseta antes dos passes de tela', () => {
     const target = new RecordingTarget()
     render({
       camera: { tx: 10, ty: 20, scale: 2 },
@@ -32,10 +40,13 @@ describe('render', () => {
       target,
     })
 
-    expect(target.transforms.map((entry) => entry.kind)).toEqual(['reset', 'world', 'reset'])
+    expect(target.transforms.map((entry) => entry.kind)).toEqual(
+      // reset (clear), world (grid, roomFills, walls, dimensions, roomLabels, snapGuides, toolOverlay), reset (hud)
+      ['reset', 'world', 'world', 'world', 'world', 'world', 'world', 'world', 'reset'],
+    )
   })
 
-  it('erro num pass nao interrompe os demais (specs/08-arquitetura.md criterio de aceitacao)', () => {
+  it('erro num pass nao interrompe os demais', () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const target = new ThrowingLineTarget()
     const ctx = {
@@ -51,7 +62,7 @@ describe('render', () => {
     errorSpy.mockRestore()
   })
 
-  it('loga o mesmo erro de pass uma unica vez, mesmo em frames repetidos (dedupe por assinatura)', () => {
+  it('loga o mesmo erro de pass uma unica vez', () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const target = new ThrowingLineTarget()
     const ctx = {
