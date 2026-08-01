@@ -3,7 +3,7 @@
 // ============================================================
 
 import { type Patch, produceWithPatches, enablePatches } from 'immer';
-import type { PlanDocument, NodeId, RoomId, Node, Room } from '../model';
+import type { PlanDocument, NodeId, RoomId, Node, Room, EdgeRef } from '../model';
 import { generateNodeId, generateRoomId, generateDefaultRoomName } from '../model';
 import { isClockwise, polygonArea } from '../geometry';
 
@@ -21,6 +21,7 @@ export type Command =
   | MoveNodeCommand
   | MergeNodesCommand
   | SplitNodeCommand
+  | SetEdgeLengthCommand
   | BatchCommand;
 
 export interface CreateRoomCommand {
@@ -95,6 +96,19 @@ export interface SplitNodePayload {
   newNodeId?: NodeId;
 }
 
+export interface SetEdgeLengthCommand {
+  type: 'SetEdgeLength';
+  transient?: boolean;
+  payload: SetEdgeLengthPayload;
+}
+
+export interface SetEdgeLengthPayload {
+  edge: EdgeRef;
+  length: number;
+  mode: 'moveTogether' | 'detach';
+  newNodeId?: NodeId;
+}
+
 export interface BatchCommand {
   type: 'Batch';
   transient?: boolean;
@@ -122,7 +136,9 @@ export type CommandErrorCode =
   | 'NON_INTEGER_COORDINATE'
   | 'SAME_NODE'
   | 'NODE_NOT_SHARED'
-  | 'DEGENERATE_WALL';
+  | 'DEGENERATE_WALL'
+  | 'EDGE_NOT_FOUND'
+  | 'INVALID_LENGTH';
 
 export interface CommandError {
   code: CommandErrorCode;
@@ -189,6 +205,8 @@ export function applyCommand(
       return applyMergeNodes(doc, cmd.payload);
     case 'SplitNode':
       return applySplitNode(doc, cmd.payload);
+    case 'SetEdgeLength':
+      return applySetEdgeLength(doc, cmd.payload);
     case 'Batch':
       return applyBatch(doc, cmd.payload);
   }
@@ -441,6 +459,98 @@ function isShared(doc: PlanDocument, nodeId: NodeId, roomId: RoomId): boolean {
     if (wall.a === nodeId || wall.b === nodeId) return true;
   }
   return false;
+}
+
+// ============================================================
+// SetEdgeLength
+// ============================================================
+
+interface ResolvedEdge {
+  startId: NodeId;
+  endId: NodeId;
+  roomId: RoomId | null;
+}
+
+/**
+ * Move o nó final da aresta ao longo da direção dela até que ela tenha o
+ * comprimento pedido.
+ *
+ * O nó final é o segundo na ordem do ciclo, que é normalizado para horário na
+ * criação: isso torna a direção determinística e independente de onde o clique
+ * caiu. `mode` só tem efeito quando esse nó é compartilhado — em `'detach'` o
+ * cômodo editado ganha uma cópia própria, em `'moveTogether'` os dois se movem.
+ * Aresta de parede avulsa não tem cômodo de onde desconectar, então ali `mode`
+ * é ignorado.
+ */
+function applySetEdgeLength(
+  doc: PlanDocument,
+  payload: SetEdgeLengthPayload,
+): CommandResult {
+  const label = 'Editar comprimento';
+
+  const edge = resolveEdgeRef(doc, payload.edge);
+  if (!edge) return rejected(doc, label, { code: 'EDGE_NOT_FOUND', ids: [] });
+
+  if (!(payload.length > 0)) {
+    return rejected(doc, label, { code: 'INVALID_LENGTH', ids: [edge.endId] });
+  }
+
+  const start = doc.nodes.find((node) => node.id === edge.startId);
+  const end = doc.nodes.find((node) => node.id === edge.endId);
+  if (!start || !end) {
+    return rejected(doc, label, { code: 'EDGE_NOT_FOUND', ids: [] });
+  }
+
+  const current = Math.hypot(end.x - start.x, end.y - start.y);
+  if (current === 0) {
+    return rejected(doc, label, { code: 'EDGE_NOT_FOUND', ids: [edge.endId] });
+  }
+
+  const to = {
+    x: Math.round(start.x + ((end.x - start.x) / current) * payload.length),
+    y: Math.round(start.y + ((end.y - start.y) / current) * payload.length),
+  };
+
+  const detaches =
+    payload.mode === 'detach' &&
+    edge.roomId !== null &&
+    isShared(doc, edge.endId, edge.roomId);
+
+  const inner: Command = detaches
+    ? {
+        type: 'SplitNode',
+        payload: {
+          nodeId: edge.endId,
+          roomId: edge.roomId!,
+          to,
+          newNodeId: payload.newNodeId,
+        },
+      }
+    : { type: 'MoveNode', payload: { nodeId: edge.endId, x: to.x, y: to.y } };
+
+  const result = applyCommand(doc, inner);
+  if (result.error) return rejected(doc, label, result.error);
+
+  return { ...result, label };
+}
+
+function resolveEdgeRef(doc: PlanDocument, edge: EdgeRef): ResolvedEdge | null {
+  if (edge.kind === 'wall') {
+    const wall = doc.walls.find((candidate) => candidate.id === edge.wallId);
+    if (!wall) return null;
+    return { startId: wall.a, endId: wall.b, roomId: null };
+  }
+
+  const room = doc.rooms.find((candidate) => candidate.id === edge.roomId);
+  if (!room) return null;
+  if (!Number.isInteger(edge.index)) return null;
+  if (edge.index < 0 || edge.index >= room.loop.length) return null;
+
+  return {
+    startId: room.loop[edge.index]!,
+    endId: room.loop[(edge.index + 1) % room.loop.length]!,
+    roomId: room.id,
+  };
 }
 
 // ============================================================
