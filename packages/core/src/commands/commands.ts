@@ -17,7 +17,8 @@ enablePatches();
 export type Command =
   | CreateRoomCommand
   | DeleteRoomCommand
-  | RenameRoomCommand;
+  | RenameRoomCommand
+  | MoveNodeCommand;
 
 export interface CreateRoomCommand {
   type: 'CreateRoom';
@@ -55,6 +56,18 @@ export interface RenameRoomPayload {
   name: string;
 }
 
+export interface MoveNodeCommand {
+  type: 'MoveNode';
+  transient?: boolean;
+  payload: MoveNodePayload;
+}
+
+export interface MoveNodePayload {
+  nodeId: NodeId;
+  x: number;
+  y: number;
+}
+
 // ============================================================
 // Resultado
 // ============================================================
@@ -65,7 +78,10 @@ export type CommandErrorCode =
   | 'DUPLICATE_LOOP_NODE'
   | 'UNKNOWN_LOOP_NODE'
   | 'DEGENERATE_POLYGON'
-  | 'ROOM_NOT_FOUND';
+  | 'ROOM_NOT_FOUND'
+  | 'NODE_NOT_FOUND'
+  | 'NODE_COLLISION'
+  | 'NON_INTEGER_COORDINATE';
 
 export interface CommandError {
   code: CommandErrorCode;
@@ -95,7 +111,64 @@ export function applyCommand(
       return applyDeleteRoom(doc, cmd.payload);
     case 'RenameRoom':
       return applyRenameRoom(doc, cmd.payload);
+    case 'MoveNode':
+      return applyMoveNode(doc, cmd.payload);
   }
+}
+
+// ============================================================
+// MoveNode
+// ============================================================
+
+function applyMoveNode(
+  doc: PlanDocument,
+  payload: MoveNodePayload,
+): CommandResult {
+  const label = 'Mover nó';
+  const rejection = validateMoveNode(doc, payload);
+  if (rejection) {
+    return { document: doc, patches: [], inversePatches: [], label, error: rejection };
+  }
+
+  const [nextDoc, patches, inversePatches] = produceWithPatches(doc, (draft) => {
+    const node = draft.nodes.find((n) => n.id === payload.nodeId);
+    if (!node) return;
+    node.x = payload.x as Node['x'];
+    node.y = payload.y as Node['y'];
+  });
+
+  return { document: nextDoc, patches, inversePatches, label };
+}
+
+/**
+ * Um destino já ocupado é rejeitado, não fundido.
+ *
+ * Fundir aqui faria `MoveNode` mudar a contagem de nós do documento sem que
+ * quem chamou pedisse isso — e a fusão tem comando próprio, com o inverso
+ * correspondente. Reparo silencioso é o que transforma payload errado em
+ * documento plausível (spec 08 § Tratamento de erro).
+ */
+function validateMoveNode(
+  doc: PlanDocument,
+  payload: MoveNodePayload,
+): CommandError | null {
+  if (!Number.isInteger(payload.x) || !Number.isInteger(payload.y)) {
+    return { code: 'NON_INTEGER_COORDINATE', ids: [payload.nodeId] };
+  }
+
+  const node = doc.nodes.find((n) => n.id === payload.nodeId);
+  if (!node) {
+    return { code: 'NODE_NOT_FOUND', ids: [payload.nodeId] };
+  }
+
+  const occupant = doc.nodes.find(
+    (n) => n.id !== payload.nodeId && n.x === payload.x && n.y === payload.y,
+  );
+  if (occupant) {
+    return { code: 'NODE_COLLISION', ids: [payload.nodeId, occupant.id] };
+  }
+
+  return null;
 }
 
 // ============================================================
