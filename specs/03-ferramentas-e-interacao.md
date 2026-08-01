@@ -176,7 +176,13 @@ Três caminhos, todos equivalentes em resultado:
 
 Digitar qualquer dígito em estado Anchored ou Drawing foca automaticamente o campo de comprimento do HUD. Não existe passo de "clicar no campo".
 
-A direção usada com entrada numérica é a direção **após snap de eixo**. Se o mouse aponta para 87° e o snap de eixo está ativo, a direção é 90°. Isso é o que permite desenhar um retângulo perfeito digitando quatro números.
+A direção usada com entrada numérica é a direção **após snap de eixo**. Se o mouse aponta para 87°, a direção é 90°. Isso é o que permite desenhar um retângulo perfeito digitando quatro números.
+
+**Como essa direção é obtida.** Por arredondamento angular — `snapAngle(ângulo do cursor, shift)`, o múltiplo de 90° mais próximo (45° com `Shift`) — e **não** pela Classe 2 do resolvedor de snap (`adr/0003-modelo-de-snap.md`).
+
+A distinção não é pedantismo, é o que faz o exemplo acima funcionar. A tolerância da Classe 2 é de 8 px de distância **perpendicular**, limitada a [2, 40] mm. Com o cursor a 3 000 mm da origem, 40 mm perpendiculares são 0,76°; um desvio de 3° são 157 mm, muito fora da tolerância. Ou seja: passar 87° pelo resolvedor de snap devolve 87°, não 90°. A Classe 2 governa a **posição** do ponto ao clicar; a direção da entrada numérica é governada pelo arredondamento angular, que não tem tolerância de distância.
+
+A direção **congela** no primeiro dígito e o segmento fantasma salta para o eixo. O salto é o retorno visual de que a direção travou — o mouse pode continuar se movendo sem afetar o segmento.
 
 **Reuso de nó (merged).** Se o `SnapResult` do ponto confirmado tem `merged` preenchido, o segmento é ancorado no nó existente em vez de criar um novo. Isso é o que permite desenhar cômodos adjacentes compartilhando aresta: o snap a nó dispara sobre o vértice do cômodo vizinho, o nó é reusado, e ao mover esse vértice ambos os cômodos se ajustam (ver invariante E6 em `01-modelo-de-dominio.md` e ADR-0002).
 
@@ -199,6 +205,17 @@ Fechamento com menos de 3 nós é ignorado.
 
 `Backspace` durante o desenho também remove o último segmento (com campo de comprimento vazio).
 
+**Com o campo de comprimento preenchido**, as duas teclas se separam:
+
+| Tecla | Campo preenchido | Campo vazio |
+|---|---|---|
+| `Backspace` | Apaga um caractere (comportamento padrão de campo) | Remove o último segmento |
+| `Esc` | Limpa o campo inteiro numa pressão e devolve o foco ao canvas, saindo da armadilha de foco | Remove o último segmento |
+
+`Esc` é cancelamento, não edição: limpar tudo de uma vez é o que se espera de cancelar, e é coerente com o papel de `Esc` como saída documentada da armadilha de foco (§ HUD de desenho). Apagar caractere a caractere é trabalho de `Backspace`.
+
+**O campo é esvaziado a cada segmento confirmado.** Não sobra valor de um segmento para o próximo, então não existe a questão de o primeiro dígito substituir ou concatenar: quando um segmento novo começa o campo está sempre vazio, e todo dígito concatena.
+
 ### HUD de desenho
 
 Ancorado ao cursor, deslocado 16 px à direita e abaixo. Contém:
@@ -211,7 +228,9 @@ Ancorado ao cursor, deslocado 16 px à direita e abaixo. Contém:
 └─────────────────────┘
 ```
 
-O campo de comprimento é editável e recebe foco automático ao digitar. O campo de ângulo é **somente leitura no M1** — exibe a direção pós-snap de eixo, mas não aceita entrada. Entrada de ângulo arbitrário entra no M2 (ver `09-roadmap.md`). A terceira linha só aparece a partir de 3 segmentos e mostra a área caso fechasse agora.
+O campo de comprimento é editável e recebe foco automático ao digitar. O campo de ângulo é **somente leitura no M1** — exibe a direção pós-snap de eixo, mas não aceita entrada. Entrada de ângulo arbitrário entra no M2 (ver `09-roadmap.md`).
+
+A terceira linha aparece a partir de **3 nós confirmados** e mostra a área caso o polígono fechasse agora. A contagem é de nós, não de segmentos, porque nó é o que a máquina de estados acumula; 3 nós são 2 segmentos confirmados mais o fechamento implícito, o menor polígono com área. O mockup acima mostra `4 lados` porque ilustra um retângulo em andamento, não o limiar de exibição.
 
 **Armadilha de foco.** Enquanto a Ferramenta Cômodo está em Anchored ou Drawing, o HUD é uma armadilha de foco: `Tab` circula apenas entre os campos do HUD e não escapa. `Esc` é a saída documentada (remove o último segmento e sai da armadilha). Isso é compatível com o piso de acessibilidade de `07-ui-e-layout.md`: armadilha de foco em interação modal é o padrão esperado (WCAG 2.1.2), desde que haja saída documentada por teclado. Fora dos estados Anchored/Drawing, `Tab` segue a travessia de foco padrão.
 

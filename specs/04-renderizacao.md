@@ -83,6 +83,10 @@ interface RenderContext {
 
 Passes 1–9 desenham conteúdo do documento. Passes 10–13 desenham estado efêmero de interação.
 
+O pass `hud` desenha apenas a **escala gráfica**. O HUD de entrada numérica (`03-ferramentas-e-interacao.md` § HUD de desenho) é elemento DOM sobreposto ao canvas, não pass de canvas: ele tem campos editáveis com foco, seleção e navegação por teclado, e uma armadilha de foco que precisa ser anunciada por leitor de tela — nada disso o canvas fornece.
+
+Passes de geometria (2–8, 10, 11) desenham em **milímetros**, com a transformação da câmera aplicada, e usam `lineWidth = px / scale` para espessura constante. Passes que desenham **texto** (9 e as cotas de 8) resetam a transformação e convertem a posição manualmente — ver § Espessura constante. Um pass declara em qual dos dois espaços trabalha; o orquestrador aplica ou reseta a transformação antes de chamá-lo, e o pass nunca gerencia transformação por conta própria.
+
 O underlay (imagem de referência) não está na lista de passes: ele usa um elemento canvas de fundo separado, sobreposto por z-index atrás do canvas principal, redesenhado apenas quando a câmera muda (ver § Orçamento de performance, regra 6). No M1 é no-op porque `doc.underlay` é sempre `null`.
 
 ## Grid adaptativo
