@@ -4,7 +4,7 @@ import { lightTheme } from './theme'
 import { RecordingTarget } from './target/RecordingTarget'
 import type { DrawTarget } from './target/DrawTarget'
 import type { Camera } from './camera'
-import type { FillStyle, LineStyle, TextStyle } from './target/DrawTarget'
+import type { FillStyle, LineStyle } from './target/DrawTarget'
 
 class ThrowingLineTarget implements DrawTarget {
   readonly clears: string[] = []

@@ -5,7 +5,7 @@
 import { type Patch, applyPatches } from 'immer';
 import type { PlanDocument } from '../model';
 import { createEmptyDocument } from '../model';
-import type { Command, CommandResult } from '../commands';
+import type { Command } from '../commands';
 import { applyCommand } from '../commands';
 
 // ============================================================

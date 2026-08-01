@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { CanvasTarget, Profiler, lightTheme, panBy, render, type Camera, type Size } from '@planta/renderer'
-  import { DocumentStore, createEmptyDocument, resolveSnap, type Point, formatLength, formatAngle, formatArea } from '@planta/core'
+  import { DocumentStore, resolveSnap, type Point, formatLength, formatAngle, formatArea } from '@planta/core'
   import { Scheduler } from './scheduler'
   import {
     applyWheelIntent,
@@ -188,7 +188,6 @@
       if (roomState.kind !== 'idle') {
         // Atualiza HUD com posição do cursor
         const wp = worldPoint(cursor)
-        const sr = snap(wp)
         const direction = roomState.kind === 'anchored'
           ? Math.atan2(wp.y - roomState.anchor.y, wp.x - roomState.anchor.x)
           : null
@@ -224,7 +223,6 @@
         if (event.key === 'Enter') {
           event.preventDefault()
           const wp = worldPoint(cursor)
-          const sr = snap(wp)
           const result = roomToolTransition(roomState, { type: 'enter' }, wp, null)
           applyRoomResult(result)
           return

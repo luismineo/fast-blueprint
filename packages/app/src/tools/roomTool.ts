@@ -3,7 +3,7 @@
 // ============================================================
 
 import type { Point, SnapResult, NodeId, CreateRoomCommand } from '@planta/core'
-import { computeRoomArea, formatLength, formatAngle, formatArea, parseLength } from '@planta/core'
+import { parseLength } from '@planta/core'
 import { angle, pointAtDistance } from '@planta/core'
 
 // ============================================================
@@ -62,7 +62,7 @@ export function roomToolTransition(
   state: RoomToolState,
   event: RoomToolEvent,
   cursor: Point,
-  origin: Point | null, // último nó confirmado ou anchor
+  _origin: Point | null,
 ): RoomToolResult {
   switch (state.kind) {
     case 'idle':
@@ -182,7 +182,6 @@ function handleAnchored(
 function anchoredResult(
   state: RoomToolState & { kind: 'anchored' },
 ): RoomToolResult {
-  const origin = state.anchor
   return {
     state,
     command: null,

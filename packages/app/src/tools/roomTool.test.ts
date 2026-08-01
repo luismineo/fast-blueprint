@@ -3,15 +3,10 @@ import {
   initialRoomState,
   roomToolTransition,
   type RoomToolState,
-  type SnapNode,
 } from './roomTool'
-import type { SnapResult } from '@planta/core'
+import type { NodeId } from '@planta/core'
 
-const noSnap: SnapResult = {
-  point: { x: 0, y: 0 },
-  targets: [],
-  merged: null,
-}
+const nid = (value: string): NodeId => value as NodeId
 
 describe('roomTool', () => {
   describe('estado Idle', () => {
@@ -42,18 +37,18 @@ describe('roomTool', () => {
       const state: RoomToolState = {
         kind: 'anchored',
         anchor: { x: 0, y: 0 },
-        anchors: [{ id: 'n1' as any, x: 0, y: 0 }],
+        anchors: [{ id: nid('n1'), x: 0, y: 0 }],
       }
 
       // Digita '3'
       const r1 = roomToolTransition(state, { type: 'digit', digit: '3' }, { x: 100, y: 0 }, null)
       expect(r1.state.kind).toBe('drawing')
-      expect((r1.state as any).inputValue).toBe('3')
+      expect(r1.state.kind === 'drawing' && r1.state.inputValue).toBe('3')
       expect(r1.segmentLength).toBe(30) // 3cm = 30mm
 
       // Digita '2'
       const r2 = roomToolTransition(r1.state, { type: 'digit', digit: '2' }, { x: 100, y: 0 }, null)
-      expect((r2.state as any).inputValue).toBe('32')
+      expect(r2.state.kind === 'drawing' && r2.state.inputValue).toBe('32')
       expect(r2.segmentLength).toBe(320) // 32cm = 320mm
 
       // Digita '0' e Enter
@@ -69,7 +64,7 @@ describe('roomTool', () => {
       const state: RoomToolState = {
         kind: 'anchored',
         anchor: { x: 0, y: 0 },
-        anchors: [{ id: 'n1' as any, x: 0, y: 0 }],
+        anchors: [{ id: nid('n1'), x: 0, y: 0 }],
       }
       const result = roomToolTransition(state, { type: 'escape' }, { x: 0, y: 0 }, null)
       expect(result.state.kind).toBe('idle')
@@ -82,7 +77,7 @@ describe('roomTool', () => {
       let state: RoomToolState = {
         kind: 'anchored',
         anchor: { x: 0, y: 0 },
-        anchors: [{ id: 'n1' as any, x: 0, y: 0 }],
+        anchors: [{ id: nid('n1'), x: 0, y: 0 }],
       }
 
       // Confirma primeiro segmento: 320 cm para direita (0°)
@@ -128,10 +123,10 @@ describe('roomTool', () => {
         kind: 'drawing',
         anchor: { x: 0, y: 0 },
         anchors: [
-          { id: 'n1' as any, x: 0, y: 0 },
-          { id: 'n2' as any, x: 3200, y: 0 },
+          { id: nid('n1'), x: 0, y: 0 },
+          { id: nid('n2'), x: 3200, y: 0 },
         ],
-        confirmedNodes: [{ id: 'n2' as any, x: 3200, y: 0 }],
+        confirmedNodes: [{ id: nid('n2'), x: 3200, y: 0 }],
       }
       const r = roomToolTransition(state, { type: 'escape' }, { x: 0, y: 0 }, null)
       expect(r.state.kind).toBe('anchored')
@@ -142,13 +137,13 @@ describe('roomTool', () => {
         kind: 'drawing',
         anchor: { x: 0, y: 0 },
         anchors: [
-          { id: 'n1' as any, x: 0, y: 0 },
-          { id: 'n2' as any, x: 3200, y: 0 },
-          { id: 'n3' as any, x: 3200, y: 2500 },
+          { id: nid('n1'), x: 0, y: 0 },
+          { id: nid('n2'), x: 3200, y: 0 },
+          { id: nid('n3'), x: 3200, y: 2500 },
         ],
         confirmedNodes: [
-          { id: 'n2' as any, x: 3200, y: 0 },
-          { id: 'n3' as any, x: 3200, y: 2500 },
+          { id: nid('n2'), x: 3200, y: 0 },
+          { id: nid('n3'), x: 3200, y: 2500 },
         ],
       }
       const r = roomToolTransition(state, { type: 'escape' }, { x: 0, y: 0 }, null)
@@ -164,10 +159,10 @@ describe('roomTool', () => {
         kind: 'drawing',
         anchor: { x: 0, y: 0 },
         anchors: [
-          { id: 'n1' as any, x: 0, y: 0 },
-          { id: 'n2' as any, x: 3200, y: 0 },
+          { id: nid('n1'), x: 0, y: 0 },
+          { id: nid('n2'), x: 3200, y: 0 },
         ],
-        confirmedNodes: [{ id: 'n2' as any, x: 3200, y: 0 }],
+        confirmedNodes: [{ id: nid('n2'), x: 3200, y: 0 }],
       }
       const r = roomToolTransition(state, { type: 'c' }, { x: 0, y: 0 }, null)
       expect(r.command).toBeNull()

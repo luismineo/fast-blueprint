@@ -4,7 +4,7 @@
 
 import { type Patch, produceWithPatches, enablePatches } from 'immer';
 import type { PlanDocument, NodeId, RoomId, Node, Room } from '../model';
-import { generateNodeId, generateRoomId, generateDefaultRoomName } from '../model';
+import { generateRoomId, generateDefaultRoomName } from '../model';
 import { orientLoop, polygonArea } from '../geometry';
 
 // Habilita suporte a patches no Immer (precisa ser chamado uma vez)

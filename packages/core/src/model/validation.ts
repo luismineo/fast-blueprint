@@ -2,7 +2,7 @@
 // Validação de invariantes — spec 01 § Invariantes
 // ============================================================
 
-import type { PlanDocument, Node, Room, Wall, Opening, FurnitureItem, EdgeRef, NodeId } from './types';
+import type { PlanDocument, FurnitureItem, EdgeRef, NodeId } from './types';
 
 export type ValidationLevel = 'error' | 'warning';
 

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { PlanDocument, Node, Room } from './types';
 import { validateDocument, validateDocumentErrors } from './validation';
 import { createEmptyDocument } from './document';
+import { deg, furnitureId, mm, nodeId, openingId, roomId, wallId } from '../testing/ids';
 
 function makeDoc(overrides: Partial<PlanDocument> = {}): PlanDocument {
   const base = createEmptyDocument();
@@ -72,7 +73,7 @@ describe('validateDocument', () => {
       const doc = makeDoc({
         nodes: [makeNode('n1', 0, 0)],
         walls: [
-          { id: 'w1' as any, a: 'n1' as any, b: 'n99' as any },
+          { id: wallId('w1'), a: nodeId('n1'), b: nodeId('n99') },
         ],
       });
       const issues = validateDocument(doc);
@@ -85,11 +86,11 @@ describe('validateDocument', () => {
         nodes: [makeNode('n1', 0, 0), makeNode('n2', 100, 0)],
         openings: [
           {
-            id: 'o1' as any,
-            edge: { kind: 'room' as const, roomId: 'r99' as any, index: 0 },
+            id: openingId('o1'),
+            edge: { kind: 'room' as const, roomId: roomId('r99'), index: 0 },
             kind: 'door' as const,
-            offset: 0 as any,
-            width: 50 as any,
+            offset: mm(0),
+            width: mm(50),
             swing: 'right' as const,
           },
         ],
@@ -104,11 +105,11 @@ describe('validateDocument', () => {
         nodes: [makeNode('n1', 0, 0), makeNode('n2', 100, 0)],
         openings: [
           {
-            id: 'o1' as any,
-            edge: { kind: 'wall' as const, wallId: 'w99' as any },
+            id: openingId('o1'),
+            edge: { kind: 'wall' as const, wallId: wallId('w99') },
             kind: 'door' as const,
-            offset: 0 as any,
-            width: 50 as any,
+            offset: mm(0),
+            width: mm(50),
             swing: 'right' as const,
           },
         ],
@@ -162,7 +163,7 @@ describe('validateDocument', () => {
     it('wall com A == B gera E5', () => {
       const doc = makeDoc({
         nodes: [makeNode('n1', 0, 0)],
-        walls: [{ id: 'w1' as any, a: 'n1' as any, b: 'n1' as any }],
+        walls: [{ id: wallId('w1'), a: nodeId('n1'), b: nodeId('n1') }],
       });
       const issues = validateDocument(doc);
       expect(issues.some((i) => i.code === 'E5')).toBe(true);
@@ -186,11 +187,11 @@ describe('validateDocument', () => {
         rooms: [makeRoom('r1', ['n1', 'n2', 'n3'])],
         openings: [
           {
-            id: 'o1' as any,
-            edge: { kind: 'room' as const, roomId: 'r1' as any, index: 0 },
+            id: openingId('o1'),
+            edge: { kind: 'room' as const, roomId: roomId('r1'), index: 0 },
             kind: 'door' as const,
-            offset: 0 as any,
-            width: 200 as any,
+            offset: mm(0),
+            width: mm(200),
             swing: 'right' as const,
           },
         ],
@@ -206,16 +207,16 @@ describe('validateDocument', () => {
         ...createEmptyDocument(),
         furniture: [
           {
-            id: 'f1' as any,
+            id: furnitureId('f1'),
             catalogId: null,
             name: 'X',
-            width: 0 as any,
-            depth: 100 as any,
-            center: { x: 0 as any, y: 0 as any },
-            rotation: 0 as any,
+            width: mm(0),
+            depth: mm(100),
+            center: { x: mm(0), y: mm(0) },
+            rotation: deg(0),
             color: null,
             locked: false,
-            clearance: 0 as any,
+            clearance: mm(0),
           },
         ],
       };

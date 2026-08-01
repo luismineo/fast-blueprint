@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { DocumentStore } from './store'
-import type { NodeId, PlanDocument } from '../model'
-import { createEmptyDocument, validateDocumentErrors } from '../model'
-import { computeRoomArea } from '../commands'
+import type { NodeId } from '../model'
+import { createEmptyDocument } from '../model'
 
 describe('DocumentStore', () => {
   const makeRoomPayload = () => {

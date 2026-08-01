@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { applyPatches } from 'immer';
 import { applyCommand, computeRoomArea, computeUsableArea } from './commands';
 import { shoelaceArea } from '../geometry';
-import type { PlanDocument, NodeId } from '../model';
+import type { NodeId } from '../model';
 import { createEmptyDocument, validateDocumentErrors } from '../model';
 import { DocumentStore } from '../history';
 
