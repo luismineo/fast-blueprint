@@ -7,7 +7,7 @@ Numeração: 0003 está reservada para o modelo de snap, decidido na correção 
 
 ## Contexto
 
-As specs definem três versões — `meta.schemaVersion` (spec 05), `version` do catálogo (spec 06) e os milestones do roadmap (spec 09) — e nenhuma delas é a versão do aplicativo.
+As specs definem três versões — `schemaVersion` (spec 05), `version` do catálogo (spec 06) e os milestones do roadmap (spec 09) — e nenhuma delas é a versão do aplicativo.
 
 Três artefatos vão exigir esse número: `package.json`, `desktop/src-tauri/tauri.conf.json` e `Cargo.toml`. O menu "Sobre" da spec 07 precisa exibi-lo, e o CI de release do M5 precisa marcá-lo por tag.
 
@@ -53,7 +53,7 @@ Semver aplicado a um aplicativo de usuário final precisa de contrato explícito
 
 ## Decisão 4 — `schemaVersion` permanece independente
 
-`meta.schemaVersion` é inteiro, sobe apenas em mudança incompatível de documento, e **não** acompanha a versão do app. Um app `0.4.0` e um `1.2.0` podem escrever `schemaVersion` 1.
+`schemaVersion` é inteiro, mora na **raiz** do documento (não em `meta` — ver `01-modelo-de-dominio.md` § Visão geral), sobe apenas em mudança incompatível de documento, e **não** acompanha a versão do app. Um app `0.4.0` e um `1.2.0` podem escrever `schemaVersion` 1.
 
 A relação entre os dois é rastreada por uma tabela de compatibilidade em `specs/05-formato-de-arquivo.md` § Compatibilidade, mantida a cada bump. Este ADR não repete a tabela — `specs/05` é a dona, por ser a spec do formato de arquivo; este documento é a dona da regra que a gerou.
 

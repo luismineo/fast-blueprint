@@ -91,7 +91,6 @@ export interface Underlay {
 }
 
 export interface DocumentMeta {
-  schemaVersion: number;
   name: string;
   createdAt: string;
   modifiedAt: string;
@@ -100,15 +99,16 @@ export interface DocumentMeta {
 }
 
 // ============================================================
-// Documento — spec 01 § Visão geral
+// Documento — spec 01 § Visão geral, spec 05 § Schema
 // ============================================================
 
 export interface PlanDocument {
+  schemaVersion: number;
+  meta: DocumentMeta;
   nodes: Node[];
   rooms: Room[];
   walls: Wall[];
   openings: Opening[];
   furniture: FurnitureItem[];
   underlay: Underlay | null;
-  meta: DocumentMeta;
 }

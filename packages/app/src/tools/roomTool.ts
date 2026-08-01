@@ -17,7 +17,7 @@ export type RoomToolState =
       kind: 'drawing'
       anchor: Point
       anchors: SnapNode[] // todos os pontos confirmados incluindo anchor
-      confirmedNodes: Point[]
+      confirmedNodes: SnapNode[]
       frozenDirection?: number // radianos, congelada após primeiro dígito
       inputValue?: string // valor atual do campo de comprimento
     }

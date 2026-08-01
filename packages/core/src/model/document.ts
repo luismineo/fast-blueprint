@@ -6,13 +6,20 @@ import type { PlanDocument, DocumentMeta, NodeId, RoomId } from './types';
 import { validateDocument } from './validation';
 
 /**
+ * Versão de schema que este build escreve.
+ * Sobe apenas em mudança incompatível de documento (spec 05 § Migrações).
+ * A tabela de compatibilidade schemaVersion → versão do app vive em
+ * `specs/05-formato-de-arquivo.md` § Compatibilidade.
+ */
+export const CURRENT_SCHEMA_VERSION = 1;
+
+/**
  * Cria um documento vazio válido.
  * Grid default: 100 mm. Unidade default: metros.
  */
 export function createEmptyDocument(): PlanDocument {
   const now = new Date().toISOString();
   const meta: DocumentMeta = {
-    schemaVersion: 1,
     name: 'Sem título',
     createdAt: now,
     modifiedAt: now,
@@ -21,13 +28,14 @@ export function createEmptyDocument(): PlanDocument {
   };
 
   const doc: PlanDocument = {
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+    meta,
     nodes: [],
     rooms: [],
     walls: [],
     openings: [],
     furniture: [],
     underlay: null,
-    meta,
   };
 
   return doc;

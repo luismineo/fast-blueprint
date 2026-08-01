@@ -1,47 +1,55 @@
 {
+  "schemaVersion": 1,
+  "meta": {
+    "name": "Cômodo em L",
+    "createdAt": "2026-07-30T00:00:00.000Z",
+    "modifiedAt": "2026-07-30T00:00:00.000Z",
+    "displayUnit": "m",
+    "gridSize": 100
+  },
   "nodes": [
     {
-      "id": "n_keyjvgol",
+      "id": "n_fx1",
       "x": 0,
       "y": 0
     },
     {
-      "id": "n_lxjhftw1",
+      "id": "n_fx2",
       "x": 4000,
       "y": 0
     },
     {
-      "id": "n_ktmvac79",
+      "id": "n_fx3",
       "x": 4000,
       "y": 1500
     },
     {
-      "id": "n_996nabd1",
+      "id": "n_fx4",
       "x": 2000,
       "y": 1500
     },
     {
-      "id": "n_lz408whz",
+      "id": "n_fx5",
       "x": 2000,
       "y": 3000
     },
     {
-      "id": "n_w3lv11rc",
+      "id": "n_fx6",
       "x": 0,
       "y": 3000
     }
   ],
   "rooms": [
     {
-      "id": "r_c608a580-a48b-463b-ac7a-3345d04eacaf",
+      "id": "r_fx1",
       "name": "Cômodo L",
       "loop": [
-        "n_keyjvgol",
-        "n_lxjhftw1",
-        "n_ktmvac79",
-        "n_996nabd1",
-        "n_lz408whz",
-        "n_w3lv11rc"
+        "n_fx1",
+        "n_fx2",
+        "n_fx3",
+        "n_fx4",
+        "n_fx5",
+        "n_fx6"
       ],
       "color": null,
       "includeInUsableArea": true
@@ -50,13 +58,5 @@
   "walls": [],
   "openings": [],
   "furniture": [],
-  "underlay": null,
-  "meta": {
-    "schemaVersion": 1,
-    "name": "Sem título",
-    "createdAt": "2026-08-01T00:48:02.888Z",
-    "modifiedAt": "2026-08-01T00:48:02.888Z",
-    "displayUnit": "m",
-    "gridSize": 100
-  }
+  "underlay": null
 }

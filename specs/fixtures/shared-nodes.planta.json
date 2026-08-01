@@ -1,57 +1,65 @@
 {
+  "schemaVersion": 1,
+  "meta": {
+    "name": "Nós compartilhados",
+    "createdAt": "2026-07-30T00:00:00.000Z",
+    "modifiedAt": "2026-07-30T00:00:00.000Z",
+    "displayUnit": "m",
+    "gridSize": 100
+  },
   "nodes": [
     {
-      "id": "n_4fmd7uim",
+      "id": "n_fx1",
       "x": 0,
       "y": 0
     },
     {
-      "id": "n_t73sgwo9",
+      "id": "n_fx2",
       "x": 3200,
       "y": 0
     },
     {
-      "id": "n_k8rjxjrd",
+      "id": "n_fx3",
       "x": 3200,
       "y": 2500
     },
     {
-      "id": "n_myekcubm",
+      "id": "n_fx4",
       "x": 0,
       "y": 2500
     },
     {
-      "id": "n_sdmfzkac",
+      "id": "n_fx6",
       "x": 6400,
       "y": 0
     },
     {
-      "id": "n_xdq0lnu9",
+      "id": "n_fx7",
       "x": 6400,
       "y": 2500
     }
   ],
   "rooms": [
     {
-      "id": "r_5235ef9d-1f81-4167-9f58-0c2dda96bd3b",
+      "id": "r_fx1",
       "name": "Quarto 1",
       "loop": [
-        "n_4fmd7uim",
-        "n_t73sgwo9",
-        "n_k8rjxjrd",
-        "n_myekcubm"
+        "n_fx1",
+        "n_fx2",
+        "n_fx3",
+        "n_fx4"
       ],
       "color": null,
       "includeInUsableArea": true
     },
     {
-      "id": "r_eca61712-bd31-423e-81ad-4da2661c3edc",
+      "id": "r_fx2",
       "name": "Quarto 2",
       "loop": [
-        "n_t73sgwo9",
-        "n_sdmfzkac",
-        "n_xdq0lnu9",
-        "n_k8rjxjrd"
+        "n_fx2",
+        "n_fx6",
+        "n_fx7",
+        "n_fx3"
       ],
       "color": null,
       "includeInUsableArea": true
@@ -60,13 +68,5 @@
   "walls": [],
   "openings": [],
   "furniture": [],
-  "underlay": null,
-  "meta": {
-    "schemaVersion": 1,
-    "name": "Sem título",
-    "createdAt": "2026-08-01T00:48:02.883Z",
-    "modifiedAt": "2026-08-01T00:48:02.883Z",
-    "displayUnit": "m",
-    "gridSize": 100
-  }
+  "underlay": null
 }

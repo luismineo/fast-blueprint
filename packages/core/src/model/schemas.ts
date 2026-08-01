@@ -76,7 +76,6 @@ export const underlaySchema = z.object({
 });
 
 export const documentMetaSchema = z.object({
-  schemaVersion: z.number().int().positive(),
   name: z.string(),
   createdAt: z.string(),
   modifiedAt: z.string(),
@@ -85,11 +84,12 @@ export const documentMetaSchema = z.object({
 });
 
 export const planDocumentSchema = z.object({
+  schemaVersion: z.number().int().positive(),
+  meta: documentMetaSchema,
   nodes: z.array(nodeSchema),
   rooms: z.array(roomSchema),
   walls: z.array(wallSchema),
   openings: z.array(openingSchema),
   furniture: z.array(furnitureItemSchema),
   underlay: underlaySchema.nullable(),
-  meta: documentMetaSchema,
 });

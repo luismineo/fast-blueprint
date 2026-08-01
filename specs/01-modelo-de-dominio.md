@@ -6,14 +6,17 @@ O documento é uma árvore imutável. Nós geométricos são compartilhados entr
 
 ```
 PlanDocument
+├── schemaVersion: number      versão do formato de arquivo
+├── meta: DocumentMeta
 ├── nodes: Node[]              vértices compartilhados
 ├── rooms: Room[]              polígonos fechados
 ├── walls: Wall[]              segmentos avulsos (divisórias, bancadas)
 ├── openings: Opening[]        portas e janelas (v1.5)
 ├── furniture: FurnitureItem[]
-├── underlay: Underlay | null  imagem de referência (v1.5)
-└── meta: DocumentMeta
+└── underlay: Underlay | null  imagem de referência (v1.5)
 ```
+
+`schemaVersion` fica na raiz do documento, não dentro de `meta` — ele descreve o formato do arquivo inteiro, inclusive o formato de `meta`. Um leitor precisa consultá-lo **antes** de saber como interpretar `meta`, o que seria circular se ele morasse lá dentro. Ver `05-formato-de-arquivo.md` § Schema e `adr/0004-versionamento.md` Decisão 4.
 
 ## Entidades
 
@@ -136,7 +139,6 @@ interface Underlay {
 
 ```ts
 interface DocumentMeta {
-  schemaVersion: number
   name: string
   createdAt: string       // ISO 8601
   modifiedAt: string
@@ -144,6 +146,8 @@ interface DocumentMeta {
   gridSize: Millimeters
 }
 ```
+
+`schemaVersion` **não** entra aqui — vive na raiz de `PlanDocument` (ver § Visão geral).
 
 ## Invariantes
 
