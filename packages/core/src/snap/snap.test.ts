@@ -5,6 +5,7 @@ import type { NodeId } from '../model'
 function ctx(overrides: Partial<SnapContext> = {}): SnapContext {
   return {
     nodes: [],
+    edges: [],
     origin: null,
     gridSize: 100,
     scale: 1, // 1 px/mm → tolerâncias em mm = tolerâncias em px

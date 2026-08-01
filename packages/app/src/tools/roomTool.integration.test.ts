@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
   DocumentStore,
   computeRoomArea,
-  resolveSnap,
   validateDocumentErrors,
   type NodeId,
   type Point,
@@ -16,6 +15,7 @@ import {
   type RoomToolEvent,
   type RoomToolState,
 } from './roomTool'
+import { resolveToolSnap } from './snapContext'
 
 /**
  * Dirige a Ferramenta Cômodo de ponta a ponta — tool → DocumentStore — e
@@ -35,20 +35,13 @@ function makeHarness() {
   }
 
   function context(cursor: Point, shift = false): RoomToolContext {
-    const doc = store.current
-    const draft = draftNodes()
-    const byId = new Map<string, { id: NodeId; x: number; y: number }>()
-    for (const n of doc.nodes) byId.set(n.id, { id: n.id, x: n.x, y: n.y })
-    for (const n of draft) byId.set(n.id, { id: n.id, x: n.x, y: n.y })
-
-    const origin = draft.length > 0 ? draft[draft.length - 1]! : null
-
+    // Pelo mesmo resolvedor que `App.svelte` usa: montar o `SnapContext` à mão
+    // aqui deixaria o teste passar sobre um caminho que o app não percorre.
     return {
       cursor,
-      snap: resolveSnap(cursor, {
-        nodes: [...byId.values()],
-        origin: origin ? { x: origin.x, y: origin.y } : null,
-        gridSize: doc.meta.gridSize,
+      snap: resolveToolSnap(cursor, {
+        doc: store.current,
+        draft: draftNodes(),
         scale: 0.1,
         shift,
         alt: false,
