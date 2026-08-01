@@ -60,11 +60,15 @@ function makeHarness() {
   }
 
   function type(digits: string, cursor: Point) {
-    for (const d of digits) drive({ type: 'digit', digit: d }, cursor)
+    for (const d of digits) drive({ type: 'digit', digit: d, field: 'length' }, cursor)
     return drive({ type: 'enter' }, cursor)
   }
 
-  return { store, drive, type, get state() { return state } }
+  function typeAngle(digits: string, cursor: Point) {
+    for (const d of digits) drive({ type: 'digit', digit: d, field: 'angle' }, cursor)
+  }
+
+  return { store, drive, type, typeAngle, get state() { return state } }
 }
 
 describe('Ferramenta Cômodo — sequência de aceitação do M1', () => {
@@ -165,5 +169,80 @@ describe('Ferramenta Cômodo — sequência de aceitação do M1', () => {
     const ids = h.state.kind === 'idle' ? [] : h.state.nodes.map((n) => n.id)
     expect(new Set(ids).size).toBe(ids.length)
     expect(ids).toHaveLength(4)
+  })
+})
+
+describe('Ferramenta Cômodo — entrada de ângulo no HUD (M2)', () => {
+  it('o ângulo digitado congela a direção sem esperar Enter', () => {
+    const h = makeHarness()
+    h.drive({ type: 'pointerDown', clickCount: 1 }, { x: 0, y: 0 })
+
+    // Cursor apontando para a direita; ângulo digitado aponta para baixo.
+    const before = h.drive({ type: 'pointerMove' }, { x: 4000, y: 0 })
+    expect(before.hud?.measuredAngleText).toBe('0,0°')
+
+    const after = h.drive({ type: 'inputChange', value: '90', field: 'angle' }, { x: 4000, y: 0 })
+    expect(after.hud?.angleText).toBe('90')
+    expect(after.hud?.measuredAngleText).toBe('90,0°')
+  })
+
+  it('o segmento fantasma salta para o ângulo digitado antes de haver comprimento', () => {
+    const h = makeHarness()
+    h.drive({ type: 'pointerDown', clickCount: 1 }, { x: 0, y: 0 })
+    const result = h.drive(
+      { type: 'inputChange', value: '90', field: 'angle' },
+      { x: 4000, y: 0 },
+    )
+
+    const ghost = result.overlays.find((o) => o.kind === 'segment' && o.role === 'ghost')
+    expect(ghost).toBeDefined()
+    if (ghost?.kind !== 'segment') throw new Error('fantasma ausente')
+    expect(ghost.b.x).toBe(0)
+    expect(ghost.b.y).toBe(4000)
+  })
+
+  it('ângulo e comprimento juntos produzem o segmento pedido', () => {
+    const h = makeHarness()
+    h.drive({ type: 'pointerDown', clickCount: 1 }, { x: 0, y: 0 })
+
+    h.typeAngle('90', { x: 4000, y: 0 })
+    h.type('250', { x: 4000, y: 0 })
+
+    const nodes = h.state.kind === 'idle' ? [] : h.state.nodes
+    expect(nodes).toHaveLength(2)
+    expect({ x: nodes[1]!.x, y: nodes[1]!.y }).toEqual({ x: 0, y: 2500 })
+  })
+
+  it('o campo de ângulo é esvaziado a cada segmento confirmado', () => {
+    const h = makeHarness()
+    h.drive({ type: 'pointerDown', clickCount: 1 }, { x: 0, y: 0 })
+
+    h.typeAngle('90', { x: 4000, y: 0 })
+    const confirmed = h.type('250', { x: 4000, y: 0 })
+
+    expect(confirmed.hud?.angleText).toBe('')
+  })
+
+  it('ângulo que não resolve não altera a direção', () => {
+    const h = makeHarness()
+    h.drive({ type: 'pointerDown', clickCount: 1 }, { x: 0, y: 0 })
+
+    const result = h.drive(
+      { type: 'inputChange', value: 'abc', field: 'angle' },
+      { x: 4000, y: 0 },
+    )
+
+    expect(result.hud?.measuredAngleText).toBe('0,0°')
+  })
+
+  it('ângulo fora de 0–359 é normalizado por módulo', () => {
+    const h = makeHarness()
+    h.drive({ type: 'pointerDown', clickCount: 1 }, { x: 0, y: 0 })
+
+    h.typeAngle('450', { x: 4000, y: 0 })
+    h.type('250', { x: 4000, y: 0 })
+
+    const nodes = h.state.kind === 'idle' ? [] : h.state.nodes
+    expect({ x: nodes[1]!.x, y: nodes[1]!.y }).toEqual({ x: 0, y: 2500 })
   })
 })

@@ -10,12 +10,14 @@ import type {
 import {
   angle,
   centroid,
+  degreesToRadians,
   distance,
   formatArea,
   parseLength,
   pointAtDistance,
   polygonArea,
   snapAngle,
+  tryParseAngle,
 } from '@planta/core'
 
 export interface DraftNode {
@@ -27,6 +29,7 @@ export interface DraftNode {
 
 export interface NumericInput {
   readonly value: string
+  readonly angleText: string
   readonly frozenDirection: number | null
 }
 
@@ -35,12 +38,14 @@ export type RoomToolState =
   | { readonly kind: 'anchored'; readonly nodes: readonly DraftNode[]; readonly input: NumericInput }
   | { readonly kind: 'drawing'; readonly nodes: readonly DraftNode[]; readonly input: NumericInput }
 
+export type HudField = 'length' | 'angle'
+
 export type RoomToolEvent =
   | { readonly type: 'activate' }
   | { readonly type: 'pointerMove' }
   | { readonly type: 'pointerDown'; readonly clickCount: number }
-  | { readonly type: 'digit'; readonly digit: string }
-  | { readonly type: 'inputChange'; readonly value: string }
+  | { readonly type: 'digit'; readonly digit: string; readonly field: HudField }
+  | { readonly type: 'inputChange'; readonly value: string; readonly field: HudField }
   | { readonly type: 'enter' }
   | { readonly type: 'close' }
   | { readonly type: 'escape' }
@@ -60,7 +65,10 @@ export interface RoomHudModel {
   /** Comprimento do candidato sob o cursor, em cm. Mostrado como dica. */
   readonly measuredText: string
   readonly editing: boolean
+  /** Graus digitados. Vazio significa "sem override de direção". */
   readonly angleText: string
+  /** Direção do candidato, mostrada como dica quando o campo está vazio. */
+  readonly measuredAngleText: string
   readonly nodeCount: number
   readonly areaText: string | null
 }
@@ -78,7 +86,7 @@ export interface RoomToolResult {
   readonly naming: NamingRequest | null
 }
 
-const EMPTY_INPUT: NumericInput = { value: '', frozenDirection: null }
+const EMPTY_INPUT: NumericInput = { value: '', angleText: '', frozenDirection: null }
 const MIN_NODES_TO_CLOSE = 3
 const MIN_SEGMENT_MM = 1
 
@@ -94,10 +102,24 @@ interface Candidate {
 }
 
 /**
+ * Direção do ângulo digitado, ou `null` quando o campo está vazio ou não
+ * resolve.
+ *
+ * O override é derivado do texto a cada avaliação em vez de guardado: uma
+ * segunda cópia da direção poderia discordar do que o campo mostra.
+ */
+function angleOverride(input: NumericInput): number | null {
+  const degrees = tryParseAngle(input.angleText)
+  return degrees === null ? null : degreesToRadians(degrees)
+}
+
+/**
  * Ponto que o próximo segmento atingiria se fosse confirmado agora.
  *
- * Digitando: a direção está congelada e o comprimento vem do campo.
- * Caso contrário: ambos vêm do resolvedor de snap.
+ * Com direção travada — pelo primeiro dígito de comprimento ou pelo campo de
+ * ângulo — o comprimento vem do campo quando ele tem valor, e da distância do
+ * cursor quando não tem. É o que faz o segmento fantasma saltar para o ângulo
+ * digitado antes de o comprimento existir.
  */
 function candidateOf(
   nodes: readonly DraftNode[],
@@ -105,13 +127,15 @@ function candidateOf(
   ctx: RoomToolContext,
 ): Candidate {
   const origin = nodes[nodes.length - 1]!
+  const frozen = angleOverride(input) ?? input.frozenDirection
 
-  if (input.value !== '' && input.frozenDirection !== null) {
-    const length = parseLength(input.value)
-    const raw = pointAtDistance(origin, input.frozenDirection, length)
+  if (frozen !== null) {
+    const length =
+      input.value !== '' ? parseLength(input.value) : distance(origin, ctx.snap.point)
+    const raw = pointAtDistance(origin, frozen, length)
     return {
       point: { x: Math.round(raw.x), y: Math.round(raw.y) },
-      direction: input.frozenDirection,
+      direction: frozen,
       length,
       merged: null,
     }
@@ -172,16 +196,31 @@ function fromActive(
       return present(state, ctx)
 
     case 'digit': {
+      if (event.field === 'angle') {
+        return present(
+          withInput(state, { ...input, angleText: input.angleText + event.digit }),
+          ctx,
+        )
+      }
       const frozen = input.frozenDirection ?? freezeDirection(nodes, ctx)
       return present(
-        withInput(state, { value: input.value + event.digit, frozenDirection: frozen }),
+        withInput(state, { ...input, value: input.value + event.digit, frozenDirection: frozen }),
         ctx,
       )
     }
 
     case 'inputChange': {
+      // O campo de ângulo trava a direção no `oninput`, não no `Enter`: o salto
+      // do segmento fantasma é o retorno visual de que a direção travou
+      // (`03-ferramentas-e-interacao.md` § HUD de desenho).
+      if (event.field === 'angle') {
+        return present(withInput(state, { ...input, angleText: event.value }), ctx)
+      }
       const frozen = input.frozenDirection ?? freezeDirection(nodes, ctx)
-      return present(withInput(state, { value: event.value, frozenDirection: frozen }), ctx)
+      return present(
+        withInput(state, { ...input, value: event.value, frozenDirection: frozen }),
+        ctx,
+      )
     }
 
     case 'pointerDown': {
@@ -210,12 +249,29 @@ function fromActive(
       return nodes.length >= MIN_NODES_TO_CLOSE ? closeRoom(nodes, ctx) : present(state, ctx)
 
     case 'escape':
-      if (input.value !== '') return present(withInput(state, EMPTY_INPUT), ctx)
+      // `Esc` limpa o campo de comprimento inteiro numa pressão; o ângulo
+      // digitado sobrevive, porque corrigir a medida não é motivo para perder
+      // a direção que já estava travada.
+      if (input.value !== '') {
+        return present(
+          withInput(state, { ...input, value: '', frozenDirection: null }),
+          ctx,
+        )
+      }
+      if (input.angleText !== '') {
+        return present(withInput(state, { ...input, angleText: '' }), ctx)
+      }
       return present(dropLast(nodes), ctx)
 
     case 'backspace':
       if (input.value !== '') {
         return present(withInput(state, { ...input, value: input.value.slice(0, -1) }), ctx)
+      }
+      if (input.angleText !== '') {
+        return present(
+          withInput(state, { ...input, angleText: input.angleText.slice(0, -1) }),
+          ctx,
+        )
       }
       return present(dropLast(nodes), ctx)
   }
@@ -312,7 +368,8 @@ function hudModel(state: RoomToolState, ctx: RoomToolContext): RoomHudModel | nu
     lengthText: state.input.value,
     measuredText: formatCentimeters(candidate.length),
     editing,
-    angleText: formatDegrees(candidate.direction),
+    angleText: state.input.angleText,
+    measuredAngleText: formatDegrees(candidate.direction),
     nodeCount: state.nodes.length,
     areaText:
       state.nodes.length >= MIN_NODES_TO_CLOSE ? formatArea(polygonArea(provisional)) : null,

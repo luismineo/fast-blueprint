@@ -10,6 +10,7 @@ function ctx(overrides: Partial<KeyContext> = {}): KeyContext {
     toolActive: true,
     drawing: true,
     lengthFieldEmpty: true,
+    angleFieldEmpty: true,
     ...overrides,
   }
 }
@@ -21,6 +22,46 @@ describe('classifyKey — regra D0', () => {
 
   it('dígito com foco no campo continua indo para a ferramenta, nao para o campo', () => {
     expect(classifyKey(ctx({ key: '3', focus: 'hudLength' })).kind).toBe('focusHudField')
+  })
+
+  it('dígito vai para o campo que tem foco', () => {
+    expect(classifyKey(ctx({ key: '9', focus: 'canvas' }))).toEqual({
+      kind: 'focusHudField',
+      field: 'length',
+    })
+    expect(classifyKey(ctx({ key: '9', focus: 'hudLength' }))).toEqual({
+      kind: 'focusHudField',
+      field: 'length',
+    })
+    expect(classifyKey(ctx({ key: '9', focus: 'hudAngle' }))).toEqual({
+      kind: 'focusHudField',
+      field: 'angle',
+    })
+  })
+
+  it('Backspace olha o campo que tem foco, nao sempre o de comprimento', () => {
+    // Ângulo preenchido, comprimento vazio: apaga caractere do ângulo.
+    expect(
+      classifyKey(
+        ctx({
+          key: 'Backspace',
+          focus: 'hudAngle',
+          angleFieldEmpty: false,
+          lengthFieldEmpty: true,
+        }),
+      ).kind,
+    ).toBe('passToField')
+
+    // Ângulo vazio: remove o último segmento.
+    expect(
+      classifyKey(ctx({ key: 'Backspace', focus: 'hudAngle', angleFieldEmpty: true })),
+    ).toEqual({ kind: 'toolEvent', event: { type: 'backspace' } })
+  })
+
+  it('c fecha o polígono pelo campo de comprimento, mesmo com foco no ângulo', () => {
+    expect(
+      classifyKey(ctx({ key: 'c', focus: 'hudAngle', lengthFieldEmpty: true })),
+    ).toEqual({ kind: 'toolEvent', event: { type: 'close' } })
   })
 
   it('dígito com foco no nome do comodo e texto', () => {

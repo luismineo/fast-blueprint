@@ -10,6 +10,7 @@ export interface KeyContext {
   readonly toolActive: boolean
   readonly drawing: boolean
   readonly lengthFieldEmpty: boolean
+  readonly angleFieldEmpty: boolean
 }
 
 export type KeyAction =
@@ -48,8 +49,12 @@ export function classifyKey(ctx: KeyContext): KeyAction {
   // com o campo focado, mantém o valor sob controle do estado: deixar o
   // browser inserir o caractere depende da posição do cursor no campo e
   // embaralha a ordem dos dígitos.
+  //
+  // O dígito vai para o campo que **tem foco**. Mandar todo dígito para
+  // comprimento tornaria a entrada de ângulo inalcançável, já que o único
+  // caminho até aquele campo é `Tab`.
   if (ctx.toolActive && ctx.drawing && ctx.focus !== 'roomName' && /^[0-9]$/.test(ctx.key)) {
-    return { kind: 'focusHudField', field: 'length' }
+    return { kind: 'focusHudField', field: ctx.focus === 'hudAngle' ? 'angle' : 'length' }
   }
 
   if (inField) {
@@ -59,7 +64,7 @@ export function classifyKey(ctx: KeyContext): KeyAction {
     if (ctx.key === 'Tab') {
       return { kind: 'focusHudField', field: ctx.focus === 'hudLength' ? 'angle' : 'length' }
     }
-    if (ctx.key === 'Backspace' && ctx.lengthFieldEmpty) {
+    if (ctx.key === 'Backspace' && focusedFieldEmpty(ctx)) {
       return { kind: 'toolEvent', event: { type: 'backspace' } }
     }
     // `c` fecha o polígono com o campo vazio, e é caractere de sufixo de
@@ -84,4 +89,16 @@ export function classifyKey(ctx: KeyContext): KeyAction {
   if (ctx.key === 'r' || ctx.key === 'R') return { kind: 'activateRoomTool' }
 
   return { kind: 'none' }
+}
+
+/**
+ * `Backspace` apaga caractere do campo que tem foco e só remove o último
+ * segmento quando esse campo está vazio.
+ *
+ * As demais regras de "campo vazio" (`c` fecha o polígono) continuam olhando o
+ * campo de comprimento, independentemente do foco — `c` não é caractere de
+ * ângulo, e é o comprimento que a sequência de referência preenche.
+ */
+function focusedFieldEmpty(ctx: KeyContext): boolean {
+  return ctx.focus === 'hudAngle' ? ctx.angleFieldEmpty : ctx.lengthFieldEmpty
 }

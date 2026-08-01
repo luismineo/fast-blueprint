@@ -11,6 +11,7 @@ export const messages = {
   hudLengthLabel: 'Comprimento em centímetros',
   hudAngleLabel: 'Ângulo em graus',
   unitCm: 'cm',
+  unitDegree: '°',
   hudSummary: (sides: number, area: string) => `${sides} lados · ${area}`,
 
   roomNameLabel: 'Nome do cômodo',

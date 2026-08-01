@@ -169,7 +169,12 @@
 
   function onLengthInput(event: Event): void {
     const value = (event.currentTarget as HTMLInputElement).value
-    dispatchTool({ type: 'inputChange', value })
+    dispatchTool({ type: 'inputChange', value, field: 'length' })
+  }
+
+  function onAngleInput(event: Event): void {
+    const value = (event.currentTarget as HTMLInputElement).value
+    dispatchTool({ type: 'inputChange', value, field: 'angle' })
   }
 
   function setupCanvas(canvas: HTMLCanvasElement, profiler: Profiler | undefined): () => void {
@@ -297,6 +302,7 @@
         toolActive,
         drawing: roomState.kind !== 'idle',
         lengthFieldEmpty: (hud?.lengthText ?? '') === '',
+        angleFieldEmpty: (hud?.angleText ?? '') === '',
       })
 
       switch (action.kind) {
@@ -336,10 +342,10 @@
 
         case 'focusHudField': {
           event.preventDefault()
-          const field = action.field === 'length' ? lengthEl : angleEl
-          field?.focus()
-          if (action.field === 'length' && /^[0-9]$/.test(event.key)) {
-            dispatchTool({ type: 'digit', digit: event.key })
+          const element = action.field === 'length' ? lengthEl : angleEl
+          element?.focus()
+          if (/^[0-9]$/.test(event.key)) {
+            dispatchTool({ type: 'digit', digit: event.key, field: action.field })
             scheduler.markDirty()
           }
         }
@@ -425,13 +431,16 @@
       <span class="hud-unit">{messages.unitCm}</span>
       <input
         bind:this={angleEl}
-        class="hud-field hud-field--readonly"
+        class="hud-field hud-field--angle"
         type="text"
-        readonly
-        aria-readonly="true"
+        inputmode="numeric"
+        autocomplete="off"
         aria-label={messages.hudAngleLabel}
         value={hud.angleText}
+        placeholder={hud.measuredAngleText}
+        oninput={onAngleInput}
       />
+      <span class="hud-unit">{messages.unitDegree}</span>
     </div>
     {#if hud.areaText}
       <div class="hud-info">{messages.hudSummary(hud.nodeCount, hud.areaText)}</div>
@@ -552,9 +561,8 @@
     outline: none;
   }
 
-  .hud-field--readonly {
+  .hud-field--angle {
     width: 48px;
-    color: var(--text-muted);
   }
 
   .hud-unit {
