@@ -28,6 +28,14 @@ export function worldToScreen(camera: Camera, world: Point): Point {
   }
 }
 
+export function worldToScreenX(camera: Camera, x: number): number {
+  return x * camera.scale + camera.tx
+}
+
+export function worldToScreenY(camera: Camera, y: number): number {
+  return y * camera.scale + camera.ty
+}
+
 export function screenToWorld(camera: Camera, screen: Point): Point {
   return {
     x: (screen.x - camera.tx) / camera.scale,

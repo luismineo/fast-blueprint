@@ -216,6 +216,12 @@ Fechamento com menos de 3 nós é ignorado.
 
 **O campo é esvaziado a cada segmento confirmado.** Não sobra valor de um segmento para o próximo, então não existe a questão de o primeiro dígito substituir ou concatenar: quando um segmento novo começa o campo está sempre vazio, e todo dígito concatena.
 
+**`c` com o foco no campo de comprimento.** `c` fecha o polígono quando o campo está **vazio**, e é caractere comum quando está preenchido — ali ele é o início de um sufixo de unidade (`320cm`).
+
+A distinção é necessária para a própria sequência de referência `320 Enter, 250 Enter, 320 Enter, C`: depois de cada `Enter` o foco permanece no campo, então pela regra D0 pura o `C` final viraria texto e o polígono nunca fecharia. Como o campo está garantidamente vazio após uma confirmação (regra acima), `c` nesse estado não é ambíguo.
+
+Dígitos seguem a reserva permanente: são sempre roteados para a entrada numérica, mesmo com o campo focado. O estado da ferramenta é a fonte da verdade do valor; deixar o browser inserir o caractere faria a ordem dos dígitos depender da posição do cursor dentro do campo.
+
 ### HUD de desenho
 
 Ancorado ao cursor, deslocado 16 px à direita e abaixo. Contém:

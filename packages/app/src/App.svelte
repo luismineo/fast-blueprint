@@ -1,8 +1,29 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
-  import { CanvasTarget, Profiler, lightTheme, panBy, render, type Camera, type Size } from '@planta/renderer'
-  import { DocumentStore, resolveSnap, type Point, formatLength, formatAngle, formatArea } from '@planta/core'
+  import { onMount, tick } from 'svelte'
+  import {
+    CanvasTarget,
+    Profiler,
+    lightTheme,
+    panBy,
+    render,
+    worldToScreen,
+    type Camera,
+    type Size,
+  } from '@planta/renderer'
+  import {
+    DocumentStore,
+    computeUsableArea,
+    formatArea,
+    generateNodeId,
+    generateRoomId,
+    type OverlayPrimitive,
+    type PlanDocument,
+    type Point,
+    type RoomId,
+  } from '@planta/core'
   import { Scheduler } from './scheduler'
+  import { messages } from './messages'
+  import './styles/tokens.css'
   import {
     applyWheelIntent,
     beginPanDrag,
@@ -10,104 +31,164 @@
     continuePanDrag,
     endsPanDrag,
     homeCamera,
-    isHomeShortcutEligible,
     shouldStartPan,
     toLocalPoint,
     type PanDragState,
   } from './canvasInput'
-  import { initialRoomState, roomToolTransition, type RoomToolState, type RoomToolResult } from './tools/roomTool'
+  import {
+    initialRoomState,
+    roomToolTransition,
+    type NamingRequest,
+    type RoomHudModel,
+    type RoomToolContext,
+    type RoomToolEvent,
+    type RoomToolState,
+  } from './tools/roomTool'
+  import { resolveToolSnap } from './tools/snapContext'
+  import { classifyKey, type FocusKind } from './tools/toolShortcuts'
+
+  const HUD_OFFSET_PX = 16
 
   let canvasEl: HTMLCanvasElement | undefined = $state.raw()
+  let lengthEl: HTMLInputElement | undefined = $state.raw()
+  let angleEl: HTMLInputElement | undefined = $state.raw()
+  let nameEl: HTMLInputElement | undefined = $state.raw()
+
+  let camera: Camera = $state.raw({ tx: 0, ty: 0, scale: 1 })
+  let viewport: Size = $state.raw({ width: 0, height: 0 })
+  let cursorPx: Point = $state.raw({ x: 0, y: 0 })
+  let roomState: RoomToolState = $state.raw(initialRoomState())
+  let overlays: readonly OverlayPrimitive[] = $state.raw([])
+  let hud: RoomHudModel | null = $state.raw(null)
+  let naming: NamingRequest | null = $state.raw(null)
+  let namingValue = $state('')
+  let toolActive = $state(false)
   let perfSummary = $state('')
-  let hudVisible = $state(false)
-  let hudLength = $state('')
-  let hudAngle = $state('')
-  let hudArea = $state('')
-  let hudSides = $state(0)
-  let hudX = $state(0)
-  let hudY = $state(0)
-  let hudFocused = $state(false)
+
+  const store = new DocumentStore()
+  let doc: PlanDocument = $state.raw(store.current)
 
   const debugPerf =
     import.meta.env.DEV &&
     typeof window !== 'undefined' &&
     new URLSearchParams(window.location.search).get('debug') === 'perf'
 
+  const usableAreaText = $derived(formatArea(computeUsableArea(doc)))
+  const roomCount = $derived(doc.rooms.length)
+  const hudLeft = $derived(cursorPx.x + HUD_OFFSET_PX)
+  const hudTop = $derived(cursorPx.y + HUD_OFFSET_PX)
+  const namingPos: Point = $derived.by(() => {
+    const request = naming
+    return request ? worldToScreen(camera, request.centroid) : { x: 0, y: 0 }
+  })
+
+  function focusKind(): FocusKind {
+    const active = typeof document === 'undefined' ? null : document.activeElement
+    if (!active) return 'canvas'
+    if (active === lengthEl) return 'hudLength'
+    if (active === angleEl) return 'hudAngle'
+    if (active === nameEl) return 'roomName'
+    if (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') return 'other'
+    return 'canvas'
+  }
+
+  function worldAt(px: Point): Point {
+    return { x: (px.x - camera.tx) / camera.scale, y: (px.y - camera.ty) / camera.scale }
+  }
+
+  function toolContext(shift: boolean): RoomToolContext {
+    const world = worldAt(cursorPx)
+    const draft = roomState.kind === 'idle' ? [] : roomState.nodes
+    return {
+      cursor: world,
+      snap: resolveToolSnap(world, {
+        doc: store.current,
+        draft,
+        scale: camera.scale,
+        shift,
+        alt: false,
+      }),
+      shift,
+      newNodeId: generateNodeId,
+      newRoomId: generateRoomId,
+    }
+  }
+
+  function dispatchTool(event: RoomToolEvent, shift = false): void {
+    const result = roomToolTransition(roomState, event, toolContext(shift))
+    roomState = result.state
+    overlays = result.overlays
+    hud = result.hud
+
+    for (const command of result.commands) store.dispatch(command)
+
+    if (result.naming) {
+      const room = store.current.rooms.find((r) => r.id === result.naming!.roomId)
+      namingValue = room?.name ?? ''
+      naming = result.naming
+      toolActive = false
+      void focusNameField()
+    }
+  }
+
+  async function focusNameField(): Promise<void> {
+    await tick()
+    nameEl?.focus()
+    nameEl?.select()
+  }
+
+  function commitName(): void {
+    const request = naming
+    naming = null
+    if (!request) return
+
+    const room = store.current.rooms.find((r) => r.id === request.roomId)
+    const trimmed = namingValue.trim()
+    if (room && trimmed !== '' && trimmed !== room.name) {
+      store.dispatch({ type: 'RenameRoom', payload: { roomId: request.roomId as RoomId, name: trimmed } })
+    }
+    canvasEl?.focus()
+  }
+
+  function cancelName(): void {
+    naming = null
+    canvasEl?.focus()
+  }
+
+  function onNameKeyDown(event: KeyboardEvent): void {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      commitName()
+      return
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      cancelName()
+    }
+  }
+
+  function onLengthInput(event: Event): void {
+    const value = (event.currentTarget as HTMLInputElement).value
+    dispatchTool({ type: 'inputChange', value })
+  }
+
   function setupCanvas(canvas: HTMLCanvasElement, profiler: Profiler | undefined): () => void {
-    const ctx = canvas.getContext('2d')
-    if (!ctx) throw new Error('Canvas 2D nao suportado')
+    const ctx2d = canvas.getContext('2d')
+    if (!ctx2d) throw new Error('Canvas 2D nao suportado')
 
-    const target = new CanvasTarget(ctx)
-    const store = new DocumentStore()
+    const target = new CanvasTarget(ctx2d)
 
-    let camera: Camera = { tx: 0, ty: 0, scale: 1 }
-    let viewport: Size = { width: 0, height: 0 }
     let spacePressed = false
     let dragState: PanDragState | null = null
-    let roomState: RoomToolState = initialRoomState()
-    let cursor = { x: 0, y: 0 }
 
     const scheduler = new Scheduler(() => {
-      render({
-        camera,
-        viewport,
-        theme: lightTheme,
-        target,
-        profiler,
-        doc: store.current,
-      })
+      render({ camera, viewport, theme: lightTheme, target, profiler, doc: store.current, overlays })
     })
 
-    function worldPoint(px: Point): Point {
-      return {
-        x: (px.x - camera.tx) / camera.scale,
-        y: (px.y - camera.ty) / camera.scale,
-      }
-    }
-
-    function snap(point: Point) {
-      const ctx = {
-        nodes: store.current.nodes.map((n) => ({ id: n.id, x: n.x, y: n.y })),
-        origin: roomState.kind !== 'idle'
-          ? roomState.kind === 'anchored'
-            ? roomState.anchor
-            : roomState.confirmedNodes.length > 0
-              ? roomState.confirmedNodes[roomState.confirmedNodes.length - 1]!
-              : roomState.anchor
-          : null,
-        gridSize: store.current.meta.gridSize,
-        scale: camera.scale,
-        shift: false,
-        alt: false,
-      }
-      return resolveSnap(point, ctx)
-    }
-
-    function applyRoomResult(result: RoomToolResult): void {
-      roomState = result.state
-      if (result.command) {
-        store.dispatch(result.command)
-        hudVisible = false
-        hudFocused = false
-      }
-      updateHud(result)
+    const unsubscribe = store.subscribe((next) => {
+      doc = next
       scheduler.markDirty()
-    }
-
-    function updateHud(result: RoomToolResult): void {
-      if (roomState.kind === 'idle') {
-        hudVisible = false
-        hudFocused = false
-        return
-      }
-      hudVisible = true
-      hudLength = result.segmentLength > 0 ? formatLength(Math.round(result.segmentLength), 'cm').replace(' cm', '') : ''
-      hudAngle = result.direction !== null ? formatAngle(result.direction) : ''
-      hudSides = result.nodeCount
-      hudArea = result.provisionalArea !== null && result.provisionalArea > 0
-        ? formatArea(result.provisionalArea)
-        : ''
-    }
+    })
 
     function currentDpr(): number {
       return window.devicePixelRatio || 1
@@ -140,42 +221,48 @@
     function onWheel(event: WheelEvent): void {
       event.preventDefault()
       const rect = canvas.getBoundingClientRect()
-      const intent = classifyWheel({
-        deltaX: event.deltaX,
-        deltaY: event.deltaY,
-        deltaMode: event.deltaMode,
-        ctrlKey: event.ctrlKey,
-        cursor: toLocalPoint(event.clientX, event.clientY, rect),
-      })
-      camera = applyWheelIntent(camera, intent)
+      camera = applyWheelIntent(
+        camera,
+        classifyWheel({
+          deltaX: event.deltaX,
+          deltaY: event.deltaY,
+          deltaMode: event.deltaMode,
+          ctrlKey: event.ctrlKey,
+          cursor: toLocalPoint(event.clientX, event.clientY, rect),
+        }),
+      )
+      if (toolActive) dispatchTool({ type: 'pointerMove' })
       scheduler.markDirty()
     }
 
     function onPointerDown(event: PointerEvent): void {
       if (shouldStartPan(event.button, spacePressed)) {
-        const rect = canvas.getBoundingClientRect()
-        dragState = beginPanDrag(event.pointerId, toLocalPoint(event.clientX, event.clientY, rect))
+        dragState = beginPanDrag(
+          event.pointerId,
+          toLocalPoint(event.clientX, event.clientY, canvas.getBoundingClientRect()),
+        )
         canvas.setPointerCapture(event.pointerId)
         event.preventDefault()
         return
       }
 
-      if (event.button === 0) {
-        const rect = canvas.getBoundingClientRect()
-        const px = toLocalPoint(event.clientX, event.clientY, rect)
-        cursor = px
-        const wp = worldPoint(px)
-        const sr = snap(wp)
-        const result = roomToolTransition(roomState, { type: 'pointerDown', point: wp, snapResult: sr }, wp, null)
-        applyRoomResult(result)
-        event.preventDefault()
-      }
+      if (event.button !== 0 || !toolActive) return
+
+      cursorPx = toLocalPoint(event.clientX, event.clientY, canvas.getBoundingClientRect())
+      dispatchTool({ type: 'pointerDown', clickCount: event.detail }, event.shiftKey)
+      scheduler.markDirty()
+      event.preventDefault()
     }
 
     function onPointerMove(event: PointerEvent): void {
+      const rect = canvas.getBoundingClientRect()
+
       if (dragState) {
-        const rect = canvas.getBoundingClientRect()
-        const step = continuePanDrag(dragState, event.pointerId, toLocalPoint(event.clientX, event.clientY, rect))
+        const step = continuePanDrag(
+          dragState,
+          event.pointerId,
+          toLocalPoint(event.clientX, event.clientY, rect),
+        )
         if (!step) return
         camera = panBy(camera, step.delta)
         dragState = step.state
@@ -183,21 +270,10 @@
         return
       }
 
-      const rect = canvas.getBoundingClientRect()
-      cursor = toLocalPoint(event.clientX, event.clientY, rect)
-      if (roomState.kind !== 'idle') {
-        // Atualiza HUD com posição do cursor
-        const wp = worldPoint(cursor)
-        const direction = roomState.kind === 'anchored'
-          ? Math.atan2(wp.y - roomState.anchor.y, wp.x - roomState.anchor.x)
-          : null
-        hudX = cursor.x + 16
-        hudY = cursor.y + 16
-        if (direction !== null) {
-          hudAngle = formatAngle(direction)
-        }
-        scheduler.markDirty()
-      }
+      cursorPx = toLocalPoint(event.clientX, event.clientY, rect)
+      if (!toolActive) return
+      dispatchTool({ type: 'pointerMove' }, event.shiftKey)
+      scheduler.markDirty()
     }
 
     function onPointerUp(event: PointerEvent): void {
@@ -207,66 +283,66 @@
     }
 
     function onKeyDown(event: KeyboardEvent): void {
-      if (event.code === 'Space') {
+      if (event.code === 'Space' && focusKind() === 'canvas') {
         spacePressed = true
         event.preventDefault()
         return
       }
-      if (event.code === 'Home' && isHomeShortcutEligible(document.activeElement)) {
-        camera = homeCamera(viewport)
-        scheduler.markDirty()
-        event.preventDefault()
-      }
 
-      // Roteamento para ferramenta cômodo
-      if (roomState.kind !== 'idle') {
-        if (event.key === 'Enter') {
-          event.preventDefault()
-          const wp = worldPoint(cursor)
-          const result = roomToolTransition(roomState, { type: 'enter' }, wp, null)
-          applyRoomResult(result)
-          return
-        }
-        if (event.key === 'Escape') {
-          event.preventDefault()
-          const wp = worldPoint(cursor)
-          const result = roomToolTransition(roomState, { type: 'escape' }, wp, null)
-          applyRoomResult(result)
-          return
-        }
-        if (event.key === 'Backspace' && hudFocused) {
-          // Deixa o campo de input processar
-          return
-        }
-        if (event.key === 'Backspace' && !hudFocused) {
-          event.preventDefault()
-          const wp = worldPoint(cursor)
-          const result = roomToolTransition(roomState, { type: 'backspace' }, wp, null)
-          applyRoomResult(result)
-          return
-        }
-        if (event.key === 'c' || event.key === 'C') {
-          event.preventDefault()
-          const wp = worldPoint(cursor)
-          const result = roomToolTransition(roomState, { type: 'c' }, wp, null)
-          applyRoomResult(result)
-          return
-        }
-        if (/^[0-9]$/.test(event.key)) {
-          event.preventDefault()
-          const wp = worldPoint(cursor)
-          const result = roomToolTransition(roomState, { type: 'digit', digit: event.key }, wp, null)
-          applyRoomResult(result)
-          return
-        }
-        return
-      }
+      const action = classifyKey({
+        key: event.key,
+        ctrlOrMeta: event.ctrlKey || event.metaKey,
+        shift: event.shiftKey,
+        focus: focusKind(),
+        toolActive,
+        drawing: roomState.kind !== 'idle',
+        lengthFieldEmpty: (hud?.lengthText ?? '') === '',
+      })
 
-      // Atalho R para ativar ferramenta cômodo
-      if (event.key === 'r' || event.key === 'R') {
-        event.preventDefault()
-        roomState = initialRoomState()
-        return
+      switch (action.kind) {
+        case 'none':
+        case 'passToField':
+          return
+
+        case 'undo':
+          event.preventDefault()
+          store.undo()
+          return
+
+        case 'redo':
+          event.preventDefault()
+          store.redo()
+          return
+
+        case 'frameAll':
+          event.preventDefault()
+          camera = homeCamera(viewport)
+          scheduler.markDirty()
+          return
+
+        case 'activateRoomTool':
+          event.preventDefault()
+          toolActive = true
+          roomState = initialRoomState()
+          dispatchTool({ type: 'activate' })
+          scheduler.markDirty()
+          return
+
+        case 'toolEvent':
+          event.preventDefault()
+          dispatchTool(action.event, event.shiftKey)
+          scheduler.markDirty()
+          return
+
+        case 'focusHudField': {
+          event.preventDefault()
+          const field = action.field === 'length' ? lengthEl : angleEl
+          field?.focus()
+          if (action.field === 'length' && /^[0-9]$/.test(event.key)) {
+            dispatchTool({ type: 'digit', digit: event.key })
+            scheduler.markDirty()
+          }
+        }
       }
     }
 
@@ -292,6 +368,7 @@
     }
 
     return () => {
+      unsubscribe()
       resizeObserver.disconnect()
       dprQuery.removeEventListener('change', onDprChange)
       canvas.removeEventListener('wheel', onWheel)
@@ -311,26 +388,67 @@
   })
 </script>
 
-<canvas bind:this={canvasEl} class="canvas-fullscreen"></canvas>
+<canvas
+  bind:this={canvasEl}
+  class="canvas-fullscreen"
+  class:tool-active={toolActive}
+  tabindex="-1"
+></canvas>
 
-{#if hudVisible}
-  <div class="hud" style="left: {hudX}px; top: {hudY}px;">
+<aside class="summary" aria-label={messages.summaryTitle}>
+  <h2 class="summary-title">{messages.summaryTitle}</h2>
+  <dl class="summary-list">
+    <dt>{messages.summaryUsableArea}</dt>
+    <dd data-testid="usable-area">{usableAreaText}</dd>
+    <dt>{messages.summaryRoomCount}</dt>
+    <dd data-testid="room-count">{roomCount}</dd>
+  </dl>
+  {#if roomCount === 0 && !toolActive}
+    <p class="summary-empty">{messages.emptyCanvas}</p>
+  {/if}
+</aside>
+
+{#if hud}
+  <div class="hud" role="group" aria-label={messages.hudLabel} style="left: {hudLeft}px; top: {hudTop}px;">
     <div class="hud-row">
       <input
-        class="hud-input"
+        bind:this={lengthEl}
+        class="hud-field"
         type="text"
-        value={hudLength}
-        readonly={!hudFocused}
-        onfocus={() => hudFocused = true}
-        onblur={() => hudFocused = false}
-        placeholder="cm"
+        inputmode="numeric"
+        autocomplete="off"
+        aria-label={messages.hudLengthLabel}
+        value={hud.lengthText}
+        placeholder={hud.measuredText}
+        oninput={onLengthInput}
       />
-      <span class="hud-readonly">{hudAngle}</span>
+      <span class="hud-unit">{messages.unitCm}</span>
+      <input
+        bind:this={angleEl}
+        class="hud-field hud-field--readonly"
+        type="text"
+        readonly
+        aria-readonly="true"
+        aria-label={messages.hudAngleLabel}
+        value={hud.angleText}
+      />
     </div>
-    {#if hudSides >= 3 && hudArea}
-      <div class="hud-info">{hudSides} lados &middot; {hudArea}</div>
+    {#if hud.areaText}
+      <div class="hud-info">{messages.hudSummary(hud.nodeCount, hud.areaText)}</div>
     {/if}
   </div>
+{/if}
+
+{#if naming}
+  <input
+    bind:this={nameEl}
+    class="room-name"
+    style="left: {namingPos.x}px; top: {namingPos.y}px;"
+    aria-label={messages.roomNameLabel}
+    bind:value={namingValue}
+    onkeydown={onNameKeyDown}
+    onblur={commitName}
+  />
 {/if}
 
 {#if debugPerf}
@@ -343,6 +461,8 @@
     padding: 0;
     height: 100%;
     overflow: hidden;
+    font-family: Inter, system-ui, sans-serif;
+    color: var(--text);
   }
 
   .canvas-fullscreen {
@@ -350,50 +470,121 @@
     width: 100vw;
     height: 100vh;
     touch-action: none;
+    outline: none;
+  }
+
+  .canvas-fullscreen.tool-active {
+    cursor: crosshair;
+  }
+
+  .summary {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 264px;
+    padding: 12px 16px;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    box-sizing: border-box;
+    font-size: 13px;
+  }
+
+  .summary-title {
+    margin: 0 0 8px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+  }
+
+  .summary-list {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px 12px;
+    margin: 0;
+  }
+
+  .summary-list dt {
+    color: var(--text-muted);
+  }
+
+  .summary-list dd {
+    margin: 0;
+    font-family: 'IBM Plex Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
+  .summary-empty {
+    margin: 12px 0 0;
+    color: var(--text-muted);
+    line-height: 1.4;
   }
 
   .hud {
     position: fixed;
-    background: rgba(255, 255, 255, 0.95);
-    border: 1px solid #ccc;
-    border-radius: 4px;
     padding: 4px 8px;
-    font: 12px 'Inter', sans-serif;
-    pointer-events: auto;
-    z-index: 10;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-field);
+    box-shadow: var(--shadow-floating);
+    font-size: 12px;
+  }
+
+  .hud:focus-within {
+    box-shadow: 0 0 0 2px var(--accent);
   }
 
   .hud-row {
     display: flex;
-    gap: 8px;
-    align-items: center;
+    align-items: baseline;
+    gap: 4px;
   }
 
-  .hud-input {
-    width: 60px;
-    border: 1px solid #999;
-    border-radius: 2px;
-    padding: 2px 4px;
-    font: 12px 'Inter', sans-serif;
-    text-align: right;
+  .hud-field {
+    width: 56px;
+    border: none;
+    background: transparent;
+    font-family: 'IBM Plex Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+    color: var(--text);
+    outline: none;
   }
 
-  .hud-readonly {
-    color: #666;
-    min-width: 48px;
+  .hud-field--readonly {
+    width: 48px;
+    color: var(--text-muted);
+  }
+
+  .hud-unit {
+    color: var(--text-muted);
   }
 
   .hud-info {
-    margin-top: 4px;
-    color: #888;
-    font-size: 11px;
+    margin-top: 2px;
+    padding-top: 2px;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+
+  .room-name {
+    position: fixed;
+    transform: translate(-50%, -50%);
+    width: 120px;
+    padding: 2px 4px;
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-field);
+    background: var(--surface-raised);
+    font-size: 12px;
+    text-align: center;
+    outline: none;
   }
 
   .perf-overlay {
     position: fixed;
     top: 8px;
-    right: 8px;
+    left: 8px;
     margin: 0;
     padding: 8px 10px;
     background: rgba(0, 0, 0, 0.75);

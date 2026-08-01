@@ -1,10 +1,18 @@
 import type { RenderContext } from '../renderContext'
 import { resolveRoomPoints } from './utils'
-import { formatArea, polygonArea, type PlanDocument, type Room } from '@planta/core'
+import { computeRoomArea, formatArea } from '@planta/core'
+import { worldToScreenX, worldToScreenY } from '../camera'
 import type { TextStyle } from '../target/DrawTarget'
 
+const LINE_GAP_PX = 2
+const MIN_WIDTH_PX = 60
+const MIN_HEIGHT_PX = 40
+
 /**
- * Pass 9: Rótulo de cômodo (nome + área no centroide).
+ * Pass 9: rótulo de cômodo (nome e área no centroide).
+ *
+ * Desenha em espaço de tela, com as duas linhas separadas em pixels — em
+ * milímetros elas se sobrepõem em qualquer zoom realista.
  */
 export function roomLabelsPass(ctx: RenderContext): void {
   if (!ctx.doc) return
@@ -17,7 +25,6 @@ export function roomLabelsPass(ctx: RenderContext): void {
     align: 'center',
     baseline: 'bottom',
   }
-
   const areaStyle: TextStyle = {
     color: theme.roomLabel,
     font: '11px Inter, sans-serif',
@@ -29,58 +36,28 @@ export function roomLabelsPass(ctx: RenderContext): void {
     const points = resolveRoomPoints(doc, room.loop)
     if (!points || points.length < 3) continue
 
-    const centroid = computeCentroid(points)
-    const area = computeRoomArea(doc, room)
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    let sx = 0
+    let sy = 0
+    for (const p of points) {
+      if (p.x < minX) minX = p.x
+      if (p.y < minY) minY = p.y
+      if (p.x > maxX) maxX = p.x
+      if (p.y > maxY) maxY = p.y
+      sx += p.x
+      sy += p.y
+    }
 
-    // Supressão se o polígono em tela é menor que a caixa do texto (~60px)
-    const bbox = computeBBox(points)
-    const screenW = (bbox.maxX - bbox.minX) * camera.scale
-    const screenH = (bbox.maxY - bbox.minY) * camera.scale
-    if (screenW < 60 || screenH < 40) continue
+    if ((maxX - minX) * camera.scale < MIN_WIDTH_PX) continue
+    if ((maxY - minY) * camera.scale < MIN_HEIGHT_PX) continue
 
-    // Nome na primeira linha (1 px acima do centroide)
-    target.text(centroid.x, centroid.y - 1, room.name, nameStyle)
+    const cx = worldToScreenX(camera, sx / points.length)
+    const cy = worldToScreenY(camera, sy / points.length)
 
-    // Área na segunda linha (1 px abaixo do centroide)
-    const areaText = formatArea(area)
-    target.text(centroid.x, centroid.y + 1, areaText, areaStyle)
+    target.text(cx, cy - LINE_GAP_PX, room.name, nameStyle)
+    target.text(cx, cy + LINE_GAP_PX, formatArea(computeRoomArea(doc, room.id)), areaStyle)
   }
 }
-
-function computeCentroid(points: { x: number; y: number }[]): { x: number; y: number } {
-  let sx = 0
-  let sy = 0
-  for (const p of points) {
-    sx += p.x
-    sy += p.y
-  }
-  return { x: sx / points.length, y: sy / points.length }
-}
-
-function computeBBox(points: { x: number; y: number }[]): { minX: number; minY: number; maxX: number; maxY: number } {
-  let minX = Infinity
-  let minY = Infinity
-  let maxX = -Infinity
-  let maxY = -Infinity
-  for (const p of points) {
-    if (p.x < minX) minX = p.x
-    if (p.y < minY) minY = p.y
-    if (p.x > maxX) maxX = p.x
-    if (p.y > maxY) maxY = p.y
-  }
-  return { minX, minY, maxX, maxY }
-}
-
-function computeRoomArea(
-  doc: PlanDocument,
-  room: Room,
-): number {
-  const points: { x: number; y: number }[] = []
-  for (const nodeId of room.loop) {
-    const node = doc.nodes.find((n) => n.id === nodeId)
-    if (!node) return 0
-    points.push({ x: node.x, y: node.y })
-  }
-  return polygonArea(points)
-}
-

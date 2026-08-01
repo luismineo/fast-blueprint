@@ -22,12 +22,23 @@ const PASSES: readonly PassEntry[] = [
   { name: 'grid', space: 'world', run: gridPass },
   { name: 'roomFills', space: 'world', run: roomFillsPass },
   { name: 'walls', space: 'world', run: wallsPass },
-  { name: 'dimensions', space: 'world', run: dimensionsPass },
-  { name: 'roomLabels', space: 'world', run: roomLabelsPass },
-  { name: 'snapGuides', space: 'world', run: snapGuidesPass },
-  { name: 'toolOverlay', space: 'world', run: toolOverlayPass },
+  { name: 'dimensions', space: 'screen', run: dimensionsPass },
+  { name: 'roomLabels', space: 'screen', run: roomLabelsPass },
+  { name: 'snapGuides', space: 'screen', run: snapGuidesPass },
+  { name: 'toolOverlay', space: 'screen', run: toolOverlayPass },
   { name: 'hud', space: 'screen', run: hudPass },
 ]
+
+/**
+ * Espaço em que cada pass desenha. Exposto para o teste asserir a regra
+ * estrutural — passes de texto e de overlay em espaço de tela — em vez de
+ * inferi-la de um array posicional.
+ */
+export function passSpaces(): Readonly<Record<string, PassSpace>> {
+  const spaces: Record<string, PassSpace> = {}
+  for (const pass of PASSES) spaces[pass.name] = pass.space
+  return spaces
+}
 
 const loggedErrorSignatures = new Set<string>()
 

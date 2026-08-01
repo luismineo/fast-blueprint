@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { render } from './render'
+import { passSpaces, render } from './render'
 import { lightTheme } from './theme'
 import { RecordingTarget } from './target/RecordingTarget'
 import type { DrawTarget } from './target/DrawTarget'
@@ -31,7 +31,25 @@ class ThrowingLineTarget implements DrawTarget {
 }
 
 describe('render', () => {
-  it('aplica a transformacao de mundo nos passes de geometria e reseta antes dos passes de tela', () => {
+  it('desenha geometria em espaco de mundo e texto/overlay em espaco de tela', () => {
+    const spaces = passSpaces()
+
+    // Geometria: a matriz da camera converte mm para px.
+    expect(spaces.grid).toBe('world')
+    expect(spaces.roomFills).toBe('world')
+    expect(spaces.walls).toBe('world')
+
+    // Texto e overlay: nunca escalados pela matriz (specs/04 secao Espessura
+    // constante). Foi por rodarem em espaco de mundo que cota e rotulo saiam
+    // com fonte de fracao de pixel no zoom inicial.
+    expect(spaces.dimensions).toBe('screen')
+    expect(spaces.roomLabels).toBe('screen')
+    expect(spaces.snapGuides).toBe('screen')
+    expect(spaces.toolOverlay).toBe('screen')
+    expect(spaces.hud).toBe('screen')
+  })
+
+  it('aplica a transformacao correspondente antes de cada pass', () => {
     const target = new RecordingTarget()
     render({
       camera: { tx: 10, ty: 20, scale: 2 },
@@ -40,10 +58,9 @@ describe('render', () => {
       target,
     })
 
-    expect(target.transforms.map((entry) => entry.kind)).toEqual(
-      // reset (clear), world (grid, roomFills, walls, dimensions, roomLabels, snapGuides, toolOverlay), reset (hud)
-      ['reset', 'world', 'world', 'world', 'world', 'world', 'world', 'world', 'reset'],
-    )
+    const spaces = passSpaces()
+    const expected = Object.values(spaces).map((s) => (s === 'world' ? 'world' : 'reset'))
+    expect(target.transforms.map((entry) => entry.kind)).toEqual(expected)
   })
 
   it('erro num pass nao interrompe os demais', () => {

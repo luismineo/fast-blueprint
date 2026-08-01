@@ -4,6 +4,7 @@ export interface LineStyle {
   readonly color: string
   readonly width: number
   readonly opacity?: number
+  readonly dash?: readonly number[]
 }
 
 export interface TextStyle {

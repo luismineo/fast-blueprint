@@ -1,6 +1,8 @@
 import type { Camera } from '../camera'
 import type { DrawTarget, LineStyle, TextStyle, FillStyle } from './DrawTarget'
 
+const EMPTY_DASH: number[] = []
+
 export class CanvasTarget implements DrawTarget {
   private readonly ctx: CanvasRenderingContext2D
   private dpr: number
@@ -37,6 +39,7 @@ export class CanvasTarget implements DrawTarget {
     this.ctx.globalAlpha = style.opacity ?? 1
     this.ctx.strokeStyle = style.color
     this.ctx.lineWidth = style.width
+    this.ctx.setLineDash(style.dash ? [...style.dash] : EMPTY_DASH)
     this.ctx.beginPath()
     this.ctx.moveTo(x1, y1)
     this.ctx.lineTo(x2, y2)
@@ -50,6 +53,7 @@ export class CanvasTarget implements DrawTarget {
     this.ctx.globalAlpha = style.opacity ?? 1
     this.ctx.strokeStyle = style.color
     this.ctx.lineWidth = style.width
+    this.ctx.setLineDash(style.dash ? [...style.dash] : EMPTY_DASH)
     this.ctx.beginPath()
     this.ctx.moveTo(points[0]!.x, points[0]!.y)
     for (let i = 1; i < points.length; i++) {

@@ -1,13 +1,20 @@
 import type { RenderContext } from '../renderContext'
+import { SNAP_GUIDE_ROLES, overlayStyles } from '../overlayStyle'
+import { drawOverlay } from './overlayDraw'
 
 /**
- * Pass 10: Guias de snap (marcadores e linhas de eixo).
- * No M1: desenha um marcador quadrado em nós sob o cursor (preview).
- * A ferramenta ativa fornece os overlays visuais; o renderer as desenha.
- * Este pass é um stub — os guias reais são desenhados via toolOverlay.
+ * Pass 10: guias de alinhamento e eixo.
+ * Desenha as primitivas de papel `snapNode` e `axisGuide`, abaixo do traço
+ * em andamento (pass 11).
  */
-export function snapGuidesPass(_ctx: RenderContext): void {
-  // No M1, as guias de snap são parte do overlay da ferramenta ativa.
-  // Este pass existe para manter a ordem de passes definida em 04-renderizacao.md
-  // e será implementado quando o M2 trouxer ponto médio, aresta, extensão e alinhamento.
+export function snapGuidesPass(ctx: RenderContext): void {
+  const overlays = ctx.overlays
+  if (!overlays || overlays.length === 0) return
+
+  const styles = overlayStyles(ctx.theme)
+  for (let i = 0; i < overlays.length; i += 1) {
+    const primitive = overlays[i]!
+    if (!SNAP_GUIDE_ROLES.has(primitive.role)) continue
+    drawOverlay(primitive, styles[primitive.role], ctx.camera, ctx.target)
+  }
 }

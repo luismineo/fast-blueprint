@@ -8,7 +8,13 @@ import { resolveRoomPoints } from './utils'
 export function wallsPass(ctx: RenderContext): void {
   if (!ctx.doc) return
 
-  const { doc, theme, target } = ctx
+  const { doc, theme, camera, target } = ctx
+
+  // Espessura constante em pixels de tela: o pass desenha em milímetros, com
+  // a transformação da câmera aplicada (`04-renderizacao.md` § Espessura
+  // constante). Sem dividir pela escala, wallWidth viraria 2,5 mm — cerca de
+  // 0,2 px no zoom inicial.
+  const constantScreenWidth = theme.wallWidth / camera.scale
 
   for (const room of doc.rooms) {
     const points = resolveRoomPoints(doc, room.loop)
@@ -19,7 +25,7 @@ export function wallsPass(ctx: RenderContext): void {
       const b = points[(i + 1) % points.length]!
       target.line(a.x, a.y, b.x, b.y, {
         color: theme.wall,
-        width: theme.wallWidth,
+        width: constantScreenWidth,
       })
     }
   }

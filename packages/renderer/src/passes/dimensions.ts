@@ -1,64 +1,69 @@
 import type { RenderContext } from '../renderContext'
 import { resolveRoomPoints } from './utils'
 import { formatLength } from '@planta/core'
+import { worldToScreenX, worldToScreenY } from '../camera'
 import type { TextStyle } from '../target/DrawTarget'
 
+const OFFSET_PX = 14
+const FONT = '10px Inter, sans-serif'
+const CHAR_WIDTH_PX = 6
+const PADDING_PX = 8
+
 /**
- * Pass 8: Cotas de aresta.
- * Desenha o comprimento de cada aresta de cômodo como texto rotacionado.
+ * Pass 8: cotas de aresta.
+ *
+ * Desenha em espaço de tela: texto nunca é escalado pela matriz da câmera
+ * (`04-renderizacao.md` § Espessura constante).
  */
 export function dimensionsPass(ctx: RenderContext): void {
   if (!ctx.doc) return
 
   const { doc, theme, camera, target } = ctx
-
-  const dimStyle: TextStyle = {
+  const style: TextStyle = {
     color: theme.dimension,
-    font: '10px Inter, sans-serif',
+    font: FONT,
     align: 'center',
     baseline: 'middle',
   }
-
-  const offsetPx = 14 // offset em px da aresta
-  const offsetMm = offsetPx / camera.scale
 
   for (const room of doc.rooms) {
     const points = resolveRoomPoints(doc, room.loop)
     if (!points || points.length < 2) continue
 
-    for (let i = 0; i < points.length; i++) {
+    for (let i = 0; i < points.length; i += 1) {
       const a = points[i]!
       const b = points[(i + 1) % points.length]!
 
-      const length = Math.hypot(b.x - a.x, b.y - a.y)
-      const midX = (a.x + b.x) / 2
-      const midY = (a.y + b.y) / 2
+      const lengthMm = Math.hypot(b.x - a.x, b.y - a.y)
+      if (lengthMm === 0) continue
 
-      // Normal da aresta (perpendicular, lado de fora do polígono)
-      const dx = b.x - a.x
-      const dy = b.y - a.y
-      const len = Math.hypot(dx, dy)
-      if (len === 0) continue
+      const ax = worldToScreenX(camera, a.x)
+      const ay = worldToScreenY(camera, a.y)
+      const bx = worldToScreenX(camera, b.x)
+      const by = worldToScreenY(camera, b.y)
 
-      // Normal apontando para fora (sentido anti-horário da aresta)
-      const nx = -dy / len
-      const ny = dx / len
+      const dx = bx - ax
+      const dy = by - ay
+      const screenLength = Math.hypot(dx, dy)
 
-      const labelX = midX + nx * offsetMm
-      const labelY = midY + ny * offsetMm
+      const text = formatLength(lengthMm, doc.meta.displayUnit)
+      if (screenLength < text.length * CHAR_WIDTH_PX + PADDING_PX) continue
 
-      // Ângulo da aresta, normalizado para [−90°, 90°] para legibilidade
-      let angle = Math.atan2(b.y - a.y, b.x - a.x)
-      // Normaliza para que o texto nunca fique de cabeça para baixo
+      // Normal externa de um ciclo horário com Y para baixo é (dy, -dx).
+      const nx = dy / screenLength
+      const ny = -dx / screenLength
+
+      let angle = Math.atan2(dy, dx)
       if (angle > Math.PI / 2) angle -= Math.PI
       if (angle < -Math.PI / 2) angle += Math.PI
 
-      // Supressão por espaço: se o comprimento em tela é menor que ~40px, pula
-      const screenLength = length * camera.scale
-      if (screenLength < 40) continue
-
-      const text = formatLength(length, doc.meta.displayUnit)
-      target.textRotated(labelX, labelY, text, angle, dimStyle)
+      target.textRotated(
+        (ax + bx) / 2 + nx * OFFSET_PX,
+        (ay + by) / 2 + ny * OFFSET_PX,
+        text,
+        angle,
+        style,
+      )
     }
   }
 }

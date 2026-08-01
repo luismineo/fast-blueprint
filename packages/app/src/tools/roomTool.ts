@@ -1,442 +1,371 @@
-// ============================================================
-// Ferramenta Cômodo — spec 03 § Cômodo, máquina de estados pura
-// ============================================================
+import type {
+  Command,
+  CreateRoomCommand,
+  NodeId,
+  OverlayPrimitive,
+  Point,
+  RoomId,
+  SnapResult,
+} from '@planta/core'
+import {
+  angle,
+  centroid,
+  distance,
+  formatArea,
+  parseLength,
+  pointAtDistance,
+  polygonArea,
+  snapAngle,
+} from '@planta/core'
 
-import type { Point, SnapResult, NodeId, CreateRoomCommand } from '@planta/core'
-import { parseLength } from '@planta/core'
-import { angle, pointAtDistance } from '@planta/core'
+export interface DraftNode {
+  readonly id: NodeId
+  readonly x: number
+  readonly y: number
+  readonly reused: boolean
+}
 
-// ============================================================
-// Estado
-// ============================================================
+export interface NumericInput {
+  readonly value: string
+  readonly frozenDirection: number | null
+}
 
 export type RoomToolState =
-  | { kind: 'idle' }
-  | { kind: 'anchored'; anchor: Point; anchors: SnapNode[] }
-  | {
-      kind: 'drawing'
-      anchor: Point
-      anchors: SnapNode[] // todos os pontos confirmados incluindo anchor
-      confirmedNodes: SnapNode[]
-      frozenDirection?: number // radianos, congelada após primeiro dígito
-      inputValue?: string // valor atual do campo de comprimento
-    }
-
-export interface SnapNode {
-  id: NodeId
-  x: number
-  y: number
-}
-
-// ============================================================
-// Transições via eventos
-// ============================================================
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'anchored'; readonly nodes: readonly DraftNode[]; readonly input: NumericInput }
+  | { readonly kind: 'drawing'; readonly nodes: readonly DraftNode[]; readonly input: NumericInput }
 
 export type RoomToolEvent =
-  | { type: 'pointerDown'; point: Point; snapResult: SnapResult }
-  | { type: 'key'; key: string; shift: boolean }
-  | { type: 'digit'; digit: string } // dígito '0'-'9'
-  | { type: 'enter' } // confirma segmento ou fecha
-  | { type: 'c' } // fecha polígono
-  | { type: 'escape' } // desfaz último segmento
-  | { type: 'backspace' } // desfaz último segmento (campo vazio)
+  | { readonly type: 'activate' }
+  | { readonly type: 'pointerMove' }
+  | { readonly type: 'pointerDown'; readonly clickCount: number }
+  | { readonly type: 'digit'; readonly digit: string }
+  | { readonly type: 'inputChange'; readonly value: string }
+  | { readonly type: 'enter' }
+  | { readonly type: 'close' }
+  | { readonly type: 'escape' }
+  | { readonly type: 'backspace' }
 
-export type RoomToolResult = {
-  state: RoomToolState
-  command: CreateRoomCommand | null
-  direction: number | null // ângulo do mouse (rad), para HUD
-  segmentLength: number // comprimento do segmento candidato, 0 em idle
-  provisionalArea: number | null // mm², null se <3 pontos
-  nodeCount: number // total de pontos confirmados (0 em idle, 1 em anchored)
+export interface RoomToolContext {
+  readonly cursor: Point
+  readonly snap: SnapResult
+  readonly shift: boolean
+  readonly newNodeId: () => NodeId
+  readonly newRoomId: () => RoomId
 }
 
-// ============================================================
-// Máquina de estados
-// ============================================================
+export interface RoomHudModel {
+  /** Dígitos já digitados. Vazio enquanto o usuário não digitou nada. */
+  readonly lengthText: string
+  /** Comprimento do candidato sob o cursor, em cm. Mostrado como dica. */
+  readonly measuredText: string
+  readonly editing: boolean
+  readonly angleText: string
+  readonly nodeCount: number
+  readonly areaText: string | null
+}
+
+export interface NamingRequest {
+  readonly roomId: RoomId
+  readonly centroid: Point
+}
+
+export interface RoomToolResult {
+  readonly state: RoomToolState
+  readonly commands: readonly Command[]
+  readonly overlays: readonly OverlayPrimitive[]
+  readonly hud: RoomHudModel | null
+  readonly naming: NamingRequest | null
+}
+
+const EMPTY_INPUT: NumericInput = { value: '', frozenDirection: null }
+const MIN_NODES_TO_CLOSE = 3
+const MIN_SEGMENT_MM = 1
 
 export function initialRoomState(): RoomToolState {
   return { kind: 'idle' }
 }
 
+interface Candidate {
+  readonly point: Point
+  readonly direction: number
+  readonly length: number
+  readonly merged: NodeId | null
+}
+
+/**
+ * Ponto que o próximo segmento atingiria se fosse confirmado agora.
+ *
+ * Digitando: a direção está congelada e o comprimento vem do campo.
+ * Caso contrário: ambos vêm do resolvedor de snap.
+ */
+function candidateOf(
+  nodes: readonly DraftNode[],
+  input: NumericInput,
+  ctx: RoomToolContext,
+): Candidate {
+  const origin = nodes[nodes.length - 1]!
+
+  if (input.value !== '' && input.frozenDirection !== null) {
+    const length = parseLength(input.value)
+    const raw = pointAtDistance(origin, input.frozenDirection, length)
+    return {
+      point: { x: Math.round(raw.x), y: Math.round(raw.y) },
+      direction: input.frozenDirection,
+      length,
+      merged: null,
+    }
+  }
+
+  const point = { x: Math.round(ctx.snap.point.x), y: Math.round(ctx.snap.point.y) }
+  return {
+    point,
+    direction: angle(origin, point),
+    length: distance(origin, point),
+    merged: ctx.snap.merged,
+  }
+}
+
+/**
+ * Direção travada no primeiro dígito: arredondamento angular sobre a direção
+ * do cursor, não a Classe 2 do resolvedor de snap, cuja tolerância é de
+ * distância perpendicular e não alcançaria 87° → 90° (`specs/03` § Confirmar
+ * um segmento).
+ */
+function freezeDirection(nodes: readonly DraftNode[], ctx: RoomToolContext): number {
+  const origin = nodes[nodes.length - 1]!
+  if (distance(origin, ctx.snap.point) < MIN_SEGMENT_MM) return 0
+  return snapAngle(angle(origin, ctx.snap.point), ctx.shift)
+}
+
 export function roomToolTransition(
   state: RoomToolState,
   event: RoomToolEvent,
-  cursor: Point,
-  _origin: Point | null,
+  ctx: RoomToolContext,
 ): RoomToolResult {
-  switch (state.kind) {
-    case 'idle':
-      return handleIdle(event, cursor)
-    case 'anchored':
-      return handleAnchored(state, event, cursor)
-    case 'drawing':
-      return handleDrawing(state, event, cursor)
-  }
+  if (state.kind === 'idle') return fromIdle(state, event, ctx)
+  return fromActive(state, event, ctx)
 }
 
-// ============================================================
-// Idle
-// ============================================================
-
-function handleIdle(event: RoomToolEvent, cursor: Point): RoomToolResult {
+function fromIdle(
+  state: RoomToolState & { kind: 'idle' },
+  event: RoomToolEvent,
+  ctx: RoomToolContext,
+): RoomToolResult {
   if (event.type === 'pointerDown') {
-    const point = event.snapResult.point
-    const snapNode: SnapNode = {
-      id: event.snapResult.merged ?? ('n_new' as NodeId),
-      x: Math.round(point.x),
-      y: Math.round(point.y),
-    }
-    return {
-      state: {
-        kind: 'anchored',
-        anchor: { x: snapNode.x, y: snapNode.y },
-        anchors: [snapNode],
-      },
-      command: null,
-      direction: angle(cursor, cursor), // 0
-      segmentLength: 0,
-      provisionalArea: null,
-      nodeCount: 1,
-    }
+    const anchor = makeNode(ctx.snap, ctx)
+    return present({ kind: 'anchored', nodes: [anchor], input: EMPTY_INPUT }, ctx)
   }
-  return noopResult(stateFromIdle(cursor))
+  return present(state, ctx)
 }
 
-function stateFromIdle(_cursor: Point): RoomToolState {
-  return { kind: 'idle' }
-}
-
-// ============================================================
-// Anchored
-// ============================================================
-
-function handleAnchored(
-  state: RoomToolState & { kind: 'anchored' },
+function fromActive(
+  state: RoomToolState & { kind: 'anchored' | 'drawing' },
   event: RoomToolEvent,
-  cursor: Point,
+  ctx: RoomToolContext,
 ): RoomToolResult {
-  const origin = state.anchor
+  const { nodes, input } = state
 
   switch (event.type) {
-    case 'pointerDown': {
-      const point = event.snapResult.point
-      const snapNode: SnapNode = {
-        id: event.snapResult.merged ?? ('n_tmp' as NodeId),
-        x: Math.round(point.x),
-        y: Math.round(point.y),
-      }
-      return {
-        state: {
-          kind: 'drawing',
-          anchor: state.anchor,
-          anchors: [...state.anchors, snapNode],
-          confirmedNodes: [snapNode],
-        },
-        command: null,
-        direction: angle(origin, point),
-        segmentLength: Math.hypot(point.x - origin.x, point.y - origin.y),
-        provisionalArea: null,
-        nodeCount: 2,
-      }
-    }
+    case 'activate':
+    case 'pointerMove':
+      return present(state, ctx)
+
     case 'digit': {
-      const dir = angle(origin, cursor)
-      return {
-        state: {
-          kind: 'drawing',
-          anchor: state.anchor,
-          anchors: state.anchors,
-          confirmedNodes: [],
-          frozenDirection: dir,
-          inputValue: event.digit,
-        },
-        command: null,
-        direction: dir,
-        segmentLength: parseLength(event.digit),
-        provisionalArea: null,
-        nodeCount: 1,
+      const frozen = input.frozenDirection ?? freezeDirection(nodes, ctx)
+      return present(
+        withInput(state, { value: input.value + event.digit, frozenDirection: frozen }),
+        ctx,
+      )
+    }
+
+    case 'inputChange': {
+      const frozen = input.frozenDirection ?? freezeDirection(nodes, ctx)
+      return present(withInput(state, { value: event.value, frozenDirection: frozen }), ctx)
+    }
+
+    case 'pointerDown': {
+      const candidate = candidateOf(nodes, input, ctx)
+
+      if (closesOnFirstNode(nodes, candidate)) return closeRoom(nodes, ctx)
+      if (event.clickCount >= 2 && nodes.length >= MIN_NODES_TO_CLOSE) {
+        return closeRoom(nodes, ctx)
       }
+      if (coincidesWithLast(nodes, candidate)) return present(state, ctx)
+
+      return present(confirm(nodes, candidate, ctx), ctx)
     }
+
     case 'enter': {
-      // Enter com campo vazio = tentativa de fechar, mas < 3 nós → ignorado
-      return anchoredResult(state)
+      if (input.value !== '') {
+        const candidate = candidateOf(nodes, input, ctx)
+        if (candidate.length < MIN_SEGMENT_MM) return present(state, ctx)
+        if (closesOnFirstNode(nodes, candidate)) return closeRoom(nodes, ctx)
+        return present(confirm(nodes, candidate, ctx), ctx)
+      }
+      return nodes.length >= MIN_NODES_TO_CLOSE ? closeRoom(nodes, ctx) : present(state, ctx)
     }
+
+    case 'close':
+      return nodes.length >= MIN_NODES_TO_CLOSE ? closeRoom(nodes, ctx) : present(state, ctx)
+
     case 'escape':
+      if (input.value !== '') return present(withInput(state, EMPTY_INPUT), ctx)
+      return present(dropLast(nodes), ctx)
+
     case 'backspace':
-      return {
-        state: { kind: 'idle' },
-        command: null,
-        direction: null,
-        segmentLength: 0,
-        provisionalArea: null,
-        nodeCount: 0,
+      if (input.value !== '') {
+        return present(withInput(state, { ...input, value: input.value.slice(0, -1) }), ctx)
       }
-    case 'c':
-      // C com <3 nós → ignorado
-      return anchoredResult(state)
-    default:
-      return anchoredResult(state)
+      return present(dropLast(nodes), ctx)
   }
 }
 
-function anchoredResult(
-  state: RoomToolState & { kind: 'anchored' },
-): RoomToolResult {
+function makeNode(snap: SnapResult, ctx: RoomToolContext): DraftNode {
   return {
-    state,
-    command: null,
-    direction: null,
-    segmentLength: 0,
-    provisionalArea: null,
-    nodeCount: 1,
+    id: snap.merged ?? ctx.newNodeId(),
+    x: Math.round(snap.point.x),
+    y: Math.round(snap.point.y),
+    reused: snap.merged !== null,
   }
 }
 
-// ============================================================
-// Drawing
-// ============================================================
-
-function handleDrawing(
-  state: RoomToolState & { kind: 'drawing' },
-  event: RoomToolEvent,
-  cursor: Point,
-): RoomToolResult {
-  const origin =
-    state.confirmedNodes.length > 0
-      ? state.confirmedNodes[state.confirmedNodes.length - 1]!
-      : state.anchor
-
-  const allPoints = [state.anchor, ...state.confirmedNodes]
-  const totalNodes = allPoints.length
-
-  switch (event.type) {
-    case 'pointerDown': {
-      const point = event.snapResult.point
-      const merged = event.snapResult.merged
-
-      // Verifica se clicou no nó inicial → fecha
-      if (merged && totalNodes >= 2) {
-        const firstNode = state.anchors[0]!
-        if (merged === firstNode.id || (point.x === firstNode.x && point.y === firstNode.y)) {
-          const loop = [...state.anchors] // já inclui o nó inicial reusado
-          return createRoomResult(loop, state.anchor)
-        }
-      }
-
-      // Confirma segmento no ponto do snap
-      const snapNode: SnapNode = {
-        id: merged ?? ('n_tmp' as NodeId),
-        x: Math.round(point.x),
-        y: Math.round(point.y),
-      }
-      return {
-        state: {
-          kind: 'drawing',
-          anchor: state.anchor,
-          anchors: [...state.anchors, snapNode],
-          confirmedNodes: [...state.confirmedNodes, snapNode],
-          frozenDirection: undefined,
-          inputValue: undefined,
-        },
-        command: null,
-        direction: angle(origin, point),
-        segmentLength: Math.hypot(point.x - origin.x, point.y - origin.y),
-        provisionalArea: computeArea([...allPoints, point]),
-        nodeCount: totalNodes + 1,
-      }
-    }
-
-    case 'digit': {
-      const dir = state.frozenDirection ?? angle(origin, cursor)
-      return {
-        state: {
-          ...state,
-          frozenDirection: dir,
-          inputValue: (state.inputValue ?? '') + event.digit,
-        },
-        command: null,
-        direction: dir,
-        segmentLength: parseLength((state.inputValue ?? '') + event.digit),
-        provisionalArea: state.confirmedNodes.length >= 1 ? computeArea(allPoints) : null,
-        nodeCount: totalNodes,
-      }
-    }
-
-    case 'enter': {
-      // Se tem frozenDirection e inputValue → confirma segmento numérico
-      if (state.frozenDirection !== undefined && state.inputValue) {
-        const length = parseLength(state.inputValue)
-        const nextPoint = pointAtDistance(origin, state.frozenDirection, length)
-        const rounded: SnapNode = {
-          id: ('n_num' as NodeId),
-          x: Math.round(nextPoint.x),
-          y: Math.round(nextPoint.y),
-        }
-        const newAllPoints = [...allPoints, rounded]
-        return {
-          state: {
-            kind: 'drawing',
-            anchor: state.anchor,
-            anchors: [...state.anchors, rounded],
-            confirmedNodes: [...state.confirmedNodes, rounded],
-            frozenDirection: undefined,
-            inputValue: undefined,
-          },
-          command: null,
-          direction: state.frozenDirection,
-          segmentLength: length,
-          provisionalArea: computeArea(newAllPoints),
-          nodeCount: totalNodes + 1,
-        }
-      }
-
-      // Enter com campo vazio → fecha (se ≥ 3 nós)
-      if (totalNodes >= 3) {
-        return createRoomResult(state.anchors, state.anchor)
-      }
-      return drawingResult(state, origin, allPoints, totalNodes)
-    }
-
-    case 'c': {
-      if (totalNodes >= 3) {
-        return createRoomResult(state.anchors, state.anchor)
-      }
-      return drawingResult(state, origin, allPoints, totalNodes)
-    }
-
-    case 'escape':
-    case 'backspace': {
-      if (state.inputValue) {
-        // Remove último dígito
-        const newValue = state.inputValue.slice(0, -1)
-        if (newValue === '') {
-          return {
-            state: { ...state, inputValue: undefined, frozenDirection: undefined },
-            command: null,
-            direction: angle(origin, cursor),
-            segmentLength: Math.hypot(cursor.x - origin.x, cursor.y - origin.y),
-            provisionalArea: state.confirmedNodes.length >= 1 ? computeArea(allPoints) : null,
-            nodeCount: totalNodes,
-          }
-        }
-        return {
-          state: { ...state, inputValue: newValue },
-          command: null,
-          direction: state.frozenDirection ?? angle(origin, cursor),
-          segmentLength: parseLength(newValue),
-          provisionalArea: state.confirmedNodes.length >= 1 ? computeArea(allPoints) : null,
-          nodeCount: totalNodes,
-        }
-      }
-
-      // Remove último segmento
-      if (state.confirmedNodes.length > 1) {
-        const newConfirmed = state.confirmedNodes.slice(0, -1)
-        const newAnchors = state.anchors.slice(0, -1)
-        const newAll = [state.anchor, ...newConfirmed]
-        return {
-          state: {
-            kind: 'drawing',
-            anchor: state.anchor,
-            anchors: newAnchors,
-            confirmedNodes: newConfirmed,
-          },
-          command: null,
-          direction: angle(origin, cursor),
-          segmentLength: Math.hypot(cursor.x - origin.x, cursor.y - origin.y),
-          provisionalArea: newConfirmed.length >= 2 ? computeArea(newAll) : null,
-          nodeCount: 1 + newConfirmed.length,
-        }
-      }
-
-      // Volta para Anchored
-      return {
-        state: {
-          kind: 'anchored',
-          anchor: state.anchor,
-          anchors: [state.anchors[0]!],
-        },
-        command: null,
-        direction: null,
-        segmentLength: 0,
-        provisionalArea: null,
-        nodeCount: 1,
-      }
-    }
-
-    default:
-      return drawingResult(state, origin, allPoints, totalNodes)
+function confirm(
+  nodes: readonly DraftNode[],
+  candidate: Candidate,
+  ctx: RoomToolContext,
+): RoomToolState {
+  const node: DraftNode = {
+    id: candidate.merged ?? ctx.newNodeId(),
+    x: candidate.point.x,
+    y: candidate.point.y,
+    reused: candidate.merged !== null,
   }
+  return { kind: 'drawing', nodes: [...nodes, node], input: EMPTY_INPUT }
 }
 
-function drawingResult(
-  state: RoomToolState & { kind: 'drawing' },
-  origin: Point,
-  allPoints: Point[],
-  totalNodes: number,
-): RoomToolResult {
-  const hasFrozen = state.frozenDirection !== undefined
-  return {
-    state,
-    command: null,
-    direction: hasFrozen ? state.frozenDirection! : angle(origin, { x: 0, y: 0 } as Point),
-    segmentLength: hasFrozen && state.inputValue ? parseLength(state.inputValue) : 0,
-    provisionalArea: totalNodes >= 3 ? computeArea(allPoints) : null,
-    nodeCount: totalNodes,
-  }
+function closesOnFirstNode(nodes: readonly DraftNode[], candidate: Candidate): boolean {
+  if (nodes.length < MIN_NODES_TO_CLOSE) return false
+  const first = nodes[0]!
+  if (candidate.merged !== null) return candidate.merged === first.id
+  return candidate.point.x === first.x && candidate.point.y === first.y
 }
 
-// ============================================================
-// Helpers
-// ============================================================
-
-function noopResult(state: RoomToolState): RoomToolResult {
-  return {
-    state,
-    command: null,
-    direction: null,
-    segmentLength: 0,
-    provisionalArea: null,
-    nodeCount: 0,
-  }
+function coincidesWithLast(nodes: readonly DraftNode[], candidate: Candidate): boolean {
+  const last = nodes[nodes.length - 1]!
+  return candidate.point.x === last.x && candidate.point.y === last.y
 }
 
-function computeArea(points: Point[]): number {
-  if (points.length < 3) return 0
-  // Fecha o polígono implicitamente
-  const closed = [...points, points[0]!]
-  let area = 0
-  for (let i = 0; i < closed.length - 1; i++) {
-    area += closed[i]!.x * closed[i + 1]!.y - closed[i + 1]!.x * closed[i]!.y
-  }
-  return Math.abs(area) / 2
+function dropLast(nodes: readonly DraftNode[]): RoomToolState {
+  if (nodes.length <= 1) return { kind: 'idle' }
+  const remaining = nodes.slice(0, -1)
+  const kind = remaining.length >= 2 ? 'drawing' : 'anchored'
+  return { kind, nodes: remaining, input: EMPTY_INPUT }
 }
 
-function createRoomResult(
-  anchors: SnapNode[],
-  _anchor: Point,
-): RoomToolResult {
-  // Gera o comando CreateRoom
-  const nodes = anchors.map((a) => ({
-    id: a.id,
-    x: a.x,
-    y: a.y,
-  }))
-  const loop = anchors.map((a) => a.id)
+function withInput(
+  state: RoomToolState & { kind: 'anchored' | 'drawing' },
+  input: NumericInput,
+): RoomToolState {
+  return { kind: state.kind, nodes: state.nodes, input }
+}
+
+function closeRoom(nodes: readonly DraftNode[], ctx: RoomToolContext): RoomToolResult {
+  const roomId = ctx.newRoomId()
+  const command: CreateRoomCommand = {
+    type: 'CreateRoom',
+    payload: {
+      nodes: nodes.filter((n) => !n.reused).map((n) => ({ id: n.id, x: n.x, y: n.y })),
+      loop: nodes.map((n) => n.id),
+      name: '',
+      roomId,
+    },
+  }
 
   return {
     state: { kind: 'idle' },
-    command: {
-      type: 'CreateRoom',
-      payload: {
-        nodes,
-        loop,
-        name: '', // será preenchido pelo app com nome default
-      },
-    },
-    direction: null,
-    segmentLength: 0,
-    provisionalArea: null,
-    nodeCount: 0,
+    commands: [command],
+    overlays: [],
+    hud: null,
+    naming: { roomId, centroid: centroid(nodes.map((n) => ({ x: n.x, y: n.y }))) },
   }
+}
+
+function present(state: RoomToolState, ctx: RoomToolContext): RoomToolResult {
+  return {
+    state,
+    commands: [],
+    overlays: roomToolOverlay(state, ctx),
+    hud: hudModel(state, ctx),
+    naming: null,
+  }
+}
+
+function hudModel(state: RoomToolState, ctx: RoomToolContext): RoomHudModel | null {
+  if (state.kind === 'idle') return null
+
+  const candidate = candidateOf(state.nodes, state.input, ctx)
+  const editing = state.input.value !== ''
+  const provisional = [...state.nodes.map((n) => ({ x: n.x, y: n.y })), candidate.point]
+
+  return {
+    lengthText: state.input.value,
+    measuredText: formatCentimeters(candidate.length),
+    editing,
+    angleText: formatDegrees(candidate.direction),
+    nodeCount: state.nodes.length,
+    areaText:
+      state.nodes.length >= MIN_NODES_TO_CLOSE ? formatArea(polygonArea(provisional)) : null,
+  }
+}
+
+/**
+ * Traço em andamento como geometria declarativa: polilinha confirmada,
+ * segmento fantasma até o candidato, e marcadores de snap.
+ */
+export function roomToolOverlay(
+  state: RoomToolState,
+  ctx: RoomToolContext,
+): readonly OverlayPrimitive[] {
+  if (state.kind === 'idle') {
+    return ctx.snap.merged !== null
+      ? [{ kind: 'marker', role: 'snapNode', position: ctx.snap.point }]
+      : []
+  }
+
+  const overlays: OverlayPrimitive[] = []
+  const points = state.nodes.map((n) => ({ x: n.x, y: n.y }))
+  const candidate = candidateOf(state.nodes, state.input, ctx)
+
+  if (points.length >= 2) {
+    overlays.push({ kind: 'polyline', role: 'draft', points, closed: false })
+  }
+
+  overlays.push({ kind: 'segment', role: 'ghost', a: points[points.length - 1]!, b: candidate.point })
+
+  if (closesOnFirstNode(state.nodes, candidate)) {
+    overlays.push({ kind: 'marker', role: 'closeTarget', position: points[0]! })
+  } else if (candidate.merged !== null) {
+    overlays.push({ kind: 'marker', role: 'snapNode', position: candidate.point })
+  }
+
+  if (ctx.snap.targets.some((t) => t.kind === 'axis')) {
+    overlays.push({
+      kind: 'segment',
+      role: 'axisGuide',
+      a: points[points.length - 1]!,
+      b: candidate.point,
+    })
+  }
+
+  return overlays
+}
+
+function formatCentimeters(lengthMm: number): string {
+  return lengthMm <= 0 ? '' : String(Math.round(lengthMm / 10))
+}
+
+function formatDegrees(directionRad: number): string {
+  const deg = ((directionRad * 180) / Math.PI + 360) % 360
+  return `${deg.toFixed(1).replace('.', ',')}°`
 }
