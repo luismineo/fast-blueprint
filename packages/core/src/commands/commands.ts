@@ -4,7 +4,7 @@
 
 import { type Patch, produceWithPatches, enablePatches } from 'immer';
 import type { PlanDocument, NodeId, RoomId, Node, Room } from '../model';
-import { generateRoomId, generateDefaultRoomName } from '../model';
+import { generateNodeId, generateRoomId, generateDefaultRoomName } from '../model';
 import { isClockwise, polygonArea } from '../geometry';
 
 // Habilita suporte a patches no Immer (precisa ser chamado uma vez)
@@ -19,6 +19,8 @@ export type Command =
   | DeleteRoomCommand
   | RenameRoomCommand
   | MoveNodeCommand
+  | MergeNodesCommand
+  | SplitNodeCommand
   | BatchCommand;
 
 export interface CreateRoomCommand {
@@ -69,6 +71,30 @@ export interface MoveNodePayload {
   y: number;
 }
 
+export interface MergeNodesCommand {
+  type: 'MergeNodes';
+  transient?: boolean;
+  payload: MergeNodesPayload;
+}
+
+export interface MergeNodesPayload {
+  keep: NodeId;
+  remove: NodeId;
+}
+
+export interface SplitNodeCommand {
+  type: 'SplitNode';
+  transient?: boolean;
+  payload: SplitNodePayload;
+}
+
+export interface SplitNodePayload {
+  nodeId: NodeId;
+  roomId: RoomId;
+  to: { x: number; y: number };
+  newNodeId?: NodeId;
+}
+
 export interface BatchCommand {
   type: 'Batch';
   transient?: boolean;
@@ -93,7 +119,10 @@ export type CommandErrorCode =
   | 'ROOM_NOT_FOUND'
   | 'NODE_NOT_FOUND'
   | 'NODE_COLLISION'
-  | 'NON_INTEGER_COORDINATE';
+  | 'NON_INTEGER_COORDINATE'
+  | 'SAME_NODE'
+  | 'NODE_NOT_SHARED'
+  | 'DEGENERATE_WALL';
 
 export interface CommandError {
   code: CommandErrorCode;
@@ -156,6 +185,10 @@ export function applyCommand(
       return applyRenameRoom(doc, cmd.payload);
     case 'MoveNode':
       return applyMoveNode(doc, cmd.payload);
+    case 'MergeNodes':
+      return applyMergeNodes(doc, cmd.payload);
+    case 'SplitNode':
+      return applySplitNode(doc, cmd.payload);
     case 'Batch':
       return applyBatch(doc, cmd.payload);
   }
@@ -241,6 +274,173 @@ function validateMoveNode(
   }
 
   return null;
+}
+
+// ============================================================
+// MergeNodes
+// ============================================================
+
+function applyMergeNodes(
+  doc: PlanDocument,
+  payload: MergeNodesPayload,
+): CommandResult {
+  const label = 'Fundir nós';
+  const rejection = validateMergeNodes(doc, payload);
+  if (rejection) return rejected(doc, label, rejection);
+
+  const [nextDoc, patches, inversePatches] = produceWithPatches(doc, (draft) => {
+    for (const room of draft.rooms) {
+      room.loop = dropRepeats(repoint(room.loop, payload));
+    }
+    for (const wall of draft.walls) {
+      if (wall.a === payload.remove) wall.a = payload.keep;
+      if (wall.b === payload.remove) wall.b = payload.keep;
+    }
+    const index = draft.nodes.findIndex((node) => node.id === payload.remove);
+    if (index !== -1) draft.nodes.splice(index, 1);
+  });
+
+  return applied(nextDoc, patches, inversePatches, label);
+}
+
+function repoint(loop: readonly NodeId[], payload: MergeNodesPayload): NodeId[] {
+  return loop.map((id) => (id === payload.remove ? payload.keep : id));
+}
+
+/**
+ * Um ciclo não repete nó (E4). Fundir dois vértices do mesmo cômodo produz a
+ * repetição; a segunda ocorrência sai e o polígono perde um lado.
+ */
+function dropRepeats(loop: readonly NodeId[]): NodeId[] {
+  const seen = new Set<NodeId>();
+  const result: NodeId[] = [];
+  for (const id of loop) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    result.push(id);
+  }
+  return result;
+}
+
+function validateMergeNodes(
+  doc: PlanDocument,
+  payload: MergeNodesPayload,
+): CommandError | null {
+  if (payload.keep === payload.remove) {
+    return { code: 'SAME_NODE', ids: [payload.keep] };
+  }
+
+  const missing = [payload.keep, payload.remove].filter(
+    (id) => !doc.nodes.some((node) => node.id === id),
+  );
+  if (missing.length > 0) {
+    return { code: 'NODE_NOT_FOUND', ids: missing };
+  }
+
+  for (const room of doc.rooms) {
+    if (dropRepeats(repoint(room.loop, payload)).length < 3) {
+      return { code: 'LOOP_TOO_SHORT', ids: [room.id] };
+    }
+  }
+
+  for (const wall of doc.walls) {
+    const a = wall.a === payload.remove ? payload.keep : wall.a;
+    const b = wall.b === payload.remove ? payload.keep : wall.b;
+    if (a === b) {
+      return { code: 'DEGENERATE_WALL', ids: [wall.id] };
+    }
+  }
+
+  return null;
+}
+
+// ============================================================
+// SplitNode
+// ============================================================
+
+/**
+ * Desconecta um nó de um cômodo, dando a ele uma cópia própria já na posição
+ * final.
+ *
+ * O destino faz parte do payload porque desconectar e reposicionar são a mesma
+ * operação: uma cópia sobre o original seriam dois nós com coordenadas
+ * idênticas, e E6 é invariante de nível `error` (spec 01 § Invariantes). Quem
+ * arrasta emite este comando no primeiro `pointermove` com deslocamento
+ * diferente de zero, nunca no `pointerdown`.
+ */
+function applySplitNode(
+  doc: PlanDocument,
+  payload: SplitNodePayload,
+): CommandResult {
+  const label = 'Desconectar nó';
+  const rejection = validateSplitNode(doc, payload);
+  if (rejection) return rejected(doc, label, rejection);
+
+  const copyId = payload.newNodeId ?? generateNodeId();
+
+  const [nextDoc, patches, inversePatches] = produceWithPatches(doc, (draft) => {
+    draft.nodes.push({
+      id: copyId,
+      x: payload.to.x as Node['x'],
+      y: payload.to.y as Node['y'],
+    });
+    const room = draft.rooms.find((candidate) => candidate.id === payload.roomId);
+    if (!room) return;
+    room.loop = room.loop.map((id) => (id === payload.nodeId ? copyId : id));
+  });
+
+  return applied(nextDoc, patches, inversePatches, label);
+}
+
+function validateSplitNode(
+  doc: PlanDocument,
+  payload: SplitNodePayload,
+): CommandError | null {
+  if (!Number.isInteger(payload.to.x) || !Number.isInteger(payload.to.y)) {
+    return { code: 'NON_INTEGER_COORDINATE', ids: [payload.nodeId] };
+  }
+
+  if (!doc.nodes.some((node) => node.id === payload.nodeId)) {
+    return { code: 'NODE_NOT_FOUND', ids: [payload.nodeId] };
+  }
+
+  const room = doc.rooms.find((candidate) => candidate.id === payload.roomId);
+  if (!room) {
+    return { code: 'ROOM_NOT_FOUND', ids: [payload.roomId] };
+  }
+
+  if (!room.loop.includes(payload.nodeId)) {
+    return { code: 'UNKNOWN_LOOP_NODE', ids: [payload.nodeId] };
+  }
+
+  if (!isShared(doc, payload.nodeId, payload.roomId)) {
+    return { code: 'NODE_NOT_SHARED', ids: [payload.nodeId] };
+  }
+
+  const occupant = doc.nodes.find(
+    (node) => node.x === payload.to.x && node.y === payload.to.y,
+  );
+  if (occupant) {
+    return { code: 'NODE_COLLISION', ids: [payload.nodeId, occupant.id] };
+  }
+
+  return null;
+}
+
+/**
+ * Desconectar um nó que ninguém mais referencia deixaria um órfão e teria o
+ * mesmo efeito de `MoveNode`. Quem arrasta já precisa saber se o nó é
+ * compartilhado — é o que decide se o diálogo de nó compartilhado aparece —
+ * então rejeitar aqui não custa uma consulta extra a ninguém.
+ */
+function isShared(doc: PlanDocument, nodeId: NodeId, roomId: RoomId): boolean {
+  for (const room of doc.rooms) {
+    if (room.id !== roomId && room.loop.includes(nodeId)) return true;
+  }
+  for (const wall of doc.walls) {
+    if (wall.a === nodeId || wall.b === nodeId) return true;
+  }
+  return false;
 }
 
 // ============================================================
