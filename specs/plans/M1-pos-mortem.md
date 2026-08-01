@@ -1,65 +1,82 @@
-# M1 — O que a spec 03 errou
+# M1 — Post-mortem
 
-A spec `03-ferramentas-e-interacao.md` descreve a máquina de estados da Ferramenta Cômodo. Implementei cada transição. Abaixo, o que estava errado ou omisso.
+O M1 foi entregue com 158 testes verdes e o aplicativo inutilizável: clicar no canvas não desenhava nada, e apertar `Enter` produzia uma única linha reta. Este documento registra por quê.
 
-## 1. Duplo clique em Anchored é indefinido
+A versão anterior deste arquivo atribuía à spec 03 falhas que eram de implementação, e descrevia como implementados comportamentos que não existiam no código (segmento fantasma, `select-all` no campo de comprimento). Foi reescrito depois do reparo.
 
-A spec lista duplo clique como mecanismo de fechamento na tabela de "Fechar o polígono". Mas Anchored só tem 1 ponto. Um duplo clique em Anchored não pode confirmar "o segmento" (não há segmento) nem "fechar" (faltam 2 nós). A implementação trata como no-op.
+## O que realmente aconteceu
 
-**O que a spec deveria ter dito:** "Duplo clique fecha o polígono. Só dispara se `confirmedNodes.length >= 2`." Ou então listar duplo clique como mecanismo exclusivo do estado Drawing, não como propriedade da ferramenta como um todo.
+### 1. A suíte de testes não exercitava nenhum caminho de integração
 
-## 2. `C`, `Enter` vazio e clique no nó inicial com < 3 nós total
+Esta é a causa raiz de todas as outras. Um milestone inteiro passou em CI sem que uma única linha de código verificasse que a ferramenta, o store e o renderer funcionavam juntos.
 
-A spec diz "Fechamento com menos de 3 nós é ignorado", mas não especifica se a ferramenta:
-- volta para Idle,
-- permanece no estado corrente,
-- emite um aviso visual,
-- ou faz outra coisa.
+- `roomTool.test.ts` testava a máquina de estados isolada e asseria `payload.nodes).toHaveLength(4)`. Passava com quatro ids **idênticos**, que o comando depois colapsava num polígono de área zero.
+- Nenhum dos seis passes novos (`walls`, `roomFills`, `dimensions`, `roomLabels`, `snapGuides`, `toolOverlay`) tinha teste. O critério de aceitação de `10-testes.md` — "`RecordingTarget` cobre todos os passes de `04-renderizacao.md`" — estava em aberto.
+- O E2E cobria só "o canvas está visível".
 
-A implementação optou por permanecer no estado corrente, silenciosamente. Essa escolha é consistente — o usuário pode ter apertado `C` sem querer e não perdeu nada — mas a spec deveria ter explicitado o comportamento esperado. "Ignorar" é ambíguo.
+**Correção.** `roomTool.integration.test.ts` dirige a sequência de aceitação inteira até o `DocumentStore` e assere contra o **documento resultante**, nunca contra o payload: 4 nós distintos, área exatamente 8.000.000 mm², documento sem issue de nível `error`. `e2e/room.spec.ts` roda o mesmo fluxo no navegador contra o build de produção.
 
-## 3. Conflito entre clique e entrada numérica parcial
+### 2. O traço em andamento não tinha caminho de renderização
 
-A spec diz que "digitar qualquer dígito em estado Anchored ou Drawing foca automaticamente o campo de comprimento". Também diz que "clique confirma no ponto resolvido pelo snap". O que acontece quando o campo contém dígitos parciais (ex: usuário digitou `32` mas ainda não deu Enter) e clica no canvas?
+`toolOverlay.ts` e `snapGuides.ts` eram funções de corpo vazio. `RenderContext` não tinha campo de overlay. `App.svelte` nunca passava o estado da ferramenta para `render`. `RoomToolResult` devolvia só escalares para o HUD, nenhuma geometria. E `RoomToolEvent` não tinha `pointerMove`, então a ferramenta nunca sabia onde estava o cursor.
 
-A implementação decidiu que o clique vence — o valor parcial do campo é descartado. Isso é consistente com a ideia de que clicar é a ação mais intencional (movimento de mouse + clique vs. digitar alguns números). Mas a spec nunca abordou essa interação. Ela trata os três caminhos de confirmação como independentes, sem discutir o que acontece na transição entre eles.
+Não era um fio solto: **a instalação inteira faltava**. Clicar não podia desenhar nada, por construção.
 
-## 4. Primeiro dígito: replace vs. append
+### 3. Ids de nó fixos colapsavam o cômodo numa linha
 
-A spec diz que digitar dígito "foca automaticamente" o campo. Mas foco programático em um campo de texto normalmente seleciona o conteúdo existente. Se o campo já tem um valor (ex: de um segmento anterior), o primeiro dígito substitui ou concatena?
+`roomTool.ts` usava os literais `'n_new'`, `'n_tmp'` e `'n_num'`; `generateNodeId()` existia em `core` e nunca era chamado. Um cômodo de quatro pontos emitia `loop: ['n_new','n_num','n_num','n_num']`, e `applyCreateRoom` resolvia os três `n_num` para o mesmo nó via `Array.find`. Resultado: polígono de área zero desenhado como uma linha — exatamente o sintoma relatado.
 
-A implementação adotou select-all (substitui). A spec não diz nada sobre isso. É um detalhe de UX que afeta diretamente o fluxo de desenho — se o campo não fizer select-all, o usuário que desenhou um segmento de 320 e agora quer 250 precisa apagar manualmente `320` antes de digitar `250`. Com select-all, o primeiro dígito já limpa e substitui.
+### 4. Texto e espessura no espaço de coordenadas errado
 
-## 5. `Backspace` vs. `Esc`: diferença sutil
+`dimensions` e `roomLabels` rodavam em espaço de mundo com fonte em pixels: no zoom inicial (~0,07 px/mm) uma fonte de 10 px virava 0,7 px de tela. `walls` passava `wallWidth` (2,5) como largura de mundo, ou seja 2,5 **milímetros** — cerca de 0,2 px. Os dois rótulos do cômodo eram separados por ±1 mm, então se sobrepunham em qualquer zoom real. E a normal da cota era `(-dy, dx)`, que aponta para **dentro** de um ciclo horário com Y para baixo.
 
-Ambos removem o último segmento quando o campo de comprimento está vazio. Mas `Backspace` com campo preenchido **edita o texto** (comportamento padrão de campo), enquanto `Esc` com campo preenchido **não faz nada** ou deveria limpar o campo?
+Mesmo com um cômodo válido no documento, quase nada seria legível.
 
-A spec documenta o caso do campo vazio mas não diz o que `Esc` faz com campo preenchido. A implementação optou por: `Esc` remove o último dígito (como Backspace) e depois, se o campo ficar vazio, remove o segmento. Isso é diferente do que a spec deixa implícito (que `Esc` só remove segmento, não dígito).
+### 5. O HUD não podia receber nem devolver texto
 
-## 6. `C` vs. clique no nó inicial: assimetria de snap
+O campo usava ligação de mão única sem `oninput`, e o handler global de teclado dava `preventDefault()` em todo dígito enquanto a ferramenta estava ativa. O campo nunca recebia texto e a ferramenta nunca lia dele. `hudX`/`hudY` só eram escritos em `pointerMove` sob `kind !== 'idle'`, condição falsa até o primeiro clique pousar — então o HUD aparecia no canto superior esquerdo.
 
-`C` fecha o polígono independentemente de onde o cursor está — ele liga o último nó confirmado ao nó inicial, com ou sem snap. Já o clique no nó inicial depende do resolvedor de snap (Classe 1) encontrar o nó inicial dentro da tolerância. Se o zoom está muito afastado e o nó inicial está fora da tolerância, o clique fecha em um ponto novo (criando um nó quase-idêntico e violando E6), enquanto `C` fecha corretamente reusando o nó existente.
+### 6. Nomeação inline ausente
 
-A spec lista os dois como equivalentes ("Fecha, reusando o nó" vs. "Fecha ligando o último nó ao inicial"), mas eles não são equivalentes — um depende de tolerância de pixel, o outro é determinístico. A spec deveria ter reconhecido essa assimetria e talvez recomendado que o clique no nó inicial usasse uma tolerância maior (ou uma busca explícita por proximidade ao nó inicial, sem passar pelo resolvedor de snap completo).
+O passo `"Quarto" Enter` do critério de aceitação não existia. `createRoomResult` emitia `name: ''` e nada abria edição.
 
-## 7. A máquina de estados esconde subestados de entrada numérica
+## O que a spec 03 realmente errou
 
-O diagrama `Idle → Anchored → Drawing → (Closed | Cancelled)` tem 4 estados. Mas na prática, `Drawing` tem dois subestados radicalmente diferentes:
-- **Seguindo mouse:** o segmento fantasma segue o cursor; `pointerMove` atualiza o HUD
-- **Entrada numérica congelada:** o segmento está travado na direção do último snap; o mouse move mas não afeta o segmento
+Três ambiguidades reais, resolvidas na spec antes de codar.
 
-A spec menciona o congelamento ("A direção usada com entrada numérica é a direção após snap de eixo"), mas não modela isso como parte do estado. Na implementação, `frozenDirection` e `inputValue` são campos do estado `Drawing`. O diagrama de 4 estados é simplificado demais — um diagrama realista teria ao menos 5 ou 6 estados.
+**A direção da entrada numérica era inalcançável como especificada.** A spec dizia que a direção vem "após snap de eixo" e dava o exemplo "o mouse aponta para 87° e a direção é 90°". Mas a Classe 2 do resolvedor tem tolerância de 8 px de distância **perpendicular**, limitada a 40 mm: a 3 000 mm da origem isso são 0,76°, e um desvio de 3° são 157 mm. Passar 87° pelo resolvedor devolve 87°. A sequência `320/250/320` produziria um paralelogramo, não um retângulo de 8,00 m².
 
-## 8. Ausência de definição para `pointerMove` durante entrada numérica
+Corrigido: a direção vem de `snapAngle` (arredondamento angular), e a spec agora diz por que não é a Classe 2.
 
-A spec não diz o que acontece com o preview de snap durante a entrada numérica. O cursor do mouse continua se movendo, e o snap preview (marcador de nó sob o cursor) deve continuar ativo ou deve ser suprimido?
+**`OverlayPrimitive` com cor em `core/`.** A spec ilustrava `{ kind: 'polyline'; points; color: HexColor }` e ao mesmo tempo colocava o tipo em `core/`, o que colide com o critério de aceitação da spec 04 ("nenhuma string hexadecimal fora de `renderer/theme.ts`") e inviabilizaria o tema escuro da v2. Corrigido para papel semântico.
 
-A implementação manteve o snap preview ativo — o usuário pode ver que está perto de um nó e decidir cancelar a entrada numérica para clicar no nó. A spec não menciona esse caso. Se o snap preview fosse suprimido, o usuário perderia informação durante a digitação.
+**Limiar da terceira linha do HUD.** "A partir de 3 segmentos" no texto, `4 lados` no mockup. Corrigido para 3 **nós** confirmados, que é o que a máquina de estados conta.
 
-## Recomendações para revisão da spec 03
+Duas outras ambiguidades só apareceram ao verificar no navegador, e estão registradas na spec:
 
-1. Substituir o diagrama de 4 estados por uma tabela de transições completa (como a que está em `specs/plans/m1-desenhar-e-medir.md`).
-2. Especificar o comportamento de cada combinação (estado, evento, condição), incluindo os casos de < 3 nós e conflitos de entrada.
-3. Documentar a política de replace vs. append no campo de comprimento.
-4. Esclarecer a diferença entre `C` e clique no nó inicial, e entre `Backspace` e `Esc`.
-5. Adicionar uma seção sobre "estados implícitos da entrada numérica" — congelamento de direção, preview durante digitação, foco de campo.
+- O campo de comprimento mostra os dígitos digitados; o comprimento medido aparece como dica. Exibir o valor medido *dentro* do campo fazia os dígitos seguintes concatenarem nele (`132` + `250`).
+- `c` fecha o polígono com o campo vazio e é sufixo de unidade (`320cm`) com o campo preenchido. Sem essa distinção, o `C` final da sequência documentada virava texto, porque depois de cada `Enter` o foco permanece no campo.
+
+## O que a implementação errou, não a spec
+
+A versão anterior deste documento culpava a spec por cinco pontos que eram decisões de implementação nunca tomadas:
+
+| Alegação anterior | Realidade |
+|---|---|
+| "A implementação adotou select-all" | O código concatenava incondicionalmente. Nenhum `select-all` existia. |
+| "O snap preview continua ativo durante a digitação" | Nenhum preview era desenhado em momento algum. |
+| "Duplo clique é tratado como no-op" | Não havia tratamento de duplo clique: `clickCount` nem chegava à ferramenta. |
+| "`Esc` remove o último dígito e depois o segmento" | Correto, mas contradizia a própria tabela de atalhos, que dá `Esc` como saída da armadilha de foco. |
+| "`C` e clique no nó inicial são assimétricos por tolerância" | O clique no nó inicial era **código morto**: o resolvedor só via nós já commitados, então `merged` era sempre `null` durante o primeiro cômodo. |
+
+## Lições
+
+**Teste de unidade sobre payload não prova nada.** Asserir a forma do comando enquanto o defeito está em como o comando é *aplicado* dá confiança falsa. O teste tem que atravessar a fronteira e olhar o resultado.
+
+**Um milestone com passes de render sem teste nenhum não está pronto.** Quatro dos oito defeitos eram do renderer, todos triviais de pegar com `RecordingTarget`, todos invisíveis para a suíte que existia.
+
+**Rodar o aplicativo é parte da verificação, não um extra.** Duas ambiguidades reais só apareceram dirigindo o fluxo no navegador — nenhuma quantidade de leitura de spec as teria encontrado.
+
+**`pnpm typecheck` e `pnpm lint` estavam vermelhos no commit do M1**, com 73 erros de lint e 8 de tipo, embora a definition of done do `CLAUDE.md` exija ambos limpos. Um gate que se pode ignorar não é um gate.
+
+**Reparo silencioso esconde o bug.** `applyCreateRoom` aceitava um loop com ids repetidos e produzia um documento plausível de área zero. Agora rejeita, com código de erro, sem tocar no documento (`08-arquitetura.md` § Tratamento de erro).
