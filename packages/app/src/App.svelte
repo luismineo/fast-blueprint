@@ -12,14 +12,19 @@
   } from '@planta/renderer'
   import {
     DocumentStore,
-    computeUsableArea,
-    formatArea,
+    ROOM_COLORS,
     generateNodeId,
     generateRoomId,
+    hitTest,
+    pruneSelection,
+    tryParseLength,
     type OverlayPrimitive,
     type PlanDocument,
     type Point,
     type RoomId,
+    type Selection,
+    type SelectionRef,
+    type SetEdgeLengthPayload,
   } from '@planta/core'
   import { Scheduler } from './scheduler'
   import { messages } from './messages'
@@ -44,8 +49,17 @@
     type RoomToolEvent,
     type RoomToolState,
   } from './tools/roomTool'
+  import {
+    initialSelectState,
+    selectToolTransition,
+    type EditRequest,
+    type SelectToolContext,
+    type SelectToolEvent,
+    type SelectToolState,
+  } from './tools/selectTool'
   import { resolveToolSnap } from './tools/snapContext'
   import { classifyKey, type FocusKind } from './tools/toolShortcuts'
+  import PropertiesPanel from './components/PropertiesPanel.svelte'
 
   const HUD_OFFSET_PX = 16
 
@@ -53,15 +67,24 @@
   let lengthEl: HTMLInputElement | undefined = $state.raw()
   let angleEl: HTMLInputElement | undefined = $state.raw()
   let nameEl: HTMLInputElement | undefined = $state.raw()
+  let edgeEl: HTMLInputElement | undefined = $state.raw()
 
   let camera: Camera = $state.raw({ tx: 0, ty: 0, scale: 1 })
   let viewport: Size = $state.raw({ width: 0, height: 0 })
   let cursorPx: Point = $state.raw({ x: 0, y: 0 })
   let roomState: RoomToolState = $state.raw(initialRoomState())
+  let selectState: SelectToolState = $state.raw(initialSelectState())
+  let selection: Selection = $state.raw([])
+  let hover: SelectionRef | null = $state.raw(null)
   let overlays: readonly OverlayPrimitive[] = $state.raw([])
   let hud: RoomHudModel | null = $state.raw(null)
   let naming: NamingRequest | null = $state.raw(null)
   let namingValue = $state('')
+  let edgeEdit: (EditRequest & { kind: 'edgeLength' }) | null = $state.raw(null)
+  let edgeEditValue = $state('')
+  // "Mover junto" / "Só este cômodo", lembrada durante a sessão
+  // (`03-ferramentas-e-interacao.md` § Editar comprimento de aresta).
+  let sharedNodeMode: SetEdgeLengthPayload['mode'] = $state('moveTogether')
   let toolActive = $state(false)
   let perfSummary = $state('')
 
@@ -73,13 +96,15 @@
     typeof window !== 'undefined' &&
     new URLSearchParams(window.location.search).get('debug') === 'perf'
 
-  const usableAreaText = $derived(formatArea(computeUsableArea(doc)))
-  const roomCount = $derived(doc.rooms.length)
   const hudLeft = $derived(cursorPx.x + HUD_OFFSET_PX)
   const hudTop = $derived(cursorPx.y + HUD_OFFSET_PX)
   const namingPos: Point = $derived.by(() => {
     const request = naming
     return request ? worldToScreen(camera, request.centroid) : { x: 0, y: 0 }
+  })
+  const edgeEditPos: Point = $derived.by(() => {
+    const request = edgeEdit
+    return request ? worldToScreen(camera, request.at) : { x: 0, y: 0 }
   })
 
   function focusKind(): FocusKind {
@@ -87,7 +112,7 @@
     if (!active) return 'canvas'
     if (active === lengthEl) return 'hudLength'
     if (active === angleEl) return 'hudAngle'
-    if (active === nameEl) return 'roomName'
+    if (active === nameEl || active === edgeEl) return 'roomName'
     if (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') return 'other'
     return 'canvas'
   }
@@ -123,18 +148,201 @@
     for (const command of result.commands) store.dispatch(command)
 
     if (result.naming) {
-      const room = store.current.rooms.find((r) => r.id === result.naming!.roomId)
-      namingValue = room?.name ?? ''
-      naming = result.naming
+      openNameEditor(result.naming.roomId, result.naming)
       toolActive = false
-      void focusNameField()
     }
+  }
+
+  function selectContext(alt: boolean): SelectToolContext {
+    const world = worldAt(cursorPx)
+    const current = store.current
+    return {
+      doc: current,
+      cursor: world,
+      hit: hitTest(world, { doc: current, scale: camera.scale }),
+      selection,
+      snap: (point, exclude) =>
+        resolveToolSnap(point, {
+          doc: current,
+          draft: [],
+          scale: camera.scale,
+          shift: false,
+          alt,
+          exclude,
+        }),
+      newNodeId: generateNodeId,
+    }
+  }
+
+  function dispatchSelect(event: SelectToolEvent, alt = false): void {
+    const result = selectToolTransition(selectState, event, selectContext(alt))
+    selectState = result.state
+    selection = result.selection
+    hover = result.hover
+    overlays = result.overlays
+
+    for (const command of result.commands) store.dispatch(command)
+    if (result.historyBoundary === 'commit') store.sealPending()
+    if (result.historyBoundary === 'abort') store.abortPending()
+
+    if (result.edit) beginEdit(result.edit)
+  }
+
+  function beginEdit(request: EditRequest): void {
+    if (request.kind === 'roomName') {
+      openNameEditor(request.roomId, null)
+      return
+    }
+    edgeEdit = request
+    edgeEditValue = String(Math.round(request.currentLength / 10))
+    void focusEdgeField()
+  }
+
+  function openNameEditor(roomId: RoomId, request: NamingRequest | null): void {
+    const room = store.current.rooms.find((r) => r.id === roomId)
+    namingValue = room?.name ?? ''
+    naming = request ?? { roomId, centroid: roomCentroid(roomId) }
+    void focusNameField()
+  }
+
+  function roomCentroid(roomId: RoomId): Point {
+    const current = store.current
+    const room = current.rooms.find((r) => r.id === roomId)
+    if (!room) return worldAt(cursorPx)
+
+    let sx = 0
+    let sy = 0
+    let count = 0
+    for (const nodeId of room.loop) {
+      const node = current.nodes.find((candidate) => candidate.id === nodeId)
+      if (!node) continue
+      sx += node.x
+      sy += node.y
+      count += 1
+    }
+    return count === 0 ? worldAt(cursorPx) : { x: sx / count, y: sy / count }
   }
 
   async function focusNameField(): Promise<void> {
     await tick()
     nameEl?.focus()
     nameEl?.select()
+  }
+
+  async function focusEdgeField(): Promise<void> {
+    await tick()
+    edgeEl?.focus()
+    edgeEl?.select()
+  }
+
+  function commitEdgeLength(mode: 'moveTogether' | 'detach'): void {
+    const request = edgeEdit
+    edgeEdit = null
+    if (!request) return
+
+    sharedNodeMode = mode
+    const length = tryParseLength(edgeEditValue)
+    if (length !== null && length > 0) {
+      store.dispatch({
+        type: 'SetEdgeLength',
+        payload: { edge: request.edge, length, mode, newNodeId: generateNodeId() },
+      })
+      selection = pruneSelection(store.current, selection)
+    }
+    canvasEl?.focus()
+  }
+
+  function cancelEdgeLength(): void {
+    edgeEdit = null
+    canvasEl?.focus()
+  }
+
+  function selectedRoomId(): RoomId | null {
+    const ref = selection.find((candidate) => candidate.kind === 'room')
+    return ref && ref.kind === 'room' ? ref.roomId : null
+  }
+
+  function renameSelectedRoom(name: string): void {
+    const roomId = selectedRoomId()
+    const trimmed = name.trim()
+    if (!roomId || trimmed === '') return
+
+    const room = store.current.rooms.find((candidate) => candidate.id === roomId)
+    if (!room || room.name === trimmed) return
+
+    store.dispatch({ type: 'RenameRoom', payload: { roomId, name: trimmed } })
+  }
+
+  function colorSelectedRoom(index: number | null): void {
+    const roomId = selectedRoomId()
+    if (!roomId) return
+
+    const color = index === null ? null : (ROOM_COLORS[index] ?? null)
+    store.dispatch({ type: 'SetRoomColor', payload: { roomId, color } })
+  }
+
+  function setSelectedRoomUsable(include: boolean): void {
+    const roomId = selectedRoomId()
+    if (!roomId) return
+    store.dispatch({
+      type: 'SetRoomUsable',
+      payload: { roomId, includeInUsableArea: include },
+    })
+  }
+
+  function applyPanelEdgeLength(text: string): void {
+    const ref = selection.find((candidate) => candidate.kind === 'edge')
+    if (!ref || ref.kind !== 'edge') return
+
+    const length = tryParseLength(text)
+    if (length === null || length <= 0) return
+
+    store.dispatch({
+      type: 'SetEdgeLength',
+      payload: {
+        edge: ref.edge,
+        length,
+        mode: sharedNodeMode,
+        newNodeId: generateNodeId(),
+      },
+    })
+    selection = pruneSelection(store.current, selection)
+  }
+
+  function applyNodeCoordinate(axis: 'x' | 'y', text: string): void {
+    const ref = selection.find((candidate) => candidate.kind === 'node')
+    if (!ref || ref.kind !== 'node') return
+
+    const value = tryParseLength(text)
+    if (value === null) return
+
+    const node = store.current.nodes.find((candidate) => candidate.id === ref.nodeId)
+    if (!node) return
+
+    store.dispatch({
+      type: 'MoveNode',
+      payload: {
+        nodeId: ref.nodeId,
+        x: axis === 'x' ? value : node.x,
+        y: axis === 'y' ? value : node.y,
+      },
+    })
+  }
+
+  function deleteSelection(): void {
+    dispatchSelect({ type: 'deleteSelection' })
+  }
+
+  function onEdgeKeyDown(event: KeyboardEvent): void {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      commitEdgeLength(edgeEdit?.endNodeShared ? sharedNodeMode : 'moveTogether')
+      return
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      cancelEdgeLength()
+    }
   }
 
   function commitName(): void {
@@ -187,8 +395,26 @@
     let dragState: PanDragState | null = null
 
     const scheduler = new Scheduler(() => {
-      render({ camera, viewport, theme: lightTheme, target, profiler, doc: store.current, overlays })
+      render({
+        camera,
+        viewport,
+        theme: lightTheme,
+        target,
+        profiler,
+        doc: store.current,
+        overlays,
+        selection,
+        hover,
+      })
     })
+
+    function activateSelect(): void {
+      toolActive = false
+      roomState = initialRoomState()
+      selectState = initialSelectState()
+      overlays = []
+      hud = null
+    }
 
     const unsubscribe = store.subscribe((next) => {
       doc = next
@@ -251,10 +477,24 @@
         return
       }
 
-      if (event.button !== 0 || !toolActive) return
+      if (event.button !== 0) return
 
       cursorPx = toLocalPoint(event.clientX, event.clientY, canvas.getBoundingClientRect())
-      dispatchTool({ type: 'pointerDown', clickCount: event.detail }, event.shiftKey)
+
+      if (toolActive) {
+        dispatchTool({ type: 'pointerDown', clickCount: event.detail }, event.shiftKey)
+      } else {
+        canvas.setPointerCapture(event.pointerId)
+        dispatchSelect(
+          {
+            type: 'pointerDown',
+            clickCount: event.detail,
+            additive: event.ctrlKey || event.metaKey,
+          },
+          event.altKey,
+        )
+      }
+
       scheduler.markDirty()
       event.preventDefault()
     }
@@ -276,15 +516,31 @@
       }
 
       cursorPx = toLocalPoint(event.clientX, event.clientY, rect)
-      if (!toolActive) return
-      dispatchTool({ type: 'pointerMove' }, event.shiftKey)
+
+      if (toolActive) {
+        dispatchTool({ type: 'pointerMove' }, event.shiftKey)
+      } else {
+        dispatchSelect({ type: 'pointerMove' }, event.altKey)
+      }
+
       scheduler.markDirty()
     }
 
     function onPointerUp(event: PointerEvent): void {
-      if (!dragState || !endsPanDrag(dragState, event.pointerId)) return
-      dragState = null
-      canvas.releasePointerCapture(event.pointerId)
+      if (dragState && endsPanDrag(dragState, event.pointerId)) {
+        dragState = null
+        canvas.releasePointerCapture(event.pointerId)
+        return
+      }
+
+      if (toolActive || event.button !== 0) return
+
+      if (canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId)
+      }
+      cursorPx = toLocalPoint(event.clientX, event.clientY, canvas.getBoundingClientRect())
+      dispatchSelect({ type: 'pointerUp' }, event.altKey)
+      scheduler.markDirty()
     }
 
     function onKeyDown(event: KeyboardEvent): void {
@@ -313,11 +569,13 @@
         case 'undo':
           event.preventDefault()
           store.undo()
+          selection = pruneSelection(store.current, selection)
           return
 
         case 'redo':
           event.preventDefault()
           store.redo()
+          selection = pruneSelection(store.current, selection)
           return
 
         case 'frameAll':
@@ -329,8 +587,16 @@
         case 'activateRoomTool':
           event.preventDefault()
           toolActive = true
+          selection = []
+          hover = null
           roomState = initialRoomState()
           dispatchTool({ type: 'activate' })
+          scheduler.markDirty()
+          return
+
+        case 'activateSelectTool':
+          event.preventDefault()
+          activateSelect()
           scheduler.markDirty()
           return
 
@@ -339,6 +605,21 @@
           dispatchTool(action.event, event.shiftKey)
           scheduler.markDirty()
           return
+
+        case 'selectEvent': {
+          event.preventDefault()
+          // `Esc` sem seleção volta para a Ferramenta Selecionar; com seleção,
+          // apenas limpa (`03-ferramentas-e-interacao.md` § tabela unificada).
+          const wasEmpty = selection.length === 0
+          if (toolActive) {
+            if (action.event.type === 'escape' && wasEmpty) activateSelect()
+            scheduler.markDirty()
+            return
+          }
+          dispatchSelect(action.event, event.altKey)
+          scheduler.markDirty()
+          return
+        }
 
         case 'focusHudField': {
           event.preventDefault()
@@ -401,18 +682,16 @@
   tabindex="-1"
 ></canvas>
 
-<aside class="summary" aria-label={messages.summaryTitle}>
-  <h2 class="summary-title">{messages.summaryTitle}</h2>
-  <dl class="summary-list">
-    <dt>{messages.summaryUsableArea}</dt>
-    <dd data-testid="usable-area">{usableAreaText}</dd>
-    <dt>{messages.summaryRoomCount}</dt>
-    <dd data-testid="room-count">{roomCount}</dd>
-  </dl>
-  {#if roomCount === 0 && !toolActive}
-    <p class="summary-empty">{messages.emptyCanvas}</p>
-  {/if}
-</aside>
+<PropertiesPanel
+  {doc}
+  {selection}
+  onRename={renameSelectedRoom}
+  onColor={colorSelectedRoom}
+  onUsable={setSelectedRoomUsable}
+  onEdgeLength={applyPanelEdgeLength}
+  onNodeCoordinate={applyNodeCoordinate}
+  onDelete={deleteSelection}
+/>
 
 {#if hud}
   <div class="hud" role="group" aria-label={messages.hudLabel} style="left: {hudLeft}px; top: {hudTop}px;">
@@ -460,6 +739,43 @@
   />
 {/if}
 
+{#if edgeEdit}
+  <div class="edge-edit" style="left: {edgeEditPos.x}px; top: {edgeEditPos.y}px;">
+    <input
+      bind:this={edgeEl}
+      class="edge-edit-field"
+      type="text"
+      inputmode="numeric"
+      autocomplete="off"
+      aria-label={messages.edgeLengthLabel}
+      bind:value={edgeEditValue}
+      onkeydown={onEdgeKeyDown}
+    />
+    <span class="edge-edit-unit">{messages.unitCm}</span>
+    {#if edgeEdit.endNodeShared}
+      <div class="edge-edit-choice">
+        <button
+          type="button"
+          class="edge-edit-button"
+          class:preferred={sharedNodeMode === 'moveTogether'}
+          data-testid="shared-move-together"
+          onclick={() => commitEdgeLength('moveTogether')}
+        >
+          {messages.sharedNodeMoveTogether}
+        </button>
+        <button
+          type="button"
+          class="edge-edit-button"
+          class:preferred={sharedNodeMode === 'detach'}
+          onclick={() => commitEdgeLength('detach')}
+        >
+          {messages.sharedNodeDetachOnly}
+        </button>
+      </div>
+    {/if}
+  </div>
+{/if}
+
 {#if debugPerf}
   <pre class="perf-overlay">{perfSummary}</pre>
 {/if}
@@ -484,50 +800,6 @@
 
   .canvas-fullscreen.tool-active {
     cursor: crosshair;
-  }
-
-  .summary {
-    position: fixed;
-    top: 0;
-    right: 0;
-    width: 264px;
-    padding: 12px 16px;
-    background: var(--surface);
-    border-left: 1px solid var(--border);
-    box-sizing: border-box;
-    font-size: 13px;
-  }
-
-  .summary-title {
-    margin: 0 0 8px;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-muted);
-  }
-
-  .summary-list {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 4px 12px;
-    margin: 0;
-  }
-
-  .summary-list dt {
-    color: var(--text-muted);
-  }
-
-  .summary-list dd {
-    margin: 0;
-    font-family: 'IBM Plex Mono', monospace;
-    font-variant-numeric: tabular-nums;
-    text-align: right;
-  }
-
-  .summary-empty {
-    margin: 12px 0 0;
-    color: var(--text-muted);
-    line-height: 1.4;
   }
 
   .hud {
@@ -587,6 +859,66 @@
     font-size: 12px;
     text-align: center;
     outline: none;
+  }
+
+  .edge-edit {
+    position: fixed;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px 8px;
+    background: var(--surface-raised);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-field);
+    box-shadow: var(--shadow-floating);
+    font-size: 12px;
+  }
+
+  .edge-edit-field {
+    width: 56px;
+    border: none;
+    background: transparent;
+    font-family: 'IBM Plex Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+    color: var(--text);
+    outline: none;
+  }
+
+  .edge-edit-unit {
+    color: var(--text-muted);
+  }
+
+  .edge-edit-choice {
+    display: flex;
+    gap: 4px;
+    width: 100%;
+    margin-top: 4px;
+  }
+
+  .edge-edit-button {
+    flex: 1;
+    padding: 2px 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-field);
+    background: var(--surface);
+    font: inherit;
+    font-size: 11px;
+    color: var(--text);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .edge-edit-button.preferred {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .edge-edit-button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
   }
 
   .perf-overlay {

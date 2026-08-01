@@ -1,4 +1,5 @@
 import type { RoomToolEvent } from './roomTool'
+import type { SelectToolEvent } from './selectTool'
 
 export type FocusKind = 'canvas' | 'hudLength' | 'hudAngle' | 'roomName' | 'other'
 
@@ -17,7 +18,9 @@ export type KeyAction =
   | { readonly kind: 'none' }
   | { readonly kind: 'passToField' }
   | { readonly kind: 'toolEvent'; readonly event: RoomToolEvent }
+  | { readonly kind: 'selectEvent'; readonly event: SelectToolEvent }
   | { readonly kind: 'activateRoomTool' }
+  | { readonly kind: 'activateSelectTool' }
   | { readonly kind: 'frameAll' }
   | { readonly kind: 'undo' }
   | { readonly kind: 'redo' }
@@ -31,17 +34,22 @@ const IN_FIELD: ReadonlySet<FocusKind> = new Set<FocusKind>(['hudLength', 'hudAn
  * com `Ctrl/Cmd`.
  */
 export function classifyKey(ctx: KeyContext): KeyAction {
+  const inField = IN_FIELD.has(ctx.focus)
+
   if (ctx.ctrlOrMeta) {
     if (ctx.key === 'z') return ctx.shift ? { kind: 'redo' } : { kind: 'undo' }
     if (ctx.key === 'y') return { kind: 'redo' }
+    if (ctx.key === 'a' && !inField) {
+      return { kind: 'selectEvent', event: { type: 'selectAll' } }
+    }
     return { kind: 'none' }
   }
 
-  const inField = IN_FIELD.has(ctx.focus)
-
   if (ctx.key === 'Escape') {
-    if (!ctx.toolActive || !ctx.drawing) return { kind: 'none' }
-    return { kind: 'toolEvent', event: { type: 'escape' } }
+    if (ctx.toolActive && ctx.drawing) {
+      return { kind: 'toolEvent', event: { type: 'escape' } }
+    }
+    return { kind: 'selectEvent', event: { type: 'escape' } }
   }
 
   // Dígitos são permanentemente reservados para a entrada numérica
@@ -86,7 +94,12 @@ export function classifyKey(ctx: KeyContext): KeyAction {
     if (ctx.key === 'Tab') return { kind: 'focusHudField', field: 'length' }
   }
 
+  if (ctx.key === 'Delete' || ctx.key === 'Backspace') {
+    return { kind: 'selectEvent', event: { type: 'deleteSelection' } }
+  }
+
   if (ctx.key === 'r' || ctx.key === 'R') return { kind: 'activateRoomTool' }
+  if (ctx.key === 'v' || ctx.key === 'V') return { kind: 'activateSelectTool' }
 
   return { kind: 'none' }
 }

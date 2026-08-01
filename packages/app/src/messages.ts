@@ -16,9 +16,32 @@ export const messages = {
 
   roomNameLabel: 'Nome do cômodo',
 
-  summaryTitle: 'Resumo',
   summaryUsableArea: 'Área útil',
+  summaryTotalArea: 'Área total',
   summaryRoomCount: 'Cômodos',
+
+  panelTitle: 'Propriedades',
+  panelRoomName: 'Nome',
+  panelArea: 'Área',
+  panelPerimeter: 'Perímetro',
+  panelColor: 'Cor',
+  panelColorNone: 'Sem cor',
+  panelColorOption: (position: number) => `Cor ${position}`,
+  panelCountsAsUsable: 'Contar na área útil',
+  panelDelete: 'Excluir',
+  panelLength: 'Comprimento',
+  panelAngle: 'Ângulo',
+  panelAdjacentRooms: 'Cômodos',
+  panelX: 'X',
+  panelY: 'Y',
+  panelConnectedRooms: 'Cômodos',
+  panelRoomCount: 'Cômodos',
+  panelNodeCount: 'Nós',
+  panelEdgeCount: 'Arestas',
+
+  edgeLengthLabel: 'Comprimento da aresta em centímetros',
+  sharedNodeMoveTogether: 'Mover junto',
+  sharedNodeDetachOnly: 'Só este cômodo',
 
   emptyCanvas: 'Pressione R e clique para começar a desenhar um cômodo',
 } as const

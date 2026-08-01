@@ -117,8 +117,43 @@ describe('classifyKey — Backspace e Escape', () => {
     }
   })
 
-  it('Escape sem desenho em andamento nao faz nada', () => {
-    expect(classifyKey(ctx({ key: 'Escape', drawing: false })).kind).toBe('none')
+  it('Escape sem desenho em andamento vai para a Ferramenta Selecionar', () => {
+    expect(classifyKey(ctx({ key: 'Escape', drawing: false }))).toEqual({
+      kind: 'selectEvent',
+      event: { type: 'escape' },
+    })
+  })
+})
+
+describe('classifyKey — atalhos da Ferramenta Selecionar', () => {
+  it('V ativa a Ferramenta Selecionar', () => {
+    expect(classifyKey(ctx({ key: 'v', drawing: false, toolActive: false })).kind).toBe(
+      'activateSelectTool',
+    )
+  })
+
+  it('Ctrl+A seleciona tudo, mas não dentro de um campo de texto', () => {
+    expect(classifyKey(ctx({ key: 'a', ctrlOrMeta: true, focus: 'canvas' }))).toEqual({
+      kind: 'selectEvent',
+      event: { type: 'selectAll' },
+    })
+    expect(classifyKey(ctx({ key: 'a', ctrlOrMeta: true, focus: 'roomName' })).kind).toBe(
+      'none',
+    )
+  })
+
+  it('Delete fora de campo exclui a seleção', () => {
+    expect(classifyKey(ctx({ key: 'Delete', drawing: false, toolActive: false }))).toEqual({
+      kind: 'selectEvent',
+      event: { type: 'deleteSelection' },
+    })
+  })
+
+  it('Backspace durante o desenho continua removendo o último segmento', () => {
+    expect(classifyKey(ctx({ key: 'Backspace', drawing: true, toolActive: true }))).toEqual({
+      kind: 'toolEvent',
+      event: { type: 'backspace' },
+    })
   })
 })
 
