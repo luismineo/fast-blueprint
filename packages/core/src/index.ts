@@ -3,6 +3,7 @@ export * from './model';
 export * from './geometry';
 export * from './format';
 export * from './snap';
+export * from './hit';
 export * from './commands';
 export * from './history';
 export * from './overlay';
