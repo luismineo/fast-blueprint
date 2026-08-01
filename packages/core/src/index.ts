@@ -4,6 +4,7 @@ export * from './geometry';
 export * from './format';
 export * from './snap';
 export * from './hit';
+export * from './selection';
 export * from './commands';
 export * from './history';
 export * from './overlay';
