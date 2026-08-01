@@ -57,10 +57,12 @@ calculadora, que é o gesto mais comum de quem está medindo.
 
 Regras:
 
-- Cada termo segue a tabela acima, e o **primeiro termo** decide a unidade da expressão
-  quando os demais são números nus. `158+40` é 158 cm + 40 cm; `1,58+40` é 1,58 m + 40 cm,
-  porque o `40` nu vale centímetro pela regra default.
-- Sufixo explícito num termo vence para aquele termo: `1,58m+40cm` → 1980 mm.
+- **Cada termo é interpretado pela tabela acima, de forma independente.** Não existe
+  unidade "da expressão": `158+40` é 158 cm + 40 cm, e `1,58+40` é 1,58 m + 40 cm —
+  os dois dão 1980 mm, porque o `40` nu vale centímetro nos dois casos.
+- Sufixo explícito num termo vale só para aquele termo: `1,58m+40cm` → 1980 mm.
+- O arredondamento para milímetro inteiro acontece **na soma**, não termo a termo, para
+  que uma cadeia longa não acumule o erro de cada arredondamento parcial.
 - Só `+` e `-`. Sem multiplicação, divisão, parênteses ou precedência — não existe
   ambiguidade de ordem numa cadeia de somas e subtrações avaliada da esquerda para a
   direita, e qualquer coisa além disso é uma calculadora, não um campo de medida.
