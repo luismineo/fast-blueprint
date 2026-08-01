@@ -39,7 +39,25 @@ interface ToolTransition<S> {
 
 `historyBoundary` sinaliza o fim de uma interação contínua (comandos `transient: true`) para o mecanismo de entrada pendente (`08-arquitetura.md` § Histórico). Ferramentas emitem `'commit'` no `onPointerUp` que finaliza um arraste e `'abort'` no `onKey` que trata o `Esc` de cancelamento. Ausente (`undefined`) em toda transição que não conclui nem cancela uma interação transiente — inclusive em toda transição de ferramentas sem interação contínua, como a Ferramenta Cômodo no M1.
 
-`OverlayPrimitive` é definido em `core/` como geometria declarativa pura (sem dependência de canvas). O renderer as interpreta para pixels. Exemplos: `{ kind: 'polyline'; points: Point[]; color: HexColor }`, `{ kind: 'label'; position: Point; text: string }`.
+`OverlayPrimitive` é definido em `core/` como geometria declarativa pura (sem dependência de canvas). O renderer as interpreta para pixels.
+
+A primitiva carrega um **papel semântico**, nunca uma cor. Cor é decisão de apresentação e vive exclusivamente em `renderer/theme.ts` (`04-renderizacao.md` § Tokens visuais); uma primitiva que carregasse `HexColor` colocaria cor em `core/` e violaria o critério de aceitação "nenhuma string hexadecimal de cor existe fora de `renderer/theme.ts`". O renderer mapeia papel → token do tema, o que também faz o tema escuro (v2) funcionar sem tocar em ferramenta alguma.
+
+```ts
+type OverlayRole = 'draft' | 'ghost' | 'snapNode' | 'axisGuide'
+
+type OverlayPrimitive =
+  | { kind: 'polyline'; points: Point[]; role: OverlayRole; closed?: boolean }
+  | { kind: 'marker'; at: Point; role: OverlayRole }
+  | { kind: 'label'; at: Point; text: string; role: OverlayRole }
+```
+
+| Papel | Usado para |
+|---|---|
+| `draft` | Polilinha já confirmada do traço em andamento |
+| `ghost` | Segmento candidato, do último nó ao cursor |
+| `snapNode` | Marcador sobre o alvo de snap de nó ou ponto médio |
+| `axisGuide` | Guia de eixo, alinhamento ou extensão |
 
 `overlay` devolve o que a ferramenta quer desenhar sobre a cena (traço em andamento, guias, HUD). Ferramentas não têm acesso ao canvas.
 
