@@ -73,6 +73,13 @@ export function exactNodeAt(
   return null
 }
 
+const NO_EXCLUSIONS: ReadonlySet<NodeId> = new Set()
+
+/** Arestas de cômodo e paredes avulsas, para o snap a parede da mobília. */
+export function wallEdges(doc: PlanDocument): SnapEdge[] {
+  return documentEdges(doc, NO_EXCLUSIONS)
+}
+
 /**
  * Arestas do documento para ponto médio, projeção e extensão.
  *

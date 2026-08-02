@@ -7,8 +7,9 @@ function ctx(overrides: Partial<KeyContext> = {}): KeyContext {
     ctrlOrMeta: false,
     shift: false,
     focus: 'canvas',
-    toolActive: true,
+    tool: 'room',
     drawing: true,
+    selectionHasFurniture: false,
     lengthFieldEmpty: true,
     angleFieldEmpty: true,
     ...overrides,
@@ -127,9 +128,10 @@ describe('classifyKey — Backspace e Escape', () => {
 
 describe('classifyKey — atalhos da Ferramenta Selecionar', () => {
   it('V ativa a Ferramenta Selecionar', () => {
-    expect(classifyKey(ctx({ key: 'v', drawing: false, toolActive: false })).kind).toBe(
-      'activateSelectTool',
-    )
+    expect(classifyKey(ctx({ key: 'v', drawing: false, tool: 'select' }))).toEqual({
+      kind: 'activateTool',
+      tool: 'select',
+    })
   })
 
   it('Ctrl+A seleciona tudo, mas não dentro de um campo de texto', () => {
@@ -143,14 +145,14 @@ describe('classifyKey — atalhos da Ferramenta Selecionar', () => {
   })
 
   it('Delete fora de campo exclui a seleção', () => {
-    expect(classifyKey(ctx({ key: 'Delete', drawing: false, toolActive: false }))).toEqual({
+    expect(classifyKey(ctx({ key: 'Delete', drawing: false, tool: 'select' }))).toEqual({
       kind: 'selectEvent',
       event: { type: 'deleteSelection' },
     })
   })
 
   it('Backspace durante o desenho continua removendo o último segmento', () => {
-    expect(classifyKey(ctx({ key: 'Backspace', drawing: true, toolActive: true }))).toEqual({
+    expect(classifyKey(ctx({ key: 'Backspace', drawing: true, tool: 'room' }))).toEqual({
       kind: 'toolEvent',
       event: { type: 'backspace' },
     })
@@ -159,12 +161,84 @@ describe('classifyKey — atalhos da Ferramenta Selecionar', () => {
 
 describe('classifyKey — ativar ferramenta', () => {
   it('R ativa a ferramenta comodo', () => {
-    expect(classifyKey(ctx({ key: 'r', toolActive: false, drawing: false })).kind).toBe(
-      'activateRoomTool',
-    )
+    expect(classifyKey(ctx({ key: 'r', tool: 'select', drawing: false }))).toEqual({
+      kind: 'activateTool',
+      tool: 'room',
+    })
   })
 
   it('R com foco em campo e texto', () => {
     expect(classifyKey(ctx({ key: 'r', focus: 'roomName' })).kind).toBe('passToField')
+  })
+
+  it('F ativa a Ferramenta Mobília', () => {
+    expect(classifyKey(ctx({ key: 'f', tool: 'select', drawing: false }))).toEqual({
+      kind: 'activateTool',
+      tool: 'furniture',
+    })
+  })
+})
+
+describe('classifyKey — atalhos escopados à seleção de mobília', () => {
+  const furniture = { tool: 'select', drawing: false, selectionHasFurniture: true } as const
+
+  it('Q e E giram 90°, e com Shift 15°', () => {
+    expect(classifyKey(ctx({ ...furniture, key: 'q' }))).toEqual({
+      kind: 'furnitureEvent',
+      action: { kind: 'rotate', deltaDeg: -90 },
+    })
+    expect(classifyKey(ctx({ ...furniture, key: 'e' }))).toEqual({
+      kind: 'furnitureEvent',
+      action: { kind: 'rotate', deltaDeg: 90 },
+    })
+    expect(classifyKey(ctx({ ...furniture, key: 'Q', shift: true }))).toEqual({
+      kind: 'furnitureEvent',
+      action: { kind: 'rotate', deltaDeg: -15 },
+    })
+  })
+
+  it('as setas movem 10 mm, e com Shift 100 mm', () => {
+    expect(classifyKey(ctx({ ...furniture, key: 'ArrowLeft' }))).toEqual({
+      kind: 'furnitureEvent',
+      action: { kind: 'nudge', dx: -10, dy: 0 },
+    })
+    expect(classifyKey(ctx({ ...furniture, key: 'ArrowDown', shift: true }))).toEqual({
+      kind: 'furnitureEvent',
+      action: { kind: 'nudge', dx: 0, dy: 100 },
+    })
+  })
+
+  it('Ctrl+D duplica', () => {
+    expect(classifyKey(ctx({ ...furniture, key: 'd', ctrlOrMeta: true }))).toEqual({
+      kind: 'furnitureEvent',
+      action: { kind: 'duplicate' },
+    })
+  })
+
+  /** A ferramenta ativa não importa: o escopo é a seleção (spec 03 § Mobília). */
+  it('valem também com a Ferramenta Mobília ativa', () => {
+    expect(
+      classifyKey(ctx({ ...furniture, tool: 'furniture', key: 'e' })).kind,
+    ).toBe('furnitureEvent')
+  })
+
+  it('sem mobília selecionada, Q e as setas não fazem nada', () => {
+    expect(classifyKey(ctx({ key: 'q', tool: 'select', drawing: false })).kind).toBe('none')
+    expect(classifyKey(ctx({ key: 'ArrowLeft', tool: 'select', drawing: false })).kind).toBe(
+      'none',
+    )
+    expect(
+      classifyKey(ctx({ key: 'd', ctrlOrMeta: true, tool: 'select', drawing: false })).kind,
+    ).toBe('none')
+  })
+
+  it('com foco num campo, nenhum deles dispara', () => {
+    expect(classifyKey(ctx({ ...furniture, key: 'e', focus: 'roomName' })).kind).toBe(
+      'passToField',
+    )
+  })
+
+  it('Ctrl+B recolhe o painel', () => {
+    expect(classifyKey(ctx({ key: 'b', ctrlOrMeta: true })).kind).toBe('togglePanel')
   })
 })

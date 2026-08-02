@@ -1,5 +1,9 @@
 import type { RoomToolEvent } from './roomTool'
 import type { SelectToolEvent } from './selectTool'
+import { NUDGE_COARSE_MM, NUDGE_MM } from './furnitureActions'
+
+/** Ferramentas que existem. Parede e Medir seguem em aberto desde o M1. */
+export type ToolId = 'select' | 'room' | 'furniture'
 
 export type FocusKind = 'canvas' | 'hudLength' | 'hudAngle' | 'roomName' | 'other'
 
@@ -8,25 +12,43 @@ export interface KeyContext {
   readonly ctrlOrMeta: boolean
   readonly shift: boolean
   readonly focus: FocusKind
-  readonly toolActive: boolean
+  readonly tool: ToolId
   readonly drawing: boolean
   readonly lengthFieldEmpty: boolean
   readonly angleFieldEmpty: boolean
+  readonly selectionHasFurniture: boolean
 }
+
+/** Ações escopadas à seleção de mobília (spec 03 § Mobília). */
+export type FurnitureAction =
+  | { readonly kind: 'rotate'; readonly deltaDeg: number }
+  | { readonly kind: 'nudge'; readonly dx: number; readonly dy: number }
+  | { readonly kind: 'duplicate' }
 
 export type KeyAction =
   | { readonly kind: 'none' }
   | { readonly kind: 'passToField' }
   | { readonly kind: 'toolEvent'; readonly event: RoomToolEvent }
   | { readonly kind: 'selectEvent'; readonly event: SelectToolEvent }
-  | { readonly kind: 'activateRoomTool' }
-  | { readonly kind: 'activateSelectTool' }
+  | { readonly kind: 'furnitureEvent'; readonly action: FurnitureAction }
+  | { readonly kind: 'activateTool'; readonly tool: ToolId }
   | { readonly kind: 'frameAll' }
   | { readonly kind: 'undo' }
   | { readonly kind: 'redo' }
+  | { readonly kind: 'togglePanel' }
   | { readonly kind: 'focusHudField'; readonly field: 'length' | 'angle' }
 
 const IN_FIELD: ReadonlySet<FocusKind> = new Set<FocusKind>(['hudLength', 'hudAngle', 'roomName'])
+
+const ROTATION_STEP_DEG = 90
+const ROTATION_FINE_DEG = 15
+
+const ARROWS: Readonly<Record<string, { dx: number; dy: number }>> = {
+  ArrowLeft: { dx: -1, dy: 0 },
+  ArrowRight: { dx: 1, dy: 0 },
+  ArrowUp: { dx: 0, dy: -1 },
+  ArrowDown: { dx: 0, dy: 1 },
+}
 
 /**
  * Regra D0 de `03-ferramentas-e-interacao.md`: enquanto o foco está num campo,
@@ -39,14 +61,18 @@ export function classifyKey(ctx: KeyContext): KeyAction {
   if (ctx.ctrlOrMeta) {
     if (ctx.key === 'z') return ctx.shift ? { kind: 'redo' } : { kind: 'undo' }
     if (ctx.key === 'y') return { kind: 'redo' }
+    if (ctx.key === 'b') return { kind: 'togglePanel' }
     if (ctx.key === 'a' && !inField) {
       return { kind: 'selectEvent', event: { type: 'selectAll' } }
+    }
+    if (ctx.key === 'd' && ctx.selectionHasFurniture) {
+      return { kind: 'furnitureEvent', action: { kind: 'duplicate' } }
     }
     return { kind: 'none' }
   }
 
   if (ctx.key === 'Escape') {
-    if (ctx.toolActive && ctx.drawing) {
+    if (ctx.tool === 'room' && ctx.drawing) {
       return { kind: 'toolEvent', event: { type: 'escape' } }
     }
     return { kind: 'selectEvent', event: { type: 'escape' } }
@@ -61,7 +87,7 @@ export function classifyKey(ctx: KeyContext): KeyAction {
   // O dígito vai para o campo que **tem foco**. Mandar todo dígito para
   // comprimento tornaria a entrada de ângulo inalcançável, já que o único
   // caminho até aquele campo é `Tab`.
-  if (ctx.toolActive && ctx.drawing && ctx.focus !== 'roomName' && /^[0-9]$/.test(ctx.key)) {
+  if (ctx.tool === 'room' && ctx.drawing && ctx.focus !== 'roomName' && /^[0-9]$/.test(ctx.key)) {
     return { kind: 'focusHudField', field: ctx.focus === 'hudAngle' ? 'angle' : 'length' }
   }
 
@@ -85,9 +111,16 @@ export function classifyKey(ctx: KeyContext): KeyAction {
     return { kind: 'passToField' }
   }
 
+  // `Q`, `E` e as setas são escopados à **seleção**, não à ferramenta ativa: o
+  // estado mais comum é móvel inserido com a Ferramenta Selecionar de volta.
+  if (ctx.selectionHasFurniture) {
+    const furniture = furnitureAction(ctx)
+    if (furniture) return { kind: 'furnitureEvent', action: furniture }
+  }
+
   if (ctx.key === 'Home') return { kind: 'frameAll' }
 
-  if (ctx.toolActive && ctx.drawing) {
+  if (ctx.tool === 'room' && ctx.drawing) {
     if (ctx.key === 'Enter') return { kind: 'toolEvent', event: { type: 'enter' } }
     if (ctx.key === 'Backspace') return { kind: 'toolEvent', event: { type: 'backspace' } }
     if (ctx.key === 'c' || ctx.key === 'C') return { kind: 'toolEvent', event: { type: 'close' } }
@@ -98,10 +131,26 @@ export function classifyKey(ctx: KeyContext): KeyAction {
     return { kind: 'selectEvent', event: { type: 'deleteSelection' } }
   }
 
-  if (ctx.key === 'r' || ctx.key === 'R') return { kind: 'activateRoomTool' }
-  if (ctx.key === 'v' || ctx.key === 'V') return { kind: 'activateSelectTool' }
+  if (ctx.key === 'r' || ctx.key === 'R') return { kind: 'activateTool', tool: 'room' }
+  if (ctx.key === 'v' || ctx.key === 'V') return { kind: 'activateTool', tool: 'select' }
+  if (ctx.key === 'f' || ctx.key === 'F') return { kind: 'activateTool', tool: 'furniture' }
 
   return { kind: 'none' }
+}
+
+function furnitureAction(ctx: KeyContext): FurnitureAction | null {
+  const step = ctx.shift ? ROTATION_FINE_DEG : ROTATION_STEP_DEG
+
+  if (ctx.key === 'q' || ctx.key === 'Q') return { kind: 'rotate', deltaDeg: -step }
+  if (ctx.key === 'e' || ctx.key === 'E') return { kind: 'rotate', deltaDeg: step }
+
+  const arrow = ARROWS[ctx.key]
+  if (arrow) {
+    const distance = ctx.shift ? NUDGE_COARSE_MM : NUDGE_MM
+    return { kind: 'nudge', dx: arrow.dx * distance, dy: arrow.dy * distance }
+  }
+
+  return null
 }
 
 /**

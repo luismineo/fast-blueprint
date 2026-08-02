@@ -13,11 +13,14 @@
   import {
     DocumentStore,
     DOCUMENT_COLORS,
+    generateFurnitureId,
     generateNodeId,
     generateRoomId,
     hitTest,
     pruneSelection,
+    resolveFurnitureSnap,
     tryParseLength,
+    type FurnitureId,
     type OverlayPrimitive,
     type PlanDocument,
     type Point,
@@ -57,8 +60,24 @@
     type SelectToolEvent,
     type SelectToolState,
   } from './tools/selectTool'
-  import { exactNodeAt, resolveToolSnap } from './tools/snapContext'
-  import { classifyKey, type FocusKind } from './tools/toolShortcuts'
+  import {
+    furnitureToolTransition,
+    initialFurnitureState,
+    type FurnitureToolEvent,
+    type FurnitureToolState,
+  } from './tools/furnitureTool'
+  import {
+    duplicateCommands,
+    nudgeCommands,
+    rotateCommands,
+  } from './tools/furnitureActions'
+  import { exactNodeAt, resolveToolSnap, wallEdges } from './tools/snapContext'
+  import {
+    classifyKey,
+    type FocusKind,
+    type FurnitureAction,
+    type ToolId,
+  } from './tools/toolShortcuts'
   import PropertiesPanel from './components/PropertiesPanel.svelte'
 
   const HUD_OFFSET_PX = 16
@@ -74,6 +93,7 @@
   let cursorPx: Point = $state.raw({ x: 0, y: 0 })
   let roomState: RoomToolState = $state.raw(initialRoomState())
   let selectState: SelectToolState = $state.raw(initialSelectState())
+  let furnitureState: FurnitureToolState = $state.raw(initialFurnitureState())
   let selection: Selection = $state.raw([])
   let hover: SelectionRef | null = $state.raw(null)
   let overlays: readonly OverlayPrimitive[] = $state.raw([])
@@ -85,7 +105,8 @@
   // "Mover junto" / "Só este cômodo", lembrada durante a sessão
   // (`03-ferramentas-e-interacao.md` § Editar comprimento de aresta).
   let sharedNodeMode: SetEdgeLengthPayload['mode'] = $state('moveTogether')
-  let toolActive = $state(false)
+  let tool: ToolId = $state('select')
+  let panelCollapsed = $state(false)
   let perfSummary = $state('')
 
   const store = new DocumentStore()
@@ -151,33 +172,113 @@
 
     if (result.naming) {
       openNameEditor(result.naming.roomId, result.naming)
-      toolActive = false
+      tool = 'select'
     }
   }
 
-  function selectContext(alt: boolean): SelectToolContext {
+  function selectContext(alt: boolean, shift = false): SelectToolContext {
     const world = worldAt(cursorPx)
     const current = store.current
     return {
       doc: current,
       cursor: world,
-      hit: hitTest(world, { doc: current, scale: camera.scale }),
+      hit: hitTest(world, { doc: current, scale: camera.scale, selection }),
       selection,
       snap: (point, exclude) =>
         resolveToolSnap(point, {
           doc: current,
           draft: [],
           scale: camera.scale,
-          shift: false,
+          shift,
           alt,
           exclude,
         }),
+      furnitureSnap: (placement, size) =>
+        resolveFurnitureSnap(placement, size, { edges: wallEdges(current), alt }),
+      shift,
       newNodeId: generateNodeId,
     }
   }
 
-  function dispatchSelect(event: SelectToolEvent, alt = false): void {
-    const result = selectToolTransition(selectState, event, selectContext(alt))
+  function furnitureContext(alt: boolean) {
+    const current = store.current
+    return {
+      cursor: worldAt(cursorPx),
+      snap: (placement: { center: Point; rotation: number }, size: { width: number; depth: number }) =>
+        resolveFurnitureSnap(placement, size, { edges: wallEdges(current), alt }),
+      newFurnitureId: generateFurnitureId,
+    }
+  }
+
+  function dispatchFurniture(event: FurnitureToolEvent, alt = false): void {
+    const result = furnitureToolTransition(furnitureState, event, furnitureContext(alt))
+    furnitureState = result.state
+    overlays = result.overlays
+
+    for (const command of result.commands) store.dispatch(command)
+
+    // Posicionar devolve a ferramenta para Selecionar, com o item selecionado:
+    // é o que faz arrastar, girar e redimensionar funcionarem em seguida sem
+    // trocar de ferramenta (`03-ferramentas-e-interacao.md` § Mobília).
+    if (result.placed) {
+      selection = [{ kind: 'furniture', furnitureId: result.placed }]
+      activateTool('select')
+    }
+  }
+
+  /**
+   * Trocar de ferramenta zera o estado das outras duas.
+   *
+   * Um traço pela metade ou um item armado que sobrevivesse à troca voltaria a
+   * aparecer sem que o usuário pedisse.
+   */
+  function activateTool(next: ToolId): void {
+    tool = next
+    roomState = initialRoomState()
+    selectState = initialSelectState()
+    furnitureState = initialFurnitureState()
+    overlays = []
+    hud = null
+
+    if (next === 'room') {
+      selection = []
+      hover = null
+      dispatchTool({ type: 'activate' })
+    }
+  }
+
+  function applyFurnitureAction(action: FurnitureAction): void {
+    const current = store.current
+
+    if (action.kind === 'duplicate') {
+      const copies: FurnitureId[] = []
+      const nextId = (): FurnitureId => {
+        const id = generateFurnitureId()
+        copies.push(id)
+        return id
+      }
+
+      for (const command of duplicateCommands(current, selection, nextId)) {
+        store.dispatch(command)
+      }
+      // A seleção passa para as cópias, como em qualquer editor: o próximo
+      // gesto é posicionar o que acabou de ser duplicado.
+      if (copies.length > 0) {
+        selection = copies.map((id) => ({ kind: 'furniture', furnitureId: id }))
+      }
+      return
+    }
+
+    const commands =
+      action.kind === 'rotate'
+        ? rotateCommands(current, selection, action.deltaDeg)
+        : nudgeCommands(current, selection, action.dx, action.dy)
+
+    for (const command of commands) store.dispatch(command)
+  }
+
+  function dispatchSelect(event: SelectToolEvent, alt = false, shift = false): void {
+    const result = selectToolTransition(selectState, event, selectContext(alt, shift))
     selectState = result.state
     selection = result.selection
     hover = result.hover
@@ -411,11 +512,7 @@
     })
 
     function activateSelect(): void {
-      toolActive = false
-      roomState = initialRoomState()
-      selectState = initialSelectState()
-      overlays = []
-      hud = null
+      activateTool('select')
     }
 
     const unsubscribe = store.subscribe((next) => {
@@ -464,7 +561,8 @@
           cursor: toLocalPoint(event.clientX, event.clientY, rect),
         }),
       )
-      if (toolActive) dispatchTool({ type: 'pointerMove' })
+      if (tool === 'room') dispatchTool({ type: 'pointerMove' })
+      if (tool === 'furniture') dispatchFurniture({ type: 'pointerMove' })
       scheduler.markDirty()
     }
 
@@ -483,8 +581,10 @@
 
       cursorPx = toLocalPoint(event.clientX, event.clientY, canvas.getBoundingClientRect())
 
-      if (toolActive) {
+      if (tool === 'room') {
         dispatchTool({ type: 'pointerDown', clickCount: 1 }, event.shiftKey)
+      } else if (tool === 'furniture') {
+        dispatchFurniture({ type: 'pointerDown' }, event.altKey)
       } else {
         canvas.setPointerCapture(event.pointerId)
         dispatchSelect(
@@ -494,6 +594,7 @@
             additive: event.ctrlKey || event.metaKey,
           },
           event.altKey,
+          event.shiftKey,
         )
       }
 
@@ -510,9 +611,9 @@
     function onDoubleClick(event: MouseEvent): void {
       cursorPx = toLocalPoint(event.clientX, event.clientY, canvas.getBoundingClientRect())
 
-      if (toolActive) {
+      if (tool === 'room') {
         dispatchTool({ type: 'pointerDown', clickCount: 2 }, event.shiftKey)
-      } else {
+      } else if (tool === 'select') {
         dispatchSelect({ type: 'pointerDown', clickCount: 2, additive: false }, event.altKey)
       }
 
@@ -538,10 +639,12 @@
 
       cursorPx = toLocalPoint(event.clientX, event.clientY, rect)
 
-      if (toolActive) {
+      if (tool === 'room') {
         dispatchTool({ type: 'pointerMove' }, event.shiftKey)
+      } else if (tool === 'furniture') {
+        dispatchFurniture({ type: 'pointerMove' }, event.altKey)
       } else {
-        dispatchSelect({ type: 'pointerMove' }, event.altKey)
+        dispatchSelect({ type: 'pointerMove' }, event.altKey, event.shiftKey)
       }
 
       scheduler.markDirty()
@@ -554,13 +657,13 @@
         return
       }
 
-      if (toolActive || event.button !== 0) return
+      if (tool !== 'select' || event.button !== 0) return
 
       if (canvas.hasPointerCapture(event.pointerId)) {
         canvas.releasePointerCapture(event.pointerId)
       }
       cursorPx = toLocalPoint(event.clientX, event.clientY, canvas.getBoundingClientRect())
-      dispatchSelect({ type: 'pointerUp' }, event.altKey)
+      dispatchSelect({ type: 'pointerUp' }, event.altKey, event.shiftKey)
       scheduler.markDirty()
     }
 
@@ -576,10 +679,11 @@
         ctrlOrMeta: event.ctrlKey || event.metaKey,
         shift: event.shiftKey,
         focus: focusKind(),
-        toolActive,
+        tool,
         drawing: roomState.kind !== 'idle',
         lengthFieldEmpty: (hud?.lengthText ?? '') === '',
         angleFieldEmpty: (hud?.angleText ?? '') === '',
+        selectionHasFurniture: selection.some((ref) => ref.kind === 'furniture'),
       })
 
       switch (action.kind) {
@@ -605,19 +709,20 @@
           scheduler.markDirty()
           return
 
-        case 'activateRoomTool':
+        case 'activateTool':
           event.preventDefault()
-          toolActive = true
-          selection = []
-          hover = null
-          roomState = initialRoomState()
-          dispatchTool({ type: 'activate' })
+          activateTool(action.tool)
           scheduler.markDirty()
           return
 
-        case 'activateSelectTool':
+        case 'togglePanel':
           event.preventDefault()
-          activateSelect()
+          panelCollapsed = !panelCollapsed
+          return
+
+        case 'furnitureEvent':
+          event.preventDefault()
+          applyFurnitureAction(action.action)
           scheduler.markDirty()
           return
 
@@ -632,12 +737,18 @@
           // `Esc` sem seleção volta para a Ferramenta Selecionar; com seleção,
           // apenas limpa (`03-ferramentas-e-interacao.md` § tabela unificada).
           const wasEmpty = selection.length === 0
-          if (toolActive) {
+          if (tool === 'furniture' && action.event.type === 'escape') {
+            if (furnitureState.kind === 'armed') dispatchFurniture({ type: 'escape' })
+            else activateSelect()
+            scheduler.markDirty()
+            return
+          }
+          if (tool === 'room') {
             if (action.event.type === 'escape' && wasEmpty) activateSelect()
             scheduler.markDirty()
             return
           }
-          dispatchSelect(action.event, event.altKey)
+          dispatchSelect(action.event, event.altKey, event.shiftKey)
           scheduler.markDirty()
           return
         }
@@ -701,7 +812,7 @@
 <canvas
   bind:this={canvasEl}
   class="canvas-fullscreen"
-  class:tool-active={toolActive}
+  class:tool-active={tool !== 'select'}
   tabindex="-1"
 ></canvas>
 

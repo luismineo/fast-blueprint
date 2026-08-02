@@ -5,6 +5,7 @@ import {
   computeRoomArea,
   createEmptyDocument,
   hitTest,
+  resolveFurnitureSnap,
   validateDocumentErrors,
   type NodeId,
   type PlanDocument,
@@ -20,7 +21,7 @@ import {
   type SelectToolEvent,
   type SelectToolState,
 } from './selectTool'
-import { resolveToolSnap } from './snapContext'
+import { resolveToolSnap, wallEdges } from './snapContext'
 
 const n = (id: string): NodeId => id as NodeId
 const LEFT = 'left' as RoomId
@@ -70,29 +71,32 @@ function makeHarness(doc: PlanDocument = twoAdjacentRooms()) {
   let idSeq = 0
   let lastEdit: EditRequest | null = null
 
-  function context(alt = false): SelectToolContext {
+  function context(alt = false, shift = false): SelectToolContext {
     const current = store.current
     return {
       doc: current,
       cursor,
-      hit: hitTest(cursor, { doc: current, scale: 0.1 }),
+      hit: hitTest(cursor, { doc: current, scale: 0.1, selection }),
       selection,
       snap: (point, exclude) =>
         resolveToolSnap(point, {
           doc: current,
           draft: [],
           scale: 0.1,
-          shift: false,
+          shift,
           alt,
           exclude,
         }),
+      furnitureSnap: (placement, size) =>
+        resolveFurnitureSnap(placement, size, { edges: wallEdges(current), alt }),
+      shift,
       newNodeId: () => `n_s${++idSeq}` as NodeId,
     }
   }
 
-  function drive(event: SelectToolEvent, at?: Point, alt = false) {
+  function drive(event: SelectToolEvent, at?: Point, alt = false, shift = false) {
     if (at) cursor = at
-    const result = selectToolTransition(state, event, context(alt))
+    const result = selectToolTransition(state, event, context(alt, shift))
     state = result.state
     selection = result.selection
     if (result.edit) lastEdit = result.edit

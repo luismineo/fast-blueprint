@@ -1,6 +1,8 @@
 import type {
   Command,
   EdgeRef,
+  FurnitureId,
+  FurnitureSnapResult,
   HitResult,
   NodeId,
   OverlayPrimitive,
@@ -22,6 +24,8 @@ import {
   toggle,
 } from '@planta/core'
 import { snapOverlays } from './snapOverlays'
+import { resizeFrom, rotationToward, type FurnitureGeometry } from './furnitureDrag'
+import { deleteFurnitureCommands } from './furnitureActions'
 
 export interface DragNode {
   readonly id: NodeId
@@ -38,6 +42,26 @@ export type SelectToolState =
       readonly nodes: readonly DragNode[]
       readonly grab: Point
       readonly primary: DragNode
+      readonly moved: boolean
+    }
+  | {
+      readonly kind: 'movingFurniture'
+      readonly furnitureId: FurnitureId
+      readonly start: FurnitureGeometry
+      readonly grab: Point
+      readonly moved: boolean
+    }
+  | {
+      readonly kind: 'resizingFurniture'
+      readonly furnitureId: FurnitureId
+      readonly corner: number
+      readonly start: FurnitureGeometry
+      readonly moved: boolean
+    }
+  | {
+      readonly kind: 'rotatingFurniture'
+      readonly furnitureId: FurnitureId
+      readonly start: FurnitureGeometry
       readonly moved: boolean
     }
 
@@ -65,6 +89,12 @@ export interface SelectToolContext {
   readonly hit: HitResult
   readonly selection: Selection
   readonly snap: (point: Point, exclude: readonly NodeId[]) => SnapResult
+  /** Snap a parede. Aresta de cômodo e parede avulsa, nunca outro móvel. */
+  readonly furnitureSnap: (
+    placement: { center: Point; rotation: number },
+    size: { width: number; depth: number },
+  ) => FurnitureSnapResult
+  readonly shift: boolean
   readonly newNodeId: () => NodeId
 }
 
@@ -133,9 +163,65 @@ function onPointerDown(
   }
 
   const selection = isInSelection(ctx.selection, ref) ? ctx.selection : replaceWith(ref)
+
+  if (hit.kind === 'furnitureCorner' || hit.kind === 'furnitureRotation') {
+    const start = geometryOf(ctx.doc, hit.furnitureId)
+    if (!start) return present(state, ctx, selection)
+
+    return present(
+      hit.kind === 'furnitureCorner'
+        ? {
+            kind: 'resizingFurniture',
+            furnitureId: hit.furnitureId,
+            corner: hit.corner,
+            start,
+            moved: false,
+          }
+        : { kind: 'rotatingFurniture', furnitureId: hit.furnitureId, start, moved: false },
+      ctx,
+      selection,
+    )
+  }
+
+  if (hit.kind === 'furniture') {
+    const item = ctx.doc.furniture.find((candidate) => candidate.id === hit.furnitureId)
+    if (!item || item.locked) return present(state, ctx, selection)
+
+    return present(
+      {
+        kind: 'movingFurniture',
+        furnitureId: item.id,
+        start: geometryFrom(item),
+        grab: ctx.cursor,
+        moved: false,
+      },
+      ctx,
+      selection,
+    )
+  }
+
   const drag = beginDrag(ref, ctx)
 
   return present(drag ?? state, ctx, selection)
+}
+
+function geometryOf(doc: PlanDocument, furnitureId: FurnitureId): FurnitureGeometry | null {
+  const item = doc.furniture.find((candidate) => candidate.id === furnitureId)
+  return item && !item.locked ? geometryFrom(item) : null
+}
+
+function geometryFrom(item: {
+  center: { x: number; y: number }
+  width: number
+  depth: number
+  rotation: number
+}): FurnitureGeometry {
+  return {
+    center: { x: item.center.x, y: item.center.y },
+    width: item.width,
+    depth: item.depth,
+    rotation: item.rotation,
+  }
 }
 
 function editRequestFor(hit: HitResult, ctx: SelectToolContext): EditRequest | null {
@@ -196,6 +282,14 @@ function onPointerMove(state: SelectToolState, ctx: SelectToolContext): SelectTo
     return present({ ...state, cursor: ctx.cursor }, ctx, ctx.selection)
   }
 
+  if (
+    state.kind === 'movingFurniture' ||
+    state.kind === 'resizingFurniture' ||
+    state.kind === 'rotatingFurniture'
+  ) {
+    return onFurnitureMove(state, ctx)
+  }
+
   if (state.kind !== 'dragging') {
     return present(state, ctx, ctx.selection)
   }
@@ -222,6 +316,113 @@ function onPointerMove(state: SelectToolState, ctx: SelectToolContext): SelectTo
     ...present({ ...state, moved: true }, ctx, ctx.selection, snapOverlays(snap.targets)),
     commands,
   }
+}
+
+type FurnitureDragState = SelectToolState & {
+  kind: 'movingFurniture' | 'resizingFurniture' | 'rotatingFurniture'
+}
+
+/**
+ * Um `TransformFurniture` transiente por frame, para as três interações.
+ *
+ * Arrastar carrega rotação junto porque o snap a parede alinha o móvel à
+ * aresta; separar em `MoveFurniture` mais uma rotação faria o retângulo pular
+ * entre dois comandos no mesmo frame.
+ */
+function onFurnitureMove(
+  state: FurnitureDragState,
+  ctx: SelectToolContext,
+): SelectToolResult {
+  const current = ctx.doc.furniture.find((item) => item.id === state.furnitureId)
+  if (!current) return present({ kind: 'idle' }, ctx, ctx.selection)
+
+  const next = nextGeometry(state, ctx)
+  if (!next) return present(state, ctx, ctx.selection)
+
+  const guides = state.kind === 'movingFurniture' ? wallGuide(state, ctx) : []
+
+  if (
+    next.geometry.center.x === current.center.x &&
+    next.geometry.center.y === current.center.y &&
+    next.geometry.width === current.width &&
+    next.geometry.depth === current.depth &&
+    next.geometry.rotation === current.rotation
+  ) {
+    return present(state, ctx, ctx.selection, guides)
+  }
+
+  return {
+    ...present({ ...state, moved: true }, ctx, ctx.selection, guides),
+    commands: [
+      {
+        type: 'TransformFurniture',
+        transient: true,
+        payload: { furnitureId: state.furnitureId, ...next.geometry },
+      },
+    ],
+  }
+}
+
+function nextGeometry(
+  state: FurnitureDragState,
+  ctx: SelectToolContext,
+): { geometry: FurnitureGeometry } | null {
+  if (state.kind === 'resizingFurniture') {
+    return {
+      geometry: resizeFrom(state.start, state.corner, ctx.cursor, ctx.shift),
+    }
+  }
+
+  if (state.kind === 'rotatingFurniture') {
+    const rotation = rotationToward(state.start.center, ctx.cursor, ctx.shift)
+    if (rotation === null) return null
+    return { geometry: { ...state.start, rotation } }
+  }
+
+  const moved = {
+    center: {
+      x: Math.round(state.start.center.x + (ctx.cursor.x - state.grab.x)),
+      y: Math.round(state.start.center.y + (ctx.cursor.y - state.grab.y)),
+    },
+    rotation: state.start.rotation,
+  }
+
+  const snapped = ctx.furnitureSnap(moved, {
+    width: state.start.width,
+    depth: state.start.depth,
+  })
+
+  return {
+    geometry: {
+      center: snapped.placement.center,
+      width: state.start.width,
+      depth: state.start.depth,
+      rotation: snapped.placement.rotation,
+    },
+  }
+}
+
+function wallGuide(
+  state: SelectToolState & { kind: 'movingFurniture' },
+  ctx: SelectToolContext,
+): OverlayPrimitive[] {
+  const moved = {
+    center: {
+      x: Math.round(state.start.center.x + (ctx.cursor.x - state.grab.x)),
+      y: Math.round(state.start.center.y + (ctx.cursor.y - state.grab.y)),
+    },
+    rotation: state.start.rotation,
+  }
+
+  const snapped = ctx.furnitureSnap(moved, {
+    width: state.start.width,
+    depth: state.start.depth,
+  })
+  if (!snapped.edge) return []
+
+  return [
+    { kind: 'segment', role: 'edgeHighlight', a: snapped.edge.a, b: snapped.edge.b },
+  ]
 }
 
 /**
@@ -308,6 +509,18 @@ function moveCommands(
 // ============================================================
 
 function onPointerUp(state: SelectToolState, ctx: SelectToolContext): SelectToolResult {
+  if (
+    state.kind === 'movingFurniture' ||
+    state.kind === 'resizingFurniture' ||
+    state.kind === 'rotatingFurniture'
+  ) {
+    if (!state.moved) return present({ kind: 'idle' }, ctx, ctx.selection)
+    return {
+      ...present({ kind: 'idle' }, ctx, ctx.selection),
+      historyBoundary: 'commit',
+    }
+  }
+
   if (state.kind === 'marquee') {
     const moved = state.anchor.x !== state.cursor.x || state.anchor.y !== state.cursor.y
     const selection = moved
@@ -370,7 +583,7 @@ function mergeOnDrop(
 // ============================================================
 
 function onEscape(state: SelectToolState, ctx: SelectToolContext): SelectToolResult {
-  if (state.kind === 'dragging' && state.moved) {
+  if (state.kind !== 'idle' && state.kind !== 'marquee' && state.moved) {
     return {
       ...present({ kind: 'idle' }, ctx, ctx.selection),
       historyBoundary: 'abort',
@@ -399,6 +612,10 @@ function onDelete(ctx: SelectToolContext): SelectToolResult {
     payload: { roomId },
   }))
 
+  // Móvel travado também é excluído: a trava vale contra arraste acidental, e
+  // `Delete` com o móvel selecionado é ação explícita (spec 03 § Selecionar).
+  commands.push(...deleteFurnitureCommands(ctx.selection))
+
   if (commands.length === 0) return present({ kind: 'idle' }, ctx, ctx.selection)
 
   return {
@@ -412,6 +629,11 @@ function onSelectAll(ctx: SelectToolContext): SelectToolResult {
     kind: 'room',
     roomId: room.id,
   }))
+
+  for (const item of ctx.doc.furniture) {
+    selection.push({ kind: 'furniture', furnitureId: item.id })
+  }
+
   return present({ kind: 'idle' }, ctx, selection)
 }
 
