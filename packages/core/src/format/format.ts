@@ -139,6 +139,17 @@ export function formatArea(mm2: number): string {
 }
 
 /**
+ * Formata uma razão como porcentagem inteira: `0,391` → `39%`.
+ *
+ * É a taxa de ocupação do painel (`01-modelo-de-dominio.md` § Grandezas
+ * derivadas). Inteiro porque é sinal, não medida — "esse quarto está lotado?"
+ * não fica mais respondida com uma casa decimal.
+ */
+export function formatPercent(ratio: number): string {
+  return `${Math.round(ratio * 100)}%`;
+}
+
+/**
  * Formata ângulo em radianos para exibição.
  * Ex: Math.PI/2 → "90,0°"
  */

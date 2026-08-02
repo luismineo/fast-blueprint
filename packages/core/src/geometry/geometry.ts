@@ -349,14 +349,29 @@ export function containment(
 
 /** Ponto-em-polígono com a fronteira contando como dentro. */
 export function pointInPolygonInclusive(point: Point, polygon: readonly Point[]): boolean {
+  return onPolygonBoundary(point, polygon) || pointInPolygon(point, polygon);
+}
+
+/**
+ * Ponto-em-polígono com a fronteira contando como **fora**.
+ *
+ * É o teste de quem pergunta "há área em comum?": dois cômodos que
+ * compartilham uma parede têm vértices um na fronteira do outro, e o ray
+ * casting responde ali de forma arbitrária (`01-modelo-de-dominio.md`
+ * § Invariantes).
+ */
+export function pointStrictlyInPolygon(point: Point, polygon: readonly Point[]): boolean {
+  return !onPolygonBoundary(point, polygon) && pointInPolygon(point, polygon);
+}
+
+function onPolygonBoundary(point: Point, polygon: readonly Point[]): boolean {
   for (let i = 0; i < polygon.length; i += 1) {
     const from = polygon[i]!;
     const to = polygon[(i + 1) % polygon.length]!;
     const foot = closestPointOnSegment(point, from, to).point;
     if (distance(point, foot) <= BOUNDARY_TOLERANCE_MM) return true;
   }
-
-  return pointInPolygon(point, polygon);
+  return false;
 }
 
 /**

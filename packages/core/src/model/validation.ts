@@ -6,7 +6,7 @@ import type { PlanDocument, EdgeRef, NodeId } from './types';
 import {
   containment,
   obbCorners,
-  pointInPolygon,
+  pointStrictlyInPolygon,
   satOverlap,
   type Point,
 } from '../geometry';
@@ -473,16 +473,24 @@ function segmentsIntersect(
   return false;
 }
 
+/**
+ * W2 é sobreposição **em área**, não contato.
+ *
+ * Dois cômodos que compartilham uma parede — a topologia de qualquer
+ * apartamento — têm vértices sobre a fronteira um do outro, e o ray casting
+ * responde ali de forma arbitrária: o canto compartilhado caía "dentro" e cada
+ * par de cômodos vizinhos acusava sobreposição. Por isso o teste de vértice é
+ * estrito, e o de aresta já ignora colinear.
+ */
 function polygonsOverlap(
   a: { x: number; y: number }[],
   b: { x: number; y: number }[],
 ): boolean {
-  // Testa se algum vértice de a está dentro de b ou vice-versa
   for (const p of a) {
-    if (pointInPolygon(p, b)) return true;
+    if (pointStrictlyInPolygon(p, b)) return true;
   }
   for (const p of b) {
-    if (pointInPolygon(p, a)) return true;
+    if (pointStrictlyInPolygon(p, a)) return true;
   }
   // Testa interseção de arestas
   for (let i = 0; i < a.length; i++) {
