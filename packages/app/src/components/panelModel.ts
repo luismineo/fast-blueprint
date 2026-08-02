@@ -1,11 +1,15 @@
 import {
   DOCUMENT_COLORS,
+  computeOccupancy,
   computeRoomArea,
   computeUsableArea,
+  documentWarnings,
   edgePoints,
   formatAngle,
   formatArea,
   formatLength,
+  formatPercent,
+  furnitureInRoom,
   roomPoints,
   type EdgeRef,
   type FurnitureId,
@@ -14,6 +18,7 @@ import {
   type Selection,
   type SelectionRef,
 } from '@planta/core'
+import { messages } from '../messages'
 
 export type PanelModel =
   | {
@@ -21,6 +26,8 @@ export type PanelModel =
       readonly usableArea: string
       readonly totalArea: string
       readonly roomCount: number
+      readonly furnitureCount: number
+      readonly warnings: readonly string[]
     }
   | {
       readonly kind: 'room'
@@ -30,6 +37,8 @@ export type PanelModel =
       readonly colorIndex: number | null
       readonly palette: readonly string[]
       readonly includeInUsableArea: boolean
+      readonly furnitureCount: number
+      readonly occupancy: string
     }
   | {
       readonly kind: 'edge'
@@ -95,7 +104,44 @@ function emptyModel(doc: PlanDocument): PanelModel {
     usableArea: formatArea(computeUsableArea(doc)),
     totalArea: formatArea(total),
     roomCount: doc.rooms.length,
+    furnitureCount: doc.furniture.length,
+    warnings: describeWarnings(doc),
   }
+}
+
+/**
+ * Avisos ativos, um texto por issue de nível `warning`
+ * (`07-ui-e-layout.md` § Painel de propriedades).
+ *
+ * A composição "qual entidade" + "qual aviso" vive aqui, e não no componente:
+ * é derivação. `core` devolve issue estruturada com código e ids, e o texto sai
+ * de `messages` — a mesma divisão que a spec 07 § Erros de `core` prescreve.
+ */
+function describeWarnings(doc: PlanDocument): string[] {
+  return documentWarnings(doc).map((issue) => {
+    const names = issue.ids.map((id) => entityName(doc, id))
+
+    switch (issue.code) {
+      case 'W1':
+        return `${names[0] ?? ''} · ${messages.selfIntersectingRoom}`
+      case 'W2':
+        return `${names.join(' · ')} · ${messages.overlappingRooms}`
+      case 'W3':
+        return `${names[0] ?? ''} · ${messages.furnitureOutsideRoom}`
+      case 'W4':
+        return messages.furnitureOverlap(names[0] ?? '', names[1] ?? '')
+      default:
+        return messages.orphanNode
+    }
+  })
+}
+
+function entityName(doc: PlanDocument, id: string): string {
+  const room = doc.rooms.find((candidate) => candidate.id === id)
+  if (room) return room.name
+
+  const item = doc.furniture.find((candidate) => candidate.id === id)
+  return item ? item.name : id
 }
 
 function roomModel(doc: PlanDocument, ref: SelectionRef & { kind: 'room' }): PanelModel {
@@ -120,6 +166,8 @@ function roomModel(doc: PlanDocument, ref: SelectionRef & { kind: 'room' }): Pan
     colorIndex: colorIndex === -1 ? null : colorIndex,
     palette: DOCUMENT_COLORS,
     includeInUsableArea: room.includeInUsableArea,
+    furnitureCount: furnitureInRoom(doc, room.id).length,
+    occupancy: formatPercent(computeOccupancy(doc, room.id)),
   }
 }
 

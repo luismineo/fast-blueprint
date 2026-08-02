@@ -19,6 +19,7 @@
     hitTest,
     pruneSelection,
     resolveFurnitureSnap,
+    tryParseAngle,
     tryParseLength,
     type FurnitureId,
     type OverlayPrimitive,
@@ -401,12 +402,18 @@
     store.dispatch({ type: 'RenameRoom', payload: { roomId, name: trimmed } })
   }
 
-  function colorSelectedRoom(index: number | null): void {
-    const roomId = selectedRoomId()
-    if (!roomId) return
-
+  /** A mesma paleta serve cômodo e móvel; quem manda é o que está selecionado. */
+  function applyColor(index: number | null): void {
     const color = index === null ? null : (DOCUMENT_COLORS[index] ?? null)
-    store.dispatch({ type: 'SetRoomColor', payload: { roomId, color } })
+
+    const furnitureId = selectedFurnitureId()
+    if (furnitureId) {
+      store.dispatch({ type: 'UpdateFurniture', payload: { furnitureId, color } })
+      return
+    }
+
+    const roomId = selectedRoomId()
+    if (roomId) store.dispatch({ type: 'SetRoomColor', payload: { roomId, color } })
   }
 
   function setSelectedRoomUsable(include: boolean): void {
@@ -459,6 +466,67 @@
 
   function deleteSelection(): void {
     dispatchSelect({ type: 'deleteSelection' })
+  }
+
+  function selectedFurnitureId(): FurnitureId | null {
+    const ref = selection.find((candidate) => candidate.kind === 'furniture')
+    return ref && ref.kind === 'furniture' ? ref.furnitureId : null
+  }
+
+  function renameSelectedFurniture(name: string): void {
+    const furnitureId = selectedFurnitureId()
+    const trimmed = name.trim()
+    if (!furnitureId || trimmed === '') return
+
+    const item = store.current.furniture.find((candidate) => candidate.id === furnitureId)
+    if (!item || item.name === trimmed) return
+
+    store.dispatch({ type: 'UpdateFurniture', payload: { furnitureId, name: trimmed } })
+  }
+
+  /**
+   * Largura, profundidade e rotação passam pelo mesmo comando: a spec 08 põe
+   * dimensão, rotação e centro num `TransformFurniture` só.
+   */
+  function resizeSelectedFurniture(field: 'width' | 'depth' | 'rotation', text: string): void {
+    const furnitureId = selectedFurnitureId()
+    if (!furnitureId) return
+
+    const item = store.current.furniture.find((candidate) => candidate.id === furnitureId)
+    if (!item) return
+
+    const value = field === 'rotation' ? tryParseAngle(text) : tryParseLength(text)
+    if (value === null) return
+
+    store.dispatch({
+      type: 'TransformFurniture',
+      payload: {
+        furnitureId,
+        width: field === 'width' ? value : item.width,
+        depth: field === 'depth' ? value : item.depth,
+        rotation: field === 'rotation' ? Math.round(value) : item.rotation,
+        center: item.center,
+      },
+    })
+  }
+
+  function setSelectedFurnitureClearance(text: string): void {
+    const furnitureId = selectedFurnitureId()
+    const value = tryParseLength(text)
+    if (!furnitureId || value === null || value < 0) return
+
+    store.dispatch({ type: 'UpdateFurniture', payload: { furnitureId, clearance: value } })
+  }
+
+  function setSelectedFurnitureLocked(locked: boolean): void {
+    const furnitureId = selectedFurnitureId()
+    if (!furnitureId) return
+
+    store.dispatch({ type: 'UpdateFurniture', payload: { furnitureId, locked } })
+  }
+
+  function duplicateSelection(): void {
+    applyFurnitureAction({ kind: 'duplicate' })
   }
 
   function onEdgeKeyDown(event: KeyboardEvent): void {
@@ -868,11 +936,16 @@
     {doc}
     {selection}
     onRename={renameSelectedRoom}
-    onColor={colorSelectedRoom}
+    onColor={applyColor}
     onUsable={setSelectedRoomUsable}
     onEdgeLength={applyPanelEdgeLength}
     onNodeCoordinate={applyNodeCoordinate}
     onDelete={deleteSelection}
+    onFurnitureName={renameSelectedFurniture}
+    onFurnitureSize={resizeSelectedFurniture}
+    onFurnitureClearance={setSelectedFurnitureClearance}
+    onFurnitureLocked={setSelectedFurnitureLocked}
+    onDuplicate={duplicateSelection}
   />
 
   <CatalogPanel

@@ -12,6 +12,11 @@
     onEdgeLength: (text: string) => void
     onNodeCoordinate: (axis: 'x' | 'y', text: string) => void
     onDelete: () => void
+    onFurnitureName: (name: string) => void
+    onFurnitureSize: (field: 'width' | 'depth' | 'rotation', text: string) => void
+    onFurnitureClearance: (text: string) => void
+    onFurnitureLocked: (locked: boolean) => void
+    onDuplicate: () => void
   }
 
   const {
@@ -23,6 +28,11 @@
     onEdgeLength,
     onNodeCoordinate,
     onDelete,
+    onFurnitureName,
+    onFurnitureSize,
+    onFurnitureClearance,
+    onFurnitureLocked,
+    onDuplicate,
   }: Props = $props()
 
   const model: PanelModel = $derived(describeSelection(doc, selection))
@@ -45,7 +55,17 @@
       <dd>{model.totalArea}</dd>
       <dt>{messages.summaryRoomCount}</dt>
       <dd data-testid="room-count">{model.roomCount}</dd>
+      <dt>{messages.panelFurnitureCount}</dt>
+      <dd data-testid="furniture-count">{model.furnitureCount}</dd>
     </dl>
+    {#if model.warnings.length > 0}
+      <h3 class="section">{messages.panelWarnings}</h3>
+      <ul class="warnings" data-testid="warnings">
+        {#each model.warnings as warning (warning)}
+          <li>{warning}</li>
+        {/each}
+      </ul>
+    {/if}
     {#if model.roomCount === 0}
       <p class="empty">{messages.emptyCanvas}</p>
     {/if}
@@ -67,6 +87,10 @@
       <dd data-testid="room-area">{model.area}</dd>
       <dt>{messages.panelPerimeter}</dt>
       <dd>{model.perimeter}</dd>
+      <dt>{messages.panelFurnitureCount}</dt>
+      <dd>{model.furnitureCount}</dd>
+      <dt>{messages.panelOccupancy}</dt>
+      <dd data-testid="room-occupancy">{model.occupancy}</dd>
     </dl>
 
     <div class="swatches" role="group" aria-label={messages.panelColor}>
@@ -148,18 +172,106 @@
       <dd>{model.connectedRooms}</dd>
     </dl>
   {:else if model.kind === 'furniture'}
-    <dl class="rows">
-      <dt>{messages.panelFurnitureName}</dt>
-      <dd data-testid="furniture-name">{model.name}</dd>
-      <dt>{messages.panelWidth}</dt>
-      <dd>{model.widthText}</dd>
-      <dt>{messages.panelDepth}</dt>
-      <dd>{model.depthText}</dd>
-      <dt>{messages.panelRotation}</dt>
-      <dd>{model.rotationText}</dd>
-      <dt>{messages.panelClearance}</dt>
-      <dd>{model.clearanceText}</dd>
-    </dl>
+    <label class="field">
+      <span class="label">{messages.panelFurnitureName}</span>
+      <input
+        class="input"
+        type="text"
+        value={model.name}
+        aria-label={messages.panelFurnitureName}
+        data-testid="furniture-name"
+        onkeydown={(event) => applyOnEnter(event, onFurnitureName)}
+        onblur={(event) => onFurnitureName(event.currentTarget.value)}
+      />
+    </label>
+
+    <label class="field">
+      <span class="label">{messages.panelWidth}</span>
+      <input
+        class="input"
+        type="text"
+        inputmode="numeric"
+        value={model.widthText}
+        disabled={model.locked}
+        aria-label={messages.panelWidth}
+        data-testid="furniture-width"
+        onkeydown={(event) => applyOnEnter(event, (text) => onFurnitureSize('width', text))}
+      />
+    </label>
+
+    <label class="field">
+      <span class="label">{messages.panelDepth}</span>
+      <input
+        class="input"
+        type="text"
+        inputmode="numeric"
+        value={model.depthText}
+        disabled={model.locked}
+        aria-label={messages.panelDepth}
+        onkeydown={(event) => applyOnEnter(event, (text) => onFurnitureSize('depth', text))}
+      />
+    </label>
+
+    <label class="field">
+      <span class="label">{messages.panelRotation}</span>
+      <input
+        class="input"
+        type="text"
+        inputmode="numeric"
+        value={model.rotationText}
+        disabled={model.locked}
+        aria-label={messages.panelRotation}
+        onkeydown={(event) => applyOnEnter(event, (text) => onFurnitureSize('rotation', text))}
+      />
+    </label>
+
+    <label class="field">
+      <span class="label">{messages.panelClearance}</span>
+      <input
+        class="input"
+        type="text"
+        inputmode="numeric"
+        value={model.clearanceText}
+        aria-label={messages.panelClearance}
+        data-testid="furniture-clearance"
+        onkeydown={(event) => applyOnEnter(event, onFurnitureClearance)}
+      />
+    </label>
+
+    <div class="swatches" role="group" aria-label={messages.panelColor}>
+      <button
+        type="button"
+        class="swatch swatch--none"
+        class:selected={model.colorIndex === null}
+        aria-label={messages.panelColorNone}
+        onclick={() => onColor(null)}
+      ></button>
+      {#each model.palette as swatch, index (swatch)}
+        <button
+          type="button"
+          class="swatch"
+          class:selected={model.colorIndex === index}
+          style="background: {swatch}"
+          aria-label={messages.panelColorOption(index + 1)}
+          onclick={() => onColor(index)}
+        ></button>
+      {/each}
+    </div>
+
+    <label class="toggle">
+      <input
+        type="checkbox"
+        checked={model.locked}
+        data-testid="furniture-locked"
+        onchange={(event) => onFurnitureLocked(event.currentTarget.checked)}
+      />
+      <span>{messages.panelLocked}</span>
+    </label>
+
+    <button type="button" class="danger" onclick={onDuplicate}>
+      {messages.panelDuplicate}
+    </button>
+    <button type="button" class="danger" onclick={onDelete}>{messages.panelDelete}</button>
   {:else}
     <dl class="rows">
       <dt>{messages.panelRoomCount}</dt>
@@ -297,5 +409,29 @@
     margin: 12px 0 0;
     color: var(--text-muted);
     line-height: 1.4;
+  }
+
+  .section {
+    margin: 8px 0 4px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--warning);
+  }
+
+  .warnings {
+    margin: 0 0 12px;
+    padding-left: 16px;
+    color: var(--warning);
+    line-height: 1.4;
+  }
+
+  .input:disabled {
+    color: var(--text-muted);
+    background: var(--surface);
+  }
+
+  .danger + .danger {
+    margin-top: 4px;
   }
 </style>

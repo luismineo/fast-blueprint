@@ -55,6 +55,8 @@ describe('describeSelection', () => {
       usableArea: '16,00 m²',
       totalArea: '16,00 m²',
       roomCount: 2,
+      furnitureCount: 0,
+      warnings: [],
     })
   })
 
