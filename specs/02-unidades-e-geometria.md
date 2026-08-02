@@ -117,11 +117,13 @@ O resolvedor opera em três classes avaliadas em ordem. Ver `adr/0003-modelo-de-
 
 #### Classe 1 — Âncora de ponto
 
-Alvos: **nó existente**, **ponto médio de aresta**.
+Alvos: **nó existente**, **ponto médio de aresta**, e **canto de móvel** quando o contexto pede.
 
 Produz um ponto exato. **Exclusiva:** se qualquer âncora disparar, a mais próxima do cursor vence e nenhuma restrição de reta é aplicada depois. O ponto retornado é a coordenada exata do alvo.
 
-`merged` é preenchido apenas quando a âncora vencedora foi um nó. Ponto médio preenche `targets` mas deixa `merged = null`.
+`merged` é preenchido apenas quando a âncora vencedora foi um nó. Ponto médio e canto de móvel preenchem `targets` mas deixam `merged = null`.
+
+**Canto de móvel não é âncora por padrão.** Só a Ferramenta Medir o liga, por um flag no contexto de snap (`03-ferramentas-e-interacao.md` § Medir). Para as ferramentas de desenho ele seria um alvo errado: um nó de cômodo ancorado num canto de sofá ficaria para trás no instante em que o sofá fosse arrastado — geometria de construção não deve seguir mobília. Para medir, é o alvo mais frequente que existe.
 
 Tolerância: 12 px de tela, limitada a [2, 200] mm (`adr/0005-tolerancias-de-snap.md`).
 
@@ -223,6 +225,8 @@ Contenção móvel-cômodo testa os 4 cantos com ponto-em-polígono. Todos dentr
 
 Quando um móvel é arrastado a menos de 150 mm de uma aresta, ele encosta: a face traseira do móvel alinha com a aresta, e a rotação se ajusta para a direção da aresta.
 
+**Aresta aqui é aresta de cômodo ou parede avulsa**, sem distinção. Uma divisória de closet é tão encostável quanto uma parede externa, e o resolvedor nunca soube diferenciar as duas — só não havia como criar a segunda antes da Ferramenta Parede (`03-ferramentas-e-interacao.md` § Parede).
+
 A face traseira é a que encosta porque é a convenção de catálogo — cama, sofá e armário têm frente e fundo, e o fundo vai na parede.
 
 **Qual borda é a traseira.** A borda em `−depth` local. `depth` cresce da parede para dentro do cômodo (`06-catalogo-de-mobilia.md` § Convenção de orientação, que é a dona desta regra): o fundo fica em `−hd`, a frente em `+hd`, e a marca de orientação do render vai na frente. Uma versão anterior deste documento dizia "borda no `+depth` local", o que contradizia a convenção do catálogo — se `+Y` entra no cômodo, a borda em `+depth` é a da frente.
@@ -232,6 +236,14 @@ A face traseira é a que encosta porque é a convenção de catálogo — cama, 
 **O snap a parede é exclusivo em relação às três classes**, pela mesma razão que a Classe 1 é exclusiva dentro do resolvedor: se uma aresta dispara, ela decide o centro **e** a rotação, e nem grid nem restrição de reta participam depois. Sem isso o grid arredondaria o centro e tiraria o móvel da parede em que ele acabou de encostar.
 
 `Alt` desliga.
+
+### Achatamento de arco
+
+`writeArcPoints(out, center, radius, from, to, ...)` escreve num buffer pré-alocado os pontos que aproximam um arco por polilinha, com um segmento a cada 15° de varredura e no mínimo quatro. Um círculo completo sai com 24 lados.
+
+É geometria pura e mora em `core/geometry` ao lado de `writeObbCorners`, mas o único consumidor é o renderer: os glifos de mobília declaram arco e o pass os achata na hora de desenhar, para que `DrawTarget` não precise de primitiva de curva (`adr/0006-glifos-de-mobilia.md`). Nada no domínio produz arco — não existe geometria curva em documento nenhum.
+
+O arco é escrito em coordenadas da caixa unitária do glifo e escalado depois, por eixo. É essa ordem que faz um arco circular virar elipse num móvel não quadrado, sem nenhum tratamento de elipse.
 
 ## Precisão de fechamento
 
@@ -252,5 +264,8 @@ A mensagem é informativa, sem limiar de recusa, sem algoritmo de ajuste, sem n�
 - [ ] Em escala 0,06 px/mm, clique a 10 px de um nó existente dispara a âncora de nó; em 0,01 px/mm, clique a 500 mm não dispara (`adr/0005-tolerancias-de-snap.md`)
 - [ ] `Alt` pressionado faz o resolvedor devolver o ponto de entrada sem alteração
 - [ ] SAT detecta sobreposição entre dois retângulos rotacionados 30° e 60° com centros a 400 mm
+- [ ] Canto de móvel dispara âncora de Classe 1 com o flag ligado, e não dispara sem ele
+- [ ] Móvel a 100 mm de uma parede avulsa encosta nela; a 200 mm, não
+- [ ] `writeArcPoints` de um círculo completo escreve 24 pontos, e o primeiro coincide com o último dentro de 1 mm
 - [ ] Property test: para qualquer polígono simples gerado, área calculada por shoelace é igual à soma das áreas dos triângulos da sua triangulação por fan
 - [ ] Property test: para qualquer sequência de comprimentos digitados, o polígono resultante fecha (primeiro nó igual ao último)

@@ -64,20 +64,30 @@ Os dois variantes de handle são a prioridade 1 de `02-unidades-e-geometria.md` 
 A primitiva carrega um **papel semântico**, nunca uma cor. Cor é decisão de apresentação e vive exclusivamente em `renderer/theme.ts` (`04-renderizacao.md` § Tokens visuais); uma primitiva que carregasse `HexColor` colocaria cor em `core/` e violaria o critério de aceitação "nenhuma string hexadecimal de cor existe fora de `renderer/theme.ts`". O renderer mapeia papel → token do tema, o que também faz o tema escuro (v2) funcionar sem tocar em ferramenta alguma.
 
 ```ts
-type OverlayRole = 'draft' | 'ghost' | 'snapNode' | 'axisGuide'
-
 type OverlayPrimitive =
-  | { kind: 'polyline'; points: Point[]; role: OverlayRole; closed?: boolean }
+  | { kind: 'polyline'; points: Point[]; role: OverlayRole; closed: boolean }
+  | { kind: 'segment'; a: Point; b: Point; role: OverlayRole }
   | { kind: 'marker'; at: Point; role: OverlayRole }
   | { kind: 'label'; at: Point; text: string; role: OverlayRole }
 ```
 
-| Papel | Usado para |
-|---|---|
-| `draft` | Polilinha já confirmada do traço em andamento |
-| `ghost` | Segmento candidato, do último nó ao cursor |
-| `snapNode` | Marcador sobre o alvo de snap de nó ou ponto médio |
-| `axisGuide` | Guia de eixo, alinhamento ou extensão |
+**Esta seção é a dona da lista de papéis.** Nenhuma outra spec declara papel de overlay.
+
+| Papel | Usado para | Pass |
+|---|---|---|
+| `draft` | Polilinha já confirmada do traço em andamento | 11 |
+| `ghost` | Segmento candidato, do último nó ao cursor | 11 |
+| `closeTarget` | Nó inicial quando o cursor está sobre ele e fechar é possível | 11 |
+| `marquee` | Retângulo de seleção por arraste | 11 |
+| `measure` | Traço e extremidades da Ferramenta Medir (§ Medir) | 11 |
+| `measureLabel` | Distância e projeções em X e Y da Ferramenta Medir | 11 |
+| `snapNode` | Marcador sobre o alvo de snap de nó | 10 |
+| `midpoint` | Losango sobre o ponto médio de aresta | 10 |
+| `axisGuide` | Guia de eixo | 10 |
+| `alignmentGuide` | Guia de alinhamento com nó existente | 10 |
+| `edgeHighlight` | Aresta que participou de projeção ou extensão | 10 |
+
+A divisão entre os passes 10 e 11 (`04-renderizacao.md` § Passes) é por papel, não por ferramenta: guia de snap é do 10, traço de ferramenta é do 11.
 
 `overlay` devolve o que a ferramenta quer desenhar sobre a cena (traço em andamento, guias, HUD). Ferramentas não têm acesso ao canvas.
 
@@ -135,21 +145,22 @@ Dígitos (`0`–`9`) sem modificador são **reservados para entrada numérica** 
 | `Ctrl/Cmd+d` | Global (seleção contém mobília) | Duplica os móveis da seleção, deslocados 200 mm | 03 § Mobília |
 | `Home` | Global (regra D0: fora de campo/widget composto) | Enquadrar tudo | 03 § Câmera |
 | `Ctrl/Cmd+b` | Global | Recolher/expandir painel direito | 07 § Layout |
-| `Backspace` | Ferramenta Cômodo em Drawing, campo de comprimento vazio | Remove último segmento | 03 § Cômodo/Cancelar |
+| `Backspace` | Ferramenta Cômodo ou Parede em Drawing, campo de comprimento vazio | Remove último segmento | 03 § Cômodo/Cancelar |
 | `Backspace` | Qualquer outro estado com seleção | Excluir seleção | 03 § Selecionar |
 | `Backspace` | Foco em campo de texto | Apaga caractere (regra de precedência D0) | — |
 | `Delete` | Com seleção, fora de campo de texto | Excluir seleção | 03 § Selecionar |
 | `Delete` | Foco em campo de texto | Apaga caractere (regra de precedência D0) | — |
-| `Escape` | Ferramenta Cômodo em Anchored ou Drawing | Remove último segmento; em Anchored volta para Idle | 03 § Cômodo/Cancelar |
-| `Escape` | Ferramenta Medir ativa | Limpa medição | 03 § Medir |
+| `Escape` | Ferramenta Cômodo ou Parede em Anchored ou Drawing | Remove último segmento; em Anchored volta para Idle | 03 § Cômodo/Cancelar |
+| `Escape` | Ferramenta Medir em Dragging ou Done | Limpa a medição e volta para Idle | 03 § Medir |
 | `Escape` | Qualquer ferramenta, com seleção | Limpa seleção | 03 |
 | `Escape` | Ociosa, sem seleção | Volta para Ferramenta Selecionar | 03 |
 | `Escape` | HUD com armadilha de foco ativa | Sai da armadilha de foco | 03 § Cômodo/HUD |
 | `c` | Ferramenta Cômodo em Drawing | Fecha polígono ligando último nó ao inicial | 03 § Cômodo/Fechar |
-| `Enter` | Ferramenta Cômodo em Anchored/Drawing, campo de comprimento preenchido | Confirma segmento | 03 § Cômodo |
+| `Enter` | Ferramenta Cômodo ou Parede em Anchored/Drawing, campo de comprimento preenchido | Confirma segmento | 03 § Cômodo |
 | `Enter` | Ferramenta Cômodo em Drawing, campo vazio | Fecha polígono | 03 § Cômodo/Fechar |
+| `Enter` | Ferramenta Parede em Drawing, campo vazio | Termina a polilinha | 03 § Parede |
 | `Enter` | Campo numérico do painel de propriedades | Aplica valor | 07 § Painel |
-| `Tab` | Ferramenta Cômodo em Anchored ou Drawing | Circula entre campos do HUD (armadilha de foco; não escapa do HUD) | 03 § Cômodo/HUD |
+| `Tab` | Ferramenta Cômodo ou Parede em Anchored ou Drawing | Circula entre campos do HUD (armadilha de foco; não escapa do HUD) | 03 § Cômodo/HUD |
 | `Tab` | Fora do HUD | Travessia de foco padrão (a11y) | 07 § Acessibilidade |
 | `g` | Global | Alternar grid | 04 § Grid |
 | `l` | Global | Alternar cotas | 04 § Cotas |
@@ -291,7 +302,46 @@ Onze interações, sem tocar em nenhum menu. Esse fluxo é o critério de aceita
 
 ## Ferramenta Parede (`W`)
 
-Idêntica à ferramenta Cômodo, sem fechamento. Cria segmentos avulsos para divisórias, bancadas e guarda-corpos. `Esc` ou `Enter` com campo vazio termina a polilinha.
+Idêntica à ferramenta Cômodo, sem fechamento. Cria segmentos avulsos para divisórias, bancadas, guarda-corpos e meia-parede — geometria que delimita sem cercar.
+
+### Estados
+
+Os mesmos três da Ferramenta Cômodo: `Idle → Anchored → Drawing`. Mesmo HUD, mesmos campos de comprimento e ângulo, mesma armadilha de foco, mesmo resolvedor de snap. A única diferença é que não existe fechamento: não há `C`, não há alvo de fechamento no nó inicial, e `Enter` com campo vazio **termina** a polilinha em vez de fechá-la.
+
+Terminar volta para `Idle` sem trocar de ferramenta — desenhar três bancadas seguidas não exige apertar `W` três vezes. Isso é diferente da Ferramenta Mobília, que devolve para Selecionar depois de posicionar, porque lá o passo seguinte quase sempre é ajustar o que acabou de entrar, e aqui quase sempre é desenhar o próximo trecho.
+
+### Um comando por polilinha
+
+A ferramenta acumula o rascunho e emite **um** `CreateWall` (`08-arquitetura.md`) no término, com todos os nós e todos os segmentos. Uma polilinha de quatro trechos é uma entrada de histórico, não quatro.
+
+É o mesmo desenho da Ferramenta Cômodo, e pelo mesmo motivo: `Backspace` já remove segmento durante o traço, então quem errou o terceiro trecho corrige antes de terminar; depois de terminado, o que o usuário quer desfazer é "aquela bancada que acabei de desenhar", inteira.
+
+Terminar sem nenhum segmento confirmado — `Esc` logo depois de ancorar — não emite comando nenhum e não empilha histórico.
+
+### Nós são compartilhados como em qualquer outro lugar
+
+A extremidade que cai sobre um nó existente reusa o nó, pela âncora de Classe 1 do snap. É assim que a bancada encosta na parede do cômodo e passa a acompanhá-la quando o cômodo é editado. Não há tratamento especial: parede avulsa e aresta de cômodo referenciam os mesmos `Node`.
+
+Consequências que já estão escritas em outras specs e valem repetir aqui porque é esta ferramenta que as torna alcançáveis:
+
+- Parede avulsa entra no hit testing na mesma prioridade da aresta de cômodo (`02-unidades-e-geometria.md` § Hit testing)
+- Parede avulsa é alvo de snap: nó nas pontas, ponto médio, projeção e extensão (`02-unidades-e-geometria.md` § Snap)
+- Móvel encosta em parede avulsa como encosta em parede de cômodo (`02-unidades-e-geometria.md` § Snap a parede) — a divisória do closet passa a ser encostável
+- Parede avulsa tem cota do próprio comprimento (`04-renderizacao.md` § Cotas)
+
+### Selecionar, medir e excluir
+
+Parede avulsa é selecionada como aresta: `SelectionRef` de `kind: 'edge'` com `EdgeRef` de `kind: 'wall'` (§ Modelo de seleção). Nenhum variante novo.
+
+O painel de propriedades de aresta serve sem mudança, e `SetEdgeLength` já define o nó final de uma parede como `b` (`08-arquitetura.md`) — duplo clique na bancada e digitar 2400 funciona pelo caminho que já existe.
+
+**`Delete` com parede avulsa selecionada exclui a parede.** Isso amplia a regra do M2, que dizia que `Delete` sobre aresta não altera o documento. A regra do M2 continua correta onde ela se aplica: aresta de cômodo não é excluível isoladamente, porque um cômodo com um lado a menos não é um polígono fechado — não existe `DeleteEdge` e não deve existir. Parede avulsa é o caso oposto: ela **é** a entidade inteira, e não ter como excluí-la deixaria o usuário sem saída depois de um traço errado já confirmado.
+
+Nós que ficam órfãos depois de excluir permanecem no documento e saem no GC ao salvar, como em `DeleteRoom` (W5, `01-modelo-de-dominio.md` § Invariantes).
+
+### O que a Ferramenta Parede não faz
+
+Não fecha polígono — quem quer área usa `R`. Não tem espessura (ADR-0002). Não vira cômodo automaticamente quando o traço volta ao início: um retângulo desenhado com `W` são quatro paredes avulsas e nenhuma área, e isso é a resposta certa, porque adivinhar intenção aqui produziria cômodo onde o usuário quis guarda-corpo.
 
 ## Ferramenta Selecionar (`V`)
 
@@ -334,15 +384,21 @@ permanecem, as demais saem (`08-arquitetura.md` § Histórico).
 | Duplo clique no interior de um cômodo | Entra em edição de nome |
 | Duplo clique numa aresta | Abre campo de comprimento da aresta |
 | `Ctrl/Cmd + A` | Seleciona tudo |
-| `Delete` / `Backspace` | Exclui os **cômodos** e os **móveis** da seleção |
+| `Delete` / `Backspace` | Exclui os **cômodos**, os **móveis** e as **paredes avulsas** da seleção |
 
-**`Delete` exclui cômodo e móvel, não nó nem aresta.** A lista de comandos de
-`08-arquitetura.md` não tem `DeleteNode` nem `DeleteEdge`, e não é a tecla que decide
-que eles deveriam existir: apagar um nó de um ciclo fechado ou deixa o cômodo com menos
-de 3 nós (E3) ou muda a forma dele de um jeito que arrastar já resolve melhor. Nó e
-aresta selecionados ignoram a tecla. Móvel tem `DeleteFurniture` e é excluído — inclusive
-quando `locked`, que bloqueia mover e transformar mas não uma ação explícita e desfazível
-(§ Mobília).
+**`Delete` exclui cômodo, móvel e parede avulsa; não exclui nó nem aresta de cômodo.**
+A lista de comandos de `08-arquitetura.md` não tem `DeleteNode` nem `DeleteEdge`, e não é
+a tecla que decide que eles deveriam existir: apagar um nó de um ciclo fechado ou deixa o
+cômodo com menos de 3 nós (E3) ou muda a forma dele de um jeito que arrastar já resolve
+melhor. Nó e aresta de cômodo selecionados ignoram a tecla. Móvel tem `DeleteFurniture` e
+é excluído — inclusive quando `locked`, que bloqueia mover e transformar mas não uma ação
+explícita e desfazível (§ Mobília).
+
+Parede avulsa entrou nessa lista no M3.5, junto da ferramenta que a cria (§ Parede). A
+distinção não é entre "aresta" e "não aresta", e sim entre **parte de uma entidade** e
+**a entidade inteira**: aresta de cômodo é um lado de um polígono que precisa continuar
+fechado, parede avulsa é o objeto completo. `DeleteWall` existe; `DeleteEdge` continua não
+existindo.
 
 ### Máquina de estados
 
@@ -470,6 +526,34 @@ Serve para responder "quanto sobra entre a cama e a parede?" sem alterar o docum
 
 Mostra também a distância projetada em X e Y quando o traço não é axial.
 
+### Estados
+
+| Estado | Como entra | Como sai |
+|---|---|---|
+| `Idle` | Ativar a ferramenta; `Esc` | `pointerdown` → `Dragging` |
+| `Dragging` | `pointerdown` | `pointerup` → `Done`; `Esc` → `Idle`, descartando o traço |
+| `Done` | `pointerup` | `Esc` → `Idle`; `pointerdown` → `Dragging` com medição nova |
+
+A medição **permanece na tela** depois de soltar o botão. Sumir junto com o `pointerup` tornaria a ferramenta inútil: ninguém consegue ler um número enquanto arrasta e olha para onde o cursor está indo. `pointerdown` novo substitui a medição anterior — existe uma por vez, porque duas viram anotação, e anotação é entidade, e entidade é o que esta ferramenta não cria.
+
+### Não emite comando nenhum
+
+É a única ferramenta cujo `ToolTransition.commands` é sempre vazio, em toda transição. Não muta documento, não empilha histórico, não é afetada por `Ctrl+Z`, e nada do que ela mostra é salvo.
+
+### Snap, e o canto de móvel
+
+As duas extremidades passam pelo resolvedor de snap, com `Alt` desligando como em qualquer arraste. Sem snap, a medida seria do pixel em que o cursor caiu, e não da geometria — que é precisamente o erro que o produto inteiro existe para evitar (`00-visao-e-escopo.md` § Princípios, 1).
+
+Esta ferramenta é a única que pede **canto de móvel** como âncora de Classe 1 (`02-unidades-e-geometria.md` § Classe 1). As ferramentas de desenho não pedem, e não devem: um nó de cômodo ancorado num canto de sofá ficaria para trás no instante em que o sofá fosse arrastado, e `merged` não teria significado. Para medir, é o alvo mais frequente — "quanto sobra entre a cama e a parede" começa no canto da cama.
+
+### O que aparece
+
+- Traço entre as duas extremidades, com marcador em cada ponta (papel `measure`)
+- Distância total, no meio do traço (papel `measureLabel`)
+- Quando o traço não é axial, `ΔX` e `ΔY` numa segunda linha do rótulo
+
+Números formatados pela unidade de exibição corrente (`02-unidades-e-geometria.md` § Unidade de exibição), como em qualquer cota.
+
 ## Câmera
 
 **Zoom.** Scroll ancorado no cursor: o ponto de mundo sob o cursor permanece sob o cursor. Limites: 0,05 a 20 px/mm. Passo de 1,1× por notch, com aceleração para trackpad.
@@ -494,7 +578,7 @@ Zoom e pan nunca entram no histórico de undo.
 - [ ] Com o foco no campo de ângulo, dígitos vão para ele e não para o de comprimento
 - [ ] Retângulo de seleção seleciona só quem está completamente envolvido
 - [ ] `pointerdown` seguido de `pointerup` sem movimento não abre entrada pendente nem empilha histórico
-- [ ] `Delete` com nó ou aresta selecionada não altera o documento; com cômodo selecionado, exclui
+- [ ] `Delete` com nó ou aresta de cômodo selecionada não altera o documento; com cômodo, móvel ou parede avulsa selecionada, exclui
 - [ ] Móvel arrastado a 100 mm de uma parede encosta e alinha rotação; a 200 mm, não
 - [ ] Posicionar um item com `F` devolve a ferramenta ativa para Selecionar, com o item selecionado
 - [ ] Móvel `locked` ignora arraste, handle e setas, e o comando correspondente é rejeitado sem tocar no documento
@@ -503,4 +587,13 @@ Zoom e pan nunca entram no histórico de undo.
 - [ ] Zoom no cursor mantém a coordenada de mundo sob o cursor invariante dentro de 1 px
 - [ ] Nenhuma ferramenta acessa o objeto documento fora de `ToolContext`
 - [ ] Com foco na barra de ferramentas, `Home` move o foco para o primeiro botão e não aciona Enquadrar tudo; com foco no canvas, `Home` enquadra tudo
+- [ ] `W`, clique, `2400 Enter`, `Enter` produz uma parede avulsa de 2400 mm e volta para Idle sem trocar de ferramenta
+- [ ] Polilinha de três trechos com `W` produz três paredes e **uma** entrada de histórico; um `Ctrl+Z` remove as três
+- [ ] `Esc` logo depois de ancorar com `W` não altera o documento nem empilha histórico
+- [ ] Extremidade de parede sobre nó de cômodo existente reusa o nó, e mover o nó move os dois
+- [ ] Móvel arrastado a 100 mm de uma parede avulsa encosta e alinha rotação
+- [ ] `M`, arrastar e soltar mostra a distância, que continua na tela depois do `pointerup` e some com `Esc`
+- [ ] A Ferramenta Medir não emite comando em nenhuma transição, e `Ctrl+Z` depois de medir desfaz o comando anterior à medição
+- [ ] Medição em diagonal mostra `ΔX` e `ΔY`; medição axial não mostra
+- [ ] Extremidade de medição a menos de 12 px do canto de um móvel ancora nele; a mesma proximidade não ancora ao desenhar com `R`
 - [ ] **Pendente de execução manual** (não satisfeito pela eliminação documental): tabela de atalhos completa testada em um Chrome e um Firefox reais, confirmando que nenhuma combinação além da família `Ctrl/Cmd+0/+/-` é interceptada, além da verificação em teclado ABNT2 já registrada

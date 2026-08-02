@@ -34,6 +34,8 @@ O canvas é o produto. Todo pixel de chrome precisa se justificar. A meta é que
 
 **Barra de ferramentas** (48 px, esquerda). Cinco ícones. Nada mais. Tooltip mostra nome e atalho.
 
+Do M3 ao M3.5, Parede e Medir aparecem indisponíveis — com `aria-disabled`, nunca `disabled`, para não sair da ordem de foco e quebrar o padrão ARIA de toolbar. A partir do M3.5 nenhum dos cinco está indisponível, e o tratamento visual de indisponível continua existindo porque é o mesmo de qualquer botão que dependa de contexto.
+
 **Painel direito** (264 px, recolhível com o atalho da tabela de `03-ferramentas-e-interacao.md`, hoje `Ctrl/Cmd+B`). Duas seções empilhadas: propriedades da seleção no topo, catálogo abaixo. Quando não há seleção, propriedades mostra o resumo do documento (área útil, área total, contagem de cômodos).
 
 Uma versão anterior desta linha dizia "recolhível com `Tab`", o que contradizia a tabela unificada — que é a dona única da lista de atalhos — e colidia com `Tab` como travessia de foco (§ Acessibilidade).
@@ -53,6 +55,8 @@ A lista de avisos é a saída de `validateDocument` de nível `warning` (`01-mod
 **Cômodo** — nome (editável), área, perímetro, número de móveis, taxa de ocupação, cor, alternância "contar na área útil", botão excluir.
 
 **Aresta** — comprimento (editável), ângulo, cômodos adjacentes.
+
+Aresta de **parede avulsa** (`01-modelo-de-dominio.md` § Wall) usa a mesma variante, com duas diferenças: no lugar de "cômodos adjacentes" aparece que ela não pertence a cômodo nenhum, e existe botão excluir, porque `DeleteWall` existe e `DeleteEdge` não (`03-ferramentas-e-interacao.md` § Selecionar). Não é variante nova: os campos são os mesmos e o comportamento de edição de comprimento é o mesmo.
 
 **Nó** — X, Y (editáveis), lista de cômodos conectados.
 
@@ -198,4 +202,6 @@ Abaixo de 1280 px, o painel direito recolhe por default. Abaixo de 900 px, vira 
 - [ ] Lint falha se houver literal de texto visível ao usuário em componente `.svelte`, exceto glifo estrutural e saída de `core/format`
 - [ ] Nenhuma chave órfã em `messages.ts` (definida e não usada, ou usada e não definida)
 - [ ] Com foco na barra de ferramentas, `Home`/`End` movem o foco para o primeiro/último botão; fora dela, `Home` enquadra tudo
+- [ ] Os cinco botões da barra ativam ferramenta, e nenhum tem `aria-disabled` verdadeiro
+- [ ] Parede avulsa selecionada mostra a variante de aresta com botão excluir; aresta de cômodo mostra a mesma variante sem ele
 - [ ] HUD com armadilha de foco ativa exibe o anel de foco de `accent` no container

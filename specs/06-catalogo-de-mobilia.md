@@ -22,6 +22,7 @@ Arquivo JSON em `packages/catalog/data/default.json`, validado pelo mesmo mecani
       "depth": 1980,
       "height": 550,
       "clearance": 600,
+      "glyph": "bed",
       "tags": ["cama", "casal", "dormir"]
     }
   ]
@@ -37,6 +38,7 @@ Arquivo JSON em `packages/catalog/data/default.json`, validado pelo mesmo mecani
 | `depth` | sim | mm, eixo local Y (fundo encosta na parede) |
 | `height` | não | mm. Não usado no render 2D; existe para futuro e para referência |
 | `clearance` | não | mm de circulação sugerida. Default 0 |
+| `glyph` | não | Id de um glifo de § Glifos. Ausente desenha retângulo |
 | `tags` | não | Termos de busca adicionais |
 
 ## Convenção de orientação
@@ -157,6 +159,73 @@ Renderizados apenas como contorno tracejado, sem preenchimento.
 
 Item desta categoria inserido no documento nasce com `outline: true` (`01-modelo-de-dominio.md` § FurnitureItem). É esse campo, e não a categoria, que o renderer lê: `renderer` não conhece o pacote `catalog`, e a categoria não sobrevive à inserção.
 
+## Glifos
+
+Símbolo de planta baixa desenhado dentro do retângulo do móvel. Um sofá desenhado como sofá se reconhece sem ler o rótulo, que é o que a `00-visao-e-escopo.md` § Proposta de valor promete.
+
+A justificativa completa, com as alternativas rejeitadas, está em `adr/0006-glifos-de-mobilia.md`. **Esta seção é a dona da lista de glifos e do mapeamento item → glifo.**
+
+### Forma
+
+```ts
+type UnitPoint = { x: number; y: number }   // ambos em [0, 1]
+
+type GlyphPrimitive =
+  | { kind: 'polyline'; points: readonly UnitPoint[]; closed: boolean }
+  | { kind: 'arc'; center: UnitPoint; radius: number; from: number; to: number }
+
+interface FurnitureGlyph {
+  id: string
+  primitives: readonly GlyphPrimitive[]
+}
+```
+
+O tipo vive em `core`, junto de `OverlayPrimitive`, pelo mesmo motivo dele: `renderer` e `catalog` precisam do tipo e a direção de dependência de `08-arquitetura.md` só admite `core` como lugar comum. Os **valores** vivem em `packages/catalog/data/glyphs.json`.
+
+Como `OverlayPrimitive`, um glifo nunca carrega cor, espessura ou fonte — não tem campo onde caberiam.
+
+### Caixa unitária
+
+`(0,0)` é o canto traseiro esquerdo do móvel, `(1,1)` o frontal direito. `y` cresce da parede para dentro do cômodo, acompanhando `depth` (§ Convenção de orientação). O renderer escala por `width × depth` **do item no documento**, não do item de catálogo: a medida que o usuário digitou é a que vale.
+
+`radius` é fração da caixa, e `from`/`to` são graus com 0 no eixo `+x`, crescendo para `+y`. Como a escala é aplicada por eixo, um arco de raio constante numa caixa não quadrada sai elíptico — é assim que a bacia de um vaso (380 × 700) fica com a proporção certa sem nenhum caso especial.
+
+Coordenada de glifo é fracionária. Isso **não** contradiz "float em coordenada de nó é bug": glifo não tem coordenada de domínio, tem proporção.
+
+### Limites de schema
+
+Um glifo tem no máximo 48 primitivas; uma polilinha, no máximo 64 pontos; um arco é achatado em no máximo 64. É o que permite ao pass de mobília trabalhar com um único buffer pré-alocado de 64 pontos, reusado primitiva a primitiva (`04-renderizacao.md` § Orçamento de performance, regra 2).
+
+### Glifos do catálogo default
+
+| Glifo | Desenho | Itens |
+|---|---|---|
+| `bed` | Retângulo interno; dois travesseiros junto ao fundo; linha da dobra do lençol a 2/3 | `bed-single`, `bed-single-xl`, `bed-double`, `bed-queen`, `bed-king`, `bed-bunk` |
+| `wardrobe` | Linha da frente das portas; divisões verticais; puxadores | `wardrobe-2d`, `wardrobe-4d`, `wardrobe-6d`, `laundry-cabinet` |
+| `drawers` | Três linhas horizontais de gaveta com puxador central | `dresser`, `filing-cabinet` |
+| `sofa` | Encosto junto ao fundo; dois braços; divisão das almofadas | `sofa-2`, `sofa-3`, `sofa-retratil-3`, `armchair` |
+| `sofa-l` | Mesmo desenho em L, com o retorno no lado direito | `sofa-l`, `bench-corner` |
+| `table-chairs` | Tampo interno; cadeiras como retângulos nos quatro lados | `dining-4`, `dining-6` |
+| `table-round` | Círculo do tampo; quatro cadeiras a 90° | `dining-round-4` |
+| `chair` | Assento; encosto junto ao fundo | `chair`, `office-chair` |
+| `shelves` | Três linhas horizontais de prateleira, sem puxador | `bookshelf` |
+| `toilet` | Caixa acoplada junto ao fundo; bacia como arco fechado | `toilet` |
+| `basin` | Cuba como arco; traço da torneira junto ao fundo | `sink-pedestal`, `vanity-60`, `vanity-80`, `laundry-sink` |
+| `shower` | Diagonal do box; ralo como círculo pequeno no centro | `shower-90`, `shower-120` |
+| `bathtub` | Banheira interna com cantos chanfrados; ralo numa ponta | `bathtub` |
+| `stove` | Quatro bocas; traço dos controles junto ao fundo | `stove-4`, `cooktop-4` |
+| `stove-5` | Cinco bocas, a quinta ao centro | `stove-5` |
+| `fridge` | Linha da porta na vertical; puxador | `fridge-frost-free` |
+| `fridge-duplex` | Duas portas empilhadas; dois puxadores | `fridge-duplex` |
+| `washer` | Porta como círculo centrado; painel junto ao fundo | `washer`, `washer-dryer`, `dishwasher` |
+| `sink-counter` | Cuba como retângulo à esquerda; torneira; linha da bancada | `sink-cabinet` |
+| `turn-circle` | Círculo inscrito | `clearance-wheelchair` |
+| `door-swing` | Folha na lateral; arco de quarto de círculo | `clearance-door-swing` |
+
+Os demais 12 itens do catálogo default não têm glifo e desenham retângulo: `nightstand`, `coffee-table`, `side-table`, `tv-rack-15`, `tv-rack-18`, `counter-run`, `island-small`, `microwave`, `desk-120`, `desk-140`, `desk-l`, `clearance-person`. São móveis que na planta são retângulos mesmo; inventar detalhe para eles seria ruído.
+
+Acrescentar glifo a um desses depois é acrescentar dado. Não exige mudança de código nem de spec — só de tabela.
+
 ## Catálogo do usuário
 
 Itens criados pelo usuário vão para `planta:catalog:user` no IndexedDB, mesma estrutura, campo `source: 'user'`.
@@ -166,6 +235,8 @@ Criados por: "Salvar como item" no painel de propriedades de um móvel seleciona
 Exportáveis e importáveis como JSON, para compartilhar entre máquinas.
 
 Item de usuário com `id` colidindo com o default vence na resolução — permite sobrescrever uma medida do catálogo padrão que não bate com o móvel real.
+
+O glifo é a exceção nessa sobreposição: um item de usuário sem `glyph` herda o do item default de mesmo `id`. Quem corrige a largura da própria cama está corrigindo a medida, não pedindo para o desenho virar retângulo. Item de usuário com `id` novo não herda nada, e desenha retângulo.
 
 ## Busca
 
@@ -177,9 +248,13 @@ Buscar "cama" retorna as seis camas. Buscar "160" não faz nada — busca é tex
 
 Agrupado por categoria, categorias recolhíveis, últimos 8 itens usados numa seção "Recentes" no topo.
 
-Cada item mostra nome, dimensão em cm e uma miniatura de proporção correta (retângulo puro, gerado, não asset).
+Cada item mostra nome, dimensão em cm e uma miniatura de proporção correta, gerada — nunca um asset.
 
 Miniaturas geradas em vez de desenhadas à mão: mantém o catálogo puramente em dados e evita 60 arquivos SVG que precisariam ser mantidos em sincronia com as medidas.
+
+Item com `glyph` mostra o glifo dentro da miniatura, na mesma caixa unitária do render (§ Glifos). É o mesmo dado alimentando os dois lugares, e é o que faz a lista de resultados de busca ser varrível com o olho. Item sem glifo mantém o retângulo proporcional.
+
+A projeção do glifo para a miniatura é função pura em `app/components/`, não cálculo dentro de `.svelte` (`08-arquitetura.md` § Pacotes).
 
 ## Critérios de aceitação
 
@@ -189,6 +264,10 @@ Miniaturas geradas em vez de desenhadas à mão: mantém o catálogo puramente e
 - [ ] Item de catálogo inserido no canvas produz `FurnitureItem` com `catalogId` preenchido
 - [ ] Editar a dimensão do móvel inserido não altera o catálogo
 - [ ] Item de usuário com id colidindo sobrescreve o default
+- [ ] Item de usuário sem `glyph` colidindo com id default herda o glifo do default
 - [ ] Busca por "geladeira" retorna os dois itens de geladeira
 - [ ] Busca ignora acentos: "servico" e "serviço" dão o mesmo resultado
 - [ ] Itens de categoria `circulacao` renderizam só com contorno tracejado
+- [ ] Todo `glyph` referenciado por um item existe em `glyphs.json`, e todo glifo é referenciado por pelo menos um item
+- [ ] Todo ponto de todo glifo está em `[0,1]`, e nenhum glifo passa de 48 primitivas
+- [ ] Miniatura de item com glifo desenha o glifo; item sem glifo desenha retângulo

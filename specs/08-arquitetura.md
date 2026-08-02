@@ -54,7 +54,11 @@ A função de render é pura (`render(doc, camera, selection, overlays): void`).
 
 ### `catalog`
 
-Dados do catálogo mais loader, busca e merge de catálogo do usuário.
+Dados do catálogo mais loader, busca e merge de catálogo do usuário. Inclui `data/glyphs.json`, os símbolos de planta baixa dos itens (`06-catalogo-de-mobilia.md` § Glifos).
+
+O **tipo** `FurnitureGlyph` fica em `core`, ao lado de `OverlayPrimitive`, porque `renderer` e `catalog` precisam dele e a direção de dependência só admite `core` como lugar comum. Os **valores** ficam aqui.
+
+`renderer` não importa `catalog` — é o `app` que resolve o mapa `catalogId → glifo` e o entrega em `RenderContext.glyphs` (`04-renderizacao.md` § Passes). Um pass que precisasse consultar o catálogo seria sinal de que a forma está no pacote errado, não de que a regra de dependência precisa de exceção.
 
 ### `app`
 
@@ -287,14 +291,49 @@ Códigos de erro novos: `FURNITURE_NOT_FOUND`, `FURNITURE_LOCKED`, `INVALID_DIME
 
 Duplicar (`Ctrl/Cmd+D`) não tem comando próprio: é um `AddFurniture` com os campos do original e o centro deslocado 200 mm. Vários móveis selecionados viram um `Batch`, portanto uma entrada de histórico.
 
+#### Comandos do M3.5
+
+```ts
+type Command =
+  | { type: 'CreateWall'; transient?: boolean; payload: CreateWallPayload }
+  | { type: 'DeleteWall'; transient?: boolean; payload: DeleteWallPayload }
+```
+
+Estavam na tabela de milestones posteriores marcados como M1 desde o começo do projeto, sem nunca terem sido feitos, porque a ferramenta que os emite não existia (`09-roadmap.md` § M3.5).
+
+**CreateWall:**
+```ts
+interface CreateWallPayload {
+  nodes: { id: NodeId; x: Millimeters; y: Millimeters }[]
+  segments: { a: NodeId; b: NodeId; wallId?: WallId }[]
+}
+```
+Cria os nós e as paredes atomicamente, na mesma forma de `CreateRoom` e pelo mesmo motivo: uma polilinha inteira é uma entrada de histórico (`03-ferramentas-e-interacao.md` § Parede). `segments` referencia ids de `nodes` ou de nós já existentes no documento. Nó com coordenada idêntica a um existente é reusado, não duplicado (E6) — é isso que faz a bancada grudar na parede do cômodo.
+
+Rejeita, sem tocar no documento: `segments` vazio (`EMPTY_WALL`), segmento com `a === b` (`DEGENERATE_WALL`, E5), referência a nó que não existe nem no payload nem no documento (`NODE_NOT_FOUND`, E2), coordenada não inteira (`NON_INTEGER_COORDINATE`).
+
+Segmento que reproduz exatamente uma parede já existente — mesmo par de nós, em qualquer ordem — é **omitido**, e o resto do comando é aplicado. Não é reparo silencioso no sentido do post-mortem do M1: o documento resultante é idêntico ao que o usuário vê na tela, porque a parede que ele acabou de traçar está lá; ela só não está lá duas vezes. Rejeitar a polilinha inteira por causa de um trecho repetido faria perder quatro segmentos bons por causa de um redundante.
+
+**DeleteWall:**
+```ts
+interface DeleteWallPayload {
+  wallId: WallId
+}
+```
+Remove a parede. Nós que ficam órfãos permanecem e saem no GC ao salvar (W5), como em `DeleteRoom`. Rejeita id inexistente (`WALL_NOT_FOUND`).
+
+Códigos de erro novos: `EMPTY_WALL`, `WALL_NOT_FOUND`. `DEGENERATE_WALL` já existia.
+
+Editar o comprimento de uma parede avulsa não precisa de comando novo: `SetEdgeLength` já aceita `EdgeRef` de `kind: 'wall'` e já define `b` como nó final.
+
+A Ferramenta Medir não aparece aqui porque não emite comando nenhum, em nenhuma transição (`03-ferramentas-e-interacao.md` § Medir). Os glifos de mobília também não: são apresentação, resolvida no render, e não tocam no documento (`adr/0006-glifos-de-mobilia.md`).
+
 #### Comandos de milestones posteriores
 
 A lista abaixo está registrada para referência de planejamento. As assinaturas serão especificadas quando o milestone for iniciado.
 
 | Comando | Milestone | Efeito |
 |---|---|---|
-| `CreateWall` | M1 | Segmento avulso (a especificar) |
-| `DeleteWall` | M1 | Remove parede avulsa (a especificar) |
 | `SetDocumentMeta` | M4 | Nome, unidade de exibição, grid |
 
 Comandos compostos (mover uma seleção com 3 móveis e 2 nós) são um `BatchCommand` que agrega comandos e produz um único item de histórico.
@@ -463,4 +502,8 @@ Nunca armazene grandeza derivada no documento. Área não é dado, é consequên
 - [ ] Undo após criar cômodo restaura documento e limpa seleção sem erro
 - [ ] Nenhum componente `.svelte` importa de `core/geometry`
 - [ ] Erro lançado dentro de um pass não interrompe os demais passes
+- [ ] `renderer` não importa `catalog` (`depcruise`), inclusive depois de os glifos existirem
+- [ ] `CreateWall` com polilinha de três trechos produz três paredes e uma entrada de histórico; o inverso devolve o documento original
+- [ ] `CreateWall` com `segments` vazio, segmento degenerado ou nó desconhecido é rejeitado sem tocar no documento
+- [ ] `DeleteWall` seguido de undo devolve a parede com o mesmo `WallId`
 - [ ] Bundle de produção fica abaixo de 300 KB gzipped

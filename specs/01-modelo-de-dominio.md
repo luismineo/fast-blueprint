@@ -66,6 +66,10 @@ interface Wall {
 }
 ```
 
+Não tem área, não conta na área útil, não fecha nada. Os nós são os mesmos `Node` que os cômodos usam: uma bancada que encosta na parede de um cômodo compartilha o nó, e mover esse nó move os dois.
+
+Criada e removida por `CreateWall`/`DeleteWall` (`08-arquitetura.md`), emitidos pela Ferramenta Parede (`03-ferramentas-e-interacao.md` § Parede). A ordem de `a` para `b` é dado, não convenção normalizada — é ela que define o nó final em `SetEdgeLength` e o lado da cota (`04-renderizacao.md` § Cotas).
+
 ### EdgeRef
 
 Referência a uma aresta, seja de cômodo ou avulsa. Usada por aberturas e por snap de mobília.

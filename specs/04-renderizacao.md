@@ -58,6 +58,7 @@ interface RenderContext {
   selection: Selection
   hover: SelectionRef | null
   theme: Theme
+  glyphs: ReadonlyMap<string, FurnitureGlyph> | null
   caches: {
     bbox: BBoxCache
     textMetrics: TextMetricsCache
@@ -68,6 +69,8 @@ interface RenderContext {
 
 `Selection` e `SelectionRef` são definidos em `core/selection` (`03-ferramentas-e-interacao.md` § Selecionar). Ficam em `core` porque renderer e `app` precisam dos dois e a direção de dependência não admite outro lugar.
 
+`glyphs` é o mapa `catalogId → FurnitureGlyph` (`06-catalogo-de-mobilia.md` § Glifos), montado pelo `app` — o único pacote que enxerga `catalog` e `renderer` ao mesmo tempo. O renderer não pode importar `catalog`, e é por isso que a forma chega por aqui em vez de ser buscada. `null` desenha todo móvel como retângulo, que é o comportamento do M3 e o estado do render antes de o catálogo carregar.
+
 `hover` existe porque `03-ferramentas-e-interacao.md` § Handles distingue "nó selecionado" de "nó sob o cursor", e o pass de seleção precisa dos dois para desenhar handles diferentes. É estado efêmero de interação, como a seleção: não entra no documento nem no histórico.
 
 | # | Pass | Conteúdo |
@@ -76,13 +79,13 @@ interface RenderContext {
 | 2 | `grid` | Grid adaptativo |
 | 3 | `roomFills` | Preenchimento dos cômodos |
 | 4 | `furnitureClearance` | Faixas de circulação (abaixo dos móveis) |
-| 5 | `furniture` | Retângulos de móveis, rótulos, hachura de colisão |
+| 5 | `furniture` | Móveis (glifo ou retângulo), rótulos, hachura de colisão |
 | 6 | `walls` | Arestas de cômodos e paredes avulsas |
 | 7 | `openings` | Portas e janelas, com arco de abertura (no-op até M6: itera array vazio) |
 | 8 | `dimensions` | Cotas de aresta |
 | 9 | `roomLabels` | Nome e área no centroide |
 | 10 | `snapGuides` | Guias de alinhamento e eixo |
-| 11 | `toolOverlay` | Traço em andamento da ferramenta ativa |
+| 11 | `toolOverlay` | Traço em andamento da ferramenta ativa, medição da Ferramenta Medir |
 | 12 | `selection` | Contornos de seleção e handles |
 | 13 | `hud` | HUD de entrada numérica, escala gráfica |
 
@@ -93,6 +96,34 @@ O pass `hud` desenha apenas a **escala gráfica**. O HUD de entrada numérica (`
 Passes de geometria (2–8, 10, 11) desenham em **milímetros**, com a transformação da câmera aplicada, e usam `lineWidth = px / scale` para espessura constante. Passes que desenham **texto** (9 e as cotas de 8) resetam a transformação e convertem a posição manualmente — ver § Espessura constante. Um pass declara em qual dos dois espaços trabalha; o orquestrador aplica ou reseta a transformação antes de chamá-lo, e o pass nunca gerencia transformação por conta própria.
 
 O underlay (imagem de referência) não está na lista de passes: ele usa um elemento canvas de fundo separado, sobreposto por z-index atrás do canvas principal, redesenhado apenas quando a câmera muda (ver § Orçamento de performance, regra 6). No M1 é no-op porque `doc.underlay` é sempre `null`.
+
+## DrawTarget
+
+A fronteira entre "o que os passes desenham" e "como isso vira pixel". Um pass só fala com esta interface; é ela que permite o mesmo pass produzir tela e SVG (§ Export).
+
+```ts
+interface DrawTarget {
+  clear(color: string): void
+  setWorldTransform(camera: Camera): void
+  resetTransform(): void
+  line(x1, y1, x2, y2, style: LineStyle): void
+  polyline(points: Point[], style: LineStyle): void
+  filledPolygon(points: Point[], fill: FillStyle): void
+  text(x, y, content: string, style: TextStyle): void
+  textRotated(x, y, content: string, angle: number, style: TextStyle): void
+}
+```
+
+**Esta seção é a dona da lista.** Oito primitivas, e nenhuma curva, arco, `clip` ou `pattern`.
+
+Acrescentar primitiva é decisão cara e explícita, porque ela nasce com três implementações obrigatórias — `CanvasTarget`, `RecordingTarget` (oráculo de teste, `10-testes.md` § Testes de render) e o backend SVG (§ Export) — e porque nenhuma delas pode divergir das outras sem quebrar "o SVG exportado é idêntico à tela". Toda primitiva que não entrou tem um registro de por quê:
+
+| Não entrou | Quem quis | Como foi resolvido |
+|---|---|---|
+| `clip`, `pattern` | Hachura de colisão de móvel (M3) | Segmentos paralelos recortados ao polígono de interseção, calculados no pass |
+| `arc`, `ellipse` | Glifo de mobília (M3.5) | Achatamento para polilinha no pass, via `writeArcPoints` em `core/geometry` (`adr/0006-glifos-de-mobilia.md`) |
+
+O arco de abertura de porta do pass 7 chega no M6 e pode reabrir a questão do `arc`: ele é arco em espaço de mundo com escala uniforme, que é o único caso em que a primitiva nativa entrega o que o achatamento não entrega. A decisão é daquele milestone.
 
 ## Grid adaptativo
 
@@ -118,6 +149,8 @@ Toda aresta de cômodo tem cota, desenhada por fora do polígono (usando a norma
 - Suprimida quando o comprimento em tela é menor que a largura do texto mais 8 px
 - Colisão entre cotas de arestas curtas adjacentes resolve deslocando alternadamente
 
+Parede avulsa (`01-modelo-de-dominio.md` § Wall) também tem cota, com uma diferença: não existe "fora do polígono" para ela. A cota vai à **esquerda** da direção `a → b`, que é determinística porque a ordem dos extremos é dado do documento. Uma bancada de 2,40 m sem medida na tela obrigaria a selecioná-la para saber quanto ela tem, e o produto inteiro existe para não obrigar isso.
+
 Alternável com `L`.
 
 ## Rótulo de cômodo
@@ -141,6 +174,27 @@ Cama queen
 ```
 
 Marca de orientação na face frontal: um traço de 2 px na borda oposta ao fundo. É o que permite ver de relance se o sofá está virado para a TV. A face frontal é a borda em `+depth` local; o fundo, que encosta na parede, é a borda em `−depth` (`02-unidades-e-geometria.md` § Snap a parede).
+
+A marca continua sendo desenhada em item com glifo. Um glifo pode tornar a direção óbvia — travesseiro de cama, encosto de sofá — mas nem todos tornam, e uma marca presente em 43 móveis e ausente em 12 é pior que uma marca sempre presente.
+
+### Glifo
+
+Item cujo `catalogId` resolve num glifo de `ctx.glyphs` (`06-catalogo-de-mobilia.md` § Glifos) desenha o glifo **dentro** do retângulo, por cima do preenchimento. Sem glifo — `catalogId: null`, item ausente do mapa, ou `ctx.glyphs` nulo — desenha o retângulo com rótulo e marca, exatamente como no M3.
+
+Regras de desenho:
+
+- **Só traço.** Primitivas de glifo viram `line`/`polyline` no token `furnitureGlyph`, nunca `filledPolygon`. O corpo do móvel já é o preenchimento.
+- **Caixa unitária escalada por item.** `(0,0)` é o canto traseiro esquerdo e `(1,1)` o frontal direito, escalados por `width × depth` do item no documento e rotacionados com ele.
+- **Arco vira polilinha no pass.** `writeArcPoints` (`core/geometry`) escreve no buffer pré-alocado, com um segmento a cada 15° de varredura e no mínimo quatro. Nenhuma primitiva nova entra em `DrawTarget` (§ DrawTarget, `adr/0006-glifos-de-mobilia.md`).
+- **Espessura constante em pixels**, como todo o resto deste pass.
+
+### Nível de detalhe
+
+O glifo só é desenhado quando o móvel ocupa pelo menos **24 × 24 px** de tela. Abaixo disso o desenho vira ruído — traços de menos de um pixel de separação — e o custo por móvel deixa de se justificar numa cena que pode ter dezenas deles.
+
+O limiar é independente do que suprime o rótulo ("dentro, se couber", acima): um glifo continua legível em caixa bem menor que a que comporta duas linhas de texto, e é justamente no zoom em que o rótulo já sumiu que ele mais serve.
+
+Ordem de aparecimento conforme o zoom aumenta: retângulo → retângulo + glifo → retângulo + glifo + rótulo.
 
 Faixa de circulação desenhada como retângulo expandido, preenchimento translúcido, sem contorno, com blend `multiply`.
 
@@ -168,6 +222,7 @@ const light: Theme = {
   dimensionWidth:    1,
   furnitureFill:     '#E4E9EE',
   furnitureStroke:   '#7C8894',
+  furnitureGlyph:    '#95A0AB',
   furnitureLabel:    '#4A545F',
   clearance:         '#DCE6DA',
   selection:         '#2F6FED',
@@ -176,10 +231,15 @@ const light: Theme = {
   snapNode:          '#2F6FED',
   collision:         '#D4735E',
   outsideRoom:       '#B9B4A8',
+  measure:           '#3E7D4F',
 }
 ```
 
 Paleta de papel: fundo levemente quente, paredes quase pretas, mobília em azul-cinza dessaturado. O único acento saturado é o azul de seleção e o coral das guias de snap — a planta em si é neutra para que o layout seja o que chama atenção.
+
+`furnitureGlyph` é um passo mais claro que `furnitureStroke` de propósito: o glifo é detalhe interno e não deve competir com o contorno que delimita onde o móvel de fato está.
+
+`measure` é verde porque é o único elemento da tela que não pertence ao desenho — a medição não vira entidade, não é salva, e some com `Esc` (`03-ferramentas-e-interacao.md` § Medir). Confundi-la com cota ou com guia de snap seria ler a planta errado.
 
 ### Cor de cômodo não é token de tema
 
@@ -229,3 +289,9 @@ Ambos respeitam as alternâncias de grid e cotas no momento do export, e o expor
 - [ ] Nenhuma string hexadecimal de cor existe fora de `renderer/theme.ts` e da paleta de cor de cômodo em `core` (§ Cor de cômodo não é token de tema)
 - [ ] Pass `selection` desenha handle de 8 px em nó selecionado, handle com contorno em nó sob o cursor, e aresta selecionada com espessura dobrada e rótulo de comprimento
 - [ ] Móvel fora de cômodo desenha contorno tracejado, e item `outline` desenha tracejado sem preenchimento
+- [ ] Móvel com glifo desenha o glifo acima de 24 × 24 px de tela e só o retângulo abaixo disso
+- [ ] Móvel sem glifo desenha o mesmo conjunto de primitivas do M3
+- [ ] Arco de glifo em item não quadrado produz polilinha com semieixos na proporção `width : depth`
+- [ ] `DrawTarget` tem exatamente as oito primitivas de § DrawTarget
+- [ ] Parede avulsa desenha cota do próprio comprimento
+- [ ] Medição em andamento desenha traço, extremidades e rótulo, e não sobrevive a `Esc`
