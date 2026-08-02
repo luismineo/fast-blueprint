@@ -28,16 +28,18 @@ describe('barra de ferramentas', () => {
     ])
   })
 
-  it('Parede e Medir aparecem desabilitadas', () => {
+  it('todos os cinco botões estão habilitados a partir do M3.5', () => {
     const disabled = TOOLBAR_BUTTONS.filter((button) => !button.enabled)
 
-    expect(disabled.map((button) => button.id)).toEqual(['wall', 'measure'])
+    expect(disabled).toEqual([])
   })
 
   it('o índice acompanha a ferramenta ativa', () => {
     expect(toolbarIndexOf('select')).toBe(0)
     expect(toolbarIndexOf('room')).toBe(1)
+    expect(toolbarIndexOf('wall')).toBe(2)
     expect(toolbarIndexOf('furniture')).toBe(3)
+    expect(toolbarIndexOf('measure')).toBe(4)
   })
 })
 

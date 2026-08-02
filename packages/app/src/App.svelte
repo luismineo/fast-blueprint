@@ -81,6 +81,11 @@
     type WallToolState,
     type WallHudModel,
   } from './tools/wallTool'
+  import {
+    initialMeasureState,
+    measureToolTransition,
+    type MeasureToolState,
+  } from './tools/measureTool'
   import { exactNodeAt, resolveToolSnap, wallEdges } from './tools/snapContext'
   import {
     classifyKey,
@@ -118,6 +123,7 @@
   let selectState: SelectToolState = $state.raw(initialSelectState())
   let furnitureState: FurnitureToolState = $state.raw(initialFurnitureState())
   let wallState: WallToolState = $state.raw(initialWallState())
+  let measureState: MeasureToolState = $state.raw(initialMeasureState())
   let selection: Selection = $state.raw([])
   let hover: SelectionRef | null = $state.raw(null)
   let overlays: readonly OverlayPrimitive[] = $state.raw([])
@@ -288,6 +294,26 @@
     hud = result.hud
 
     for (const command of result.commands) store.dispatch(command)
+  }
+
+  function measureContext() {
+    const world = worldAt(cursorPx)
+    const current = store.current
+    return {
+      snap: resolveToolSnap(world, {
+        doc: current,
+        draft: [],
+        scale: camera.scale,
+        shift: false,
+        alt: false,
+      }),
+    }
+  }
+
+  function dispatchMeasure(event: { type: 'pointerDown' } | { type: 'pointerUp' } | { type: 'pointerMove' } | { type: 'escape' }): void {
+    const result = measureToolTransition(measureState, event, measureContext())
+    measureState = result.state
+    overlays = result.overlays
   }
 
   /**
