@@ -45,11 +45,17 @@ type HitResult =
   | { kind: 'edge'; edge: EdgeRef }
   | { kind: 'roomInterior'; roomId: RoomId }
   | { kind: 'furniture'; furnitureId: FurnitureId }
+  | { kind: 'furnitureCorner'; furnitureId: FurnitureId; corner: number }
+  | { kind: 'furnitureRotation'; furnitureId: FurnitureId }
   | { kind: 'opening'; openingId: OpeningId }
   | null
 ```
 
-`furniture` e `opening` existem no tipo desde já para que o hit testing não precise trocar de forma em M3 e M6; até lá os dois nunca são produzidos, porque os arrays correspondentes estão vazios.
+`opening` existe no tipo desde já para que o hit testing não precise trocar de forma em M6; até lá nunca é produzido, porque o array correspondente está vazio.
+
+Os dois variantes de handle são a prioridade 1 de `02-unidades-e-geometria.md` § Hit testing — "handle de seleção ativa". Só são produzidos para móvel **selecionado e destravado**, e por isso `hitTest` recebe a seleção no contexto. São variantes irmãos, e não um `handle` aninhado, porque quem consome liga um estado da máquina a cada um: canto abre `ResizingFurniture`, rotação abre `RotatingFurniture`.
+
+`corner` é o índice do canto em `obbCorners` — os dois primeiros são a face traseira (`06-catalogo-de-mobilia.md` § Convenção de orientação). O handle de rotação fica a 24 px da face frontal.
 
 `historyBoundary` sinaliza o fim de uma interação contínua (comandos `transient: true`) para o mecanismo de entrada pendente (`08-arquitetura.md` § Histórico). Ferramentas emitem `'commit'` no `onPointerUp` que finaliza um arraste e `'abort'` no `onKey` que trata o `Esc` de cancelamento. Ausente (`undefined`) em toda transição que não conclui nem cancela uma interação transiente — inclusive em toda transição de ferramentas sem interação contínua, como a Ferramenta Cômodo no M1.
 

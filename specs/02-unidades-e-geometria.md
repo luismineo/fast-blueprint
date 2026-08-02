@@ -197,6 +197,8 @@ Ordem de prioridade quando múltiplos alvos estão sob o cursor:
 
 Tolerância para elementos lineares: 6 px. Para handles: 10 px.
 
+Handle de móvel só existe para móvel selecionado e destravado, então o resolvedor recebe a seleção junto do documento. Isso não vale para nó: um nó que só ganhasse prioridade depois de selecionado seria inalcançável, porque o clique que o selecionaria acertaria a aresta que passa por ele — nó é testado antes da aresta e independentemente da seleção. Móvel não tem esse problema, porque o corpo dele continua agarrável.
+
 Ponto-em-polígono usa ray casting com tratamento de vértice: raio horizontal para +X, aresta conta se `(y[i] > py) !== (y[j] > py)`.
 
 ## Geometria de mobília
