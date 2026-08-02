@@ -16,6 +16,7 @@
     generateFurnitureId,
     generateNodeId,
     generateRoomId,
+    generateWallId,
     hitTest,
     pruneSelection,
     resolveFurnitureSnap,
@@ -72,6 +73,14 @@
     nudgeCommands,
     rotateCommands,
   } from './tools/furnitureActions'
+  import {
+    initialWallState,
+    wallToolTransition,
+    type WallToolContext,
+    type WallToolEvent,
+    type WallToolState,
+    type WallHudModel,
+  } from './tools/wallTool'
   import { exactNodeAt, resolveToolSnap, wallEdges } from './tools/snapContext'
   import {
     classifyKey,
@@ -108,10 +117,11 @@
   let roomState: RoomToolState = $state.raw(initialRoomState())
   let selectState: SelectToolState = $state.raw(initialSelectState())
   let furnitureState: FurnitureToolState = $state.raw(initialFurnitureState())
+  let wallState: WallToolState = $state.raw(initialWallState())
   let selection: Selection = $state.raw([])
   let hover: SelectionRef | null = $state.raw(null)
   let overlays: readonly OverlayPrimitive[] = $state.raw([])
-  let hud: RoomHudModel | null = $state.raw(null)
+  let hud: RoomHudModel | WallHudModel | null = $state.raw(null)
   let naming: NamingRequest | null = $state.raw(null)
   let namingValue = $state('')
   let edgeEdit: (EditRequest & { kind: 'edgeLength' }) | null = $state.raw(null)
@@ -235,6 +245,26 @@
     }
   }
 
+  function wallContext(shift: boolean): WallToolContext {
+    const world = worldAt(cursorPx)
+    const draft = wallState.kind === 'idle' ? [] : wallState.nodes
+    const current = store.current
+    return {
+      cursor: world,
+      snap: resolveToolSnap(world, {
+        doc: current,
+        draft,
+        scale: camera.scale,
+        shift,
+        alt: false,
+      }),
+      shift,
+      nodeAt: (point) => exactNodeAt(point, { doc: current, draft }),
+      newNodeId: generateNodeId,
+      newWallId: generateWallId,
+    }
+  }
+
   function dispatchFurniture(event: FurnitureToolEvent, alt = false): void {
     const result = furnitureToolTransition(furnitureState, event, furnitureContext(alt))
     furnitureState = result.state
@@ -249,6 +279,15 @@
       selection = [{ kind: 'furniture', furnitureId: result.placed }]
       activateTool('select')
     }
+  }
+
+  function dispatchWall(event: WallToolEvent, shift = false): void {
+    const result = wallToolTransition(wallState, event, wallContext(shift))
+    wallState = result.state
+    overlays = result.overlays
+    hud = result.hud
+
+    for (const command of result.commands) store.dispatch(command)
   }
 
   /**
