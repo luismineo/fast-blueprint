@@ -3,10 +3,10 @@
 // ============================================================
 
 import {
-  closestPointOnSegment,
   distance,
   obbCorners,
   roundMm,
+  segmentDistance,
   type Point,
 } from '../geometry';
 import type { SnapEdge } from './snap';
@@ -80,12 +80,24 @@ export function resolveFurnitureSnap(
   return { placement: attachTo(best, placement.center, size.depth), edge: best };
 }
 
+/**
+ * Distância entre o retângulo do móvel e a aresta, lado a lado.
+ *
+ * Lado a lado, e não canto a canto: um móvel arrastado **por cima** da parede
+ * tem os quatro cantos longe dela e mesmo assim a toca. Sem isso, empurrar o
+ * sofá contra a parede deixava metade dele para fora, com aviso de "fora do
+ * cômodo", em vez de encostar.
+ */
 function rectangleToSegment(corners: readonly Point[], edge: SnapEdge): number {
   let closest = Infinity;
-  for (const corner of corners) {
-    const foot = closestPointOnSegment(corner, edge.a, edge.b).point;
-    closest = Math.min(closest, distance(corner, foot));
+
+  for (let i = 0; i < corners.length; i += 1) {
+    const from = corners[i]!;
+    const to = corners[(i + 1) % corners.length]!;
+    closest = Math.min(closest, segmentDistance(from, to, edge.a, edge.b));
+    if (closest === 0) return 0;
   }
+
   return closest;
 }
 

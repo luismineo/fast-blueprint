@@ -324,6 +324,40 @@ function hasSeparatingAxis(from: readonly Point[], other: readonly Point[]): boo
   return false;
 }
 
+/**
+ * Distância entre dois segmentos. Zero quando eles se cruzam ou se tocam.
+ *
+ * Medir só de ponta a segmento erra o caso em que um atravessa o outro: os
+ * extremos ficam longe e a interseção passa despercebida. É o que decide se um
+ * móvel arrastado **por cima** de uma parede encosta nela
+ * (`02-unidades-e-geometria.md` § Snap a parede).
+ */
+export function segmentDistance(a1: Point, a2: Point, b1: Point, b2: Point): number {
+  if (segmentsCross(a1, a2, b1, b2)) return 0;
+
+  return Math.min(
+    distance(a1, closestPointOnSegment(a1, b1, b2).point),
+    distance(a2, closestPointOnSegment(a2, b1, b2).point),
+    distance(b1, closestPointOnSegment(b1, a1, a2).point),
+    distance(b2, closestPointOnSegment(b2, a1, a2).point),
+  );
+}
+
+function segmentsCross(a1: Point, a2: Point, b1: Point, b2: Point): boolean {
+  const side = (p: Point, q: Point, r: Point): number =>
+    (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+
+  const d1 = side(b1, b2, a1);
+  const d2 = side(b1, b2, a2);
+  const d3 = side(a1, a2, b1);
+  const d4 = side(a1, a2, b2);
+
+  return (
+    ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+    ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))
+  );
+}
+
 export type Containment = 'inside' | 'partial' | 'outside';
 
 /**

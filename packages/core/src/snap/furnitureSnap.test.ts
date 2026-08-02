@@ -101,9 +101,10 @@ describe('snap a parede', () => {
   });
 
   it('a parede mais próxima vence', () => {
-    // Perto do canto superior esquerdo, um pouco mais perto da de cima.
+    // Perto do canto superior esquerdo, sem cruzar nenhuma parede: 80 mm da
+    // de cima e 100 mm da esquerda.
     const result = resolveFurnitureSnap(
-      { center: { x: 340, y: 320 }, rotation: 0 },
+      { center: { x: 600, y: 380 }, rotation: 0 },
       SIZE,
       ctx(),
     );
@@ -111,6 +112,34 @@ describe('snap a parede', () => {
     expect(result.edge).toEqual(WALLS[0]);
     expect(result.placement.rotation).toBe(0);
   });
+
+  /**
+   * Empurrar o móvel **por cima** da parede é o mesmo gesto de encostar. Com a
+   * distância medida canto a canto, os quatro cantos ficavam longe da aresta
+   * que atravessa o retângulo, o snap não disparava, e metade do móvel ficava
+   * para fora do cômodo com aviso.
+   */
+  it('arrastar por cima da parede encosta, em vez de atravessar', () => {
+    const result = resolveFurnitureSnap(
+      { center: { x: 1600, y: 0 }, rotation: 0 },
+      SIZE,
+      ctx(),
+    );
+
+    expect(result.edge).toEqual(WALLS[0]);
+    expect(result.placement).toEqual({ center: { x: 1600, y: 300 }, rotation: 0 });
+  })
+
+  it('atravessar de vez leva o móvel para o outro lado da parede', () => {
+    const result = resolveFurnitureSnap(
+      { center: { x: 1600, y: -100 }, rotation: 0 },
+      SIZE,
+      ctx(),
+    );
+
+    // O lado é o lado em que o centro já está: acima da parede.
+    expect(result.placement).toEqual({ center: { x: 1600, y: -300 }, rotation: 180 });
+  })
 
   it('Alt desliga', () => {
     const placement = { center: { x: 1600, y: 400 }, rotation: 45 };

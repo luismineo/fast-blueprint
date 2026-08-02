@@ -55,6 +55,43 @@ test('a taxa de ocupacao responde se a cama cabe no quarto', async ({ page }) =>
   await expect(page.getByTestId('room-occupancy')).toHaveText('39%')
 })
 
+/**
+ * O risco levantado no plano: o snap põe dois cantos exatamente sobre a
+ * aresta, e o ray casting é assimétrico na fronteira. Sem tratamento, a mesma
+ * cama encostada em cima ficaria contida e encostada embaixo acusaria "fora do
+ * cômodo".
+ *
+ * Uma página por parede: acumular móveis entre as verificações produziria
+ * aviso de colisão e esconderia o que se quer medir.
+ */
+const WALLS: [string, number, number, string][] = [
+  ['de cima', 100, 20, '0'],
+  ['de baixo', 100, 145, '180'],
+  ['da esquerda', 25, 80, '270'],
+  ['da direita', 185, 80, '90'],
+]
+
+for (const [label, dx, dy, rotation] of WALLS) {
+  test(`a cama encostada na parede ${label} fica contida, sem aviso`, async ({ page }) => {
+    await page.goto('/')
+    await expect(page.locator('canvas')).toBeVisible()
+
+    const origin = await canvasOrigin(page)
+    await drawRoom(page, origin, 0)
+
+    await page.getByTestId('catalog-search').fill('solteiro')
+    await page.getByTestId('catalog-item-bed-single').click()
+    await page.mouse.click(origin.x + dx, origin.y + dy)
+
+    // A rotação acompanha a parede: o fundo encosta nela.
+    await expect(page.getByLabel('Rotação')).toHaveValue(rotation)
+
+    await page.keyboard.press('Escape')
+    await expect(page.getByTestId('furniture-count')).toHaveText('1')
+    await expect(page.getByTestId('warnings')).toBeHidden()
+  })
+}
+
 test('Q e E giram o movel selecionado, e Ctrl+Z desfaz', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('canvas')).toBeVisible()
