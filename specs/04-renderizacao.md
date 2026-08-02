@@ -78,7 +78,7 @@ interface RenderContext {
 | 4 | `furnitureClearance` | Faixas de circulação (abaixo dos móveis) |
 | 5 | `furniture` | Retângulos de móveis, rótulos, hachura de colisão |
 | 6 | `walls` | Arestas de cômodos e paredes avulsas |
-| 7 | `openings` | Portas e janelas, com arco de abertura (no-op no M1: itera array vazio; implementação entra em M6) |
+| 7 | `openings` | Portas e janelas, com arco de abertura (no-op até M6: itera array vazio) |
 | 8 | `dimensions` | Cotas de aresta |
 | 9 | `roomLabels` | Nome e área no centroide |
 | 10 | `snapGuides` | Guias de alinhamento e eixo |
@@ -140,9 +140,15 @@ Cama queen
 158 × 198
 ```
 
-Marca de orientação na face frontal: um traço de 2 px na borda oposta ao fundo. É o que permite ver de relance se o sofá está virado para a TV.
+Marca de orientação na face frontal: um traço de 2 px na borda oposta ao fundo. É o que permite ver de relance se o sofá está virado para a TV. A face frontal é a borda em `+depth` local; o fundo, que encosta na parede, é a borda em `−depth` (`02-unidades-e-geometria.md` § Snap a parede).
 
 Faixa de circulação desenhada como retângulo expandido, preenchimento translúcido, sem contorno, com blend `multiply`.
+
+Móvel total ou parcialmente fora de qualquer cômodo troca o contorno sólido por tracejado, no token `outsideRoom`. Item com `outline` (`01-modelo-de-dominio.md` § FurnitureItem) é sempre tracejado e **sem preenchimento**: é gabarito de circulação, não massa.
+
+A região de sobreposição entre dois móveis é hachurada no token `collision`. A hachura é gerada como segmentos paralelos recortados ao polígono de interseção, e não como padrão de preenchimento: `DrawTarget` não tem `clip` nem `pattern`, e acrescentá-los obrigaria o backend SVG (§ Export) a implementar os dois para produzir o mesmo resultado.
+
+O pass desenha em espaço de **tela**: ele carrega texto, e espessura de contorno, tamanho de handle e passo de hachura são constantes em pixels (§ Espessura constante). O pass `furnitureClearance` desenha em espaço de mundo — é só preenchimento, sem texto e sem espessura.
 
 ## Tokens visuais
 
@@ -222,3 +228,4 @@ Ambos respeitam as alternâncias de grid e cotas no momento do export, e o expor
 - [ ] SVG exportado e PNG exportado da mesma cena têm geometria coincidente
 - [ ] Nenhuma string hexadecimal de cor existe fora de `renderer/theme.ts` e da paleta de cor de cômodo em `core` (§ Cor de cômodo não é token de tema)
 - [ ] Pass `selection` desenha handle de 8 px em nó selecionado, handle com contorno em nó sob o cursor, e aresta selecionada com espessura dobrada e rótulo de comprimento
+- [ ] Móvel fora de cômodo desenha contorno tracejado, e item `outline` desenha tracejado sem preenchimento

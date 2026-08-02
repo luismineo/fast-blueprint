@@ -211,6 +211,82 @@ interface BatchPayload {
 ```
 Aplica os comandos em ordem e produz **um** item de histórico — um grupo de patches por comando interno, na mesma estrutura de § Histórico. Se qualquer comando interno é rejeitado, o lote inteiro é rejeitado e o documento fica intacto.
 
+#### Comandos do M3
+
+```ts
+type Command =
+  | { type: 'AddFurniture'; transient?: boolean; payload: AddFurniturePayload }
+  | { type: 'MoveFurniture'; transient?: boolean; payload: MoveFurniturePayload }
+  | { type: 'TransformFurniture'; transient?: boolean; payload: TransformFurniturePayload }
+  | { type: 'UpdateFurniture'; transient?: boolean; payload: UpdateFurniturePayload }
+  | { type: 'DeleteFurniture'; transient?: boolean; payload: DeleteFurniturePayload }
+```
+
+**AddFurniture:**
+```ts
+interface AddFurniturePayload {
+  furnitureId?: FurnitureId   // se omitido, gerado
+  catalogId: string | null
+  name: string
+  width: Millimeters
+  depth: Millimeters
+  center: { x: Millimeters; y: Millimeters }
+  rotation: Degrees
+  clearance: Millimeters
+  color?: HexColor | null
+  locked?: boolean
+  outline?: boolean
+}
+```
+Empilha o móvel no fim de `furniture`, que é a ordem de desenho (`05-formato-de-arquivo.md` § Regras).
+
+O payload carrega as **dimensões resolvidas**, nunca só um id de catálogo: `core` não conhece o pacote `catalog`, e a direção de dependência de § Pacotes não admite que conheça. Quem insere lê o item e monta o payload. `catalogId` fica no documento como rastreabilidade (`01-modelo-de-dominio.md` § FurnitureItem) — é isso que faz "editar a dimensão do móvel inserido não altera o catálogo" (`06-catalogo-de-mobilia.md`) ser verdade por construção, e não por cuidado de quem chama.
+
+**MoveFurniture:**
+```ts
+interface MoveFurniturePayload {
+  furnitureId: FurnitureId
+  center: { x: Millimeters; y: Millimeters }
+}
+```
+Transiente durante arraste. Rejeita item `locked`.
+
+**TransformFurniture:**
+```ts
+interface TransformFurniturePayload {
+  furnitureId: FurnitureId
+  width: Millimeters
+  depth: Millimeters
+  rotation: Degrees
+  center: { x: Millimeters; y: Millimeters }
+}
+```
+Rotação e redimensionamento. Carrega `center` porque redimensionar por handle de canto mantém o canto oposto fixo, o que move o centro — separar as duas operações faria o retângulo pular a cada frame do arraste. Rejeita item `locked`, dimensão ≤ 0 (E8), rotação fora de 0–359 e qualquer valor não inteiro.
+
+**UpdateFurniture:**
+```ts
+interface UpdateFurniturePayload {
+  furnitureId: FurnitureId
+  name?: string
+  color?: HexColor | null
+  clearance?: Millimeters
+  locked?: boolean
+}
+```
+Campos não geométricos. **Não** é bloqueado por `locked`: é por aqui que se destrava.
+
+**DeleteFurniture:**
+```ts
+interface DeleteFurniturePayload {
+  furnitureId: FurnitureId
+}
+```
+Não é bloqueado por `locked`. A trava existe contra arraste acidental; excluir é ação explícita e desfazível, e uma trava que obrigasse a destravar antes de excluir só acrescentaria um passo (`03-ferramentas-e-interacao.md` § Mobília).
+
+Códigos de erro novos: `FURNITURE_NOT_FOUND`, `FURNITURE_LOCKED`, `INVALID_DIMENSION`, `INVALID_ROTATION`.
+
+Duplicar (`Ctrl/Cmd+D`) não tem comando próprio: é um `AddFurniture` com os campos do original e o centro deslocado 200 mm. Vários móveis selecionados viram um `Batch`, portanto uma entrada de histórico.
+
 #### Comandos de milestones posteriores
 
 A lista abaixo está registrada para referência de planejamento. As assinaturas serão especificadas quando o milestone for iniciado.
@@ -219,11 +295,6 @@ A lista abaixo está registrada para referência de planejamento. As assinaturas
 |---|---|---|
 | `CreateWall` | M1 | Segmento avulso (a especificar) |
 | `DeleteWall` | M1 | Remove parede avulsa (a especificar) |
-| `AddFurniture` | M3 | Insere móvel |
-| `MoveFurniture` | M3 | Move móvel |
-| `TransformFurniture` | M3 | Rotação e redimensionamento |
-| `UpdateFurniture` | M3 | Nome, cor, circulação, travar |
-| `DeleteFurniture` | M3 | Remove móvel |
 | `SetDocumentMeta` | M4 | Nome, unidade de exibição, grid |
 
 Comandos compostos (mover uma seleção com 3 móveis e 2 nós) são um `BatchCommand` que agrega comandos e produz um único item de histórico.

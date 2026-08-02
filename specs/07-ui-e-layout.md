@@ -34,7 +34,9 @@ O canvas é o produto. Todo pixel de chrome precisa se justificar. A meta é que
 
 **Barra de ferramentas** (48 px, esquerda). Cinco ícones. Nada mais. Tooltip mostra nome e atalho.
 
-**Painel direito** (264 px, recolhível com `Tab`). Duas seções empilhadas: propriedades da seleção no topo, catálogo abaixo. Quando não há seleção, propriedades mostra o resumo do documento (área útil, área total, contagem de cômodos).
+**Painel direito** (264 px, recolhível com o atalho da tabela de `03-ferramentas-e-interacao.md`, hoje `Ctrl/Cmd+B`). Duas seções empilhadas: propriedades da seleção no topo, catálogo abaixo. Quando não há seleção, propriedades mostra o resumo do documento (área útil, área total, contagem de cômodos).
+
+Uma versão anterior desta linha dizia "recolhível com `Tab`", o que contradizia a tabela unificada — que é a dona única da lista de atalhos — e colidia com `Tab` como travessia de foco (§ Acessibilidade).
 
 **Rodapé do canvas.** Escala gráfica, indicador de zoom com clique para resetar, contador de avisos com clique para listar. Sobreposto ao canvas, não ocupa layout.
 
@@ -46,6 +48,8 @@ Muda conforme a seleção.
 
 **Nada selecionado** — resumo do documento: área útil, área total, número de cômodos, número de móveis, lista de avisos ativos.
 
+A lista de avisos é a saída de `validateDocument` de nível `warning` (`01-modelo-de-dominio.md` § Invariantes), na ordem W1 a W5. `core` devolve issue estruturada com código e ids; o app mapeia o código para a mensagem, como já faz com erro de I/O (§ Erros de `core`).
+
 **Cômodo** — nome (editável), área, perímetro, número de móveis, taxa de ocupação, cor, alternância "contar na área útil", botão excluir.
 
 **Aresta** — comprimento (editável), ângulo, cômodos adjacentes.
@@ -53,6 +57,10 @@ Muda conforme a seleção.
 **Nó** — X, Y (editáveis), lista de cômodos conectados.
 
 **Móvel** — nome, largura, profundidade, rotação, circulação, cor, travar, "salvar como item do catálogo", duplicar, excluir.
+
+Largura, profundidade e circulação em centímetros; rotação em graus inteiros, 0–359. Com o móvel travado, os campos de dimensão e rotação ficam desabilitados: a trava é do comando (`08-arquitetura.md` § Comandos do M3), e um campo que aceita valor para vê-lo recusado em silêncio é pior que um campo desabilitado. Excluir continua disponível.
+
+"Salvar como item do catálogo" pergunta nome e categoria e grava no catálogo do usuário (`06-catalogo-de-mobilia.md` § Catálogo do usuário).
 
 **Múltipla seleção** — contagem por tipo, e as ações que fazem sentido para todos.
 

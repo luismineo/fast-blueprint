@@ -47,6 +47,8 @@ Consequência: uma cama tem `width` 1580 (cabeceira) e `depth` 1980 (comprimento
 
 Essa convenção é o que faz o snap a parede (`02-unidades-e-geometria.md`) funcionar sem o usuário pensar.
 
+**Esta seção é a dona da regra.** Como `depth` cresce da parede para dentro do cômodo, o fundo do móvel é a borda em `−depth` local e a frente é a borda em `+depth` — é dali que sai a face que encosta no snap a parede e a face que recebe a marca de orientação no render (`04-renderizacao.md` § Mobília). `02-unidades-e-geometria.md` cita a consequência; a convenção é definida aqui.
+
 ## Categorias
 
 `quarto`, `sala`, `cozinha`, `banheiro`, `servico`, `escritorio`, `circulacao`
@@ -152,6 +154,8 @@ Itens sem massa física, usados para verificar espaço livre.
 Renderizados apenas como contorno tracejado, sem preenchimento.
 
 `clearance-wheelchair` usa o círculo de giro de 1,50 m da NBR 9050. Colocar esse item numa planta responde de imediato se o apartamento é acessível.
+
+Item desta categoria inserido no documento nasce com `outline: true` (`01-modelo-de-dominio.md` § FurnitureItem). É esse campo, e não a categoria, que o renderer lê: `renderer` não conhece o pacote `catalog`, e a categoria não sobrevive à inserção.
 
 ## Catálogo do usuário
 

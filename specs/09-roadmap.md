@@ -55,8 +55,16 @@ Este é o momento de testar com gente de verdade. Se o fluxo de desenho não con
 - Avisos de sobreposição e de móvel fora de cômodo
 - Taxa de ocupação por cômodo
 - Salvar móvel no catálogo do usuário
+- **Barra de ferramentas** e `Ctrl/Cmd+B`, herdados do M2 (§ M2, Fora do M2). Parede e Medir entram desabilitadas
+- **Regra de lint contra literal de texto em `.svelte`**, herdada do M2
 
 **Pronto quando:** dá para responder "cabe uma cama queen com 60 cm de circulação dos dois lados no Quarto L?" em menos de um minuto.
+
+**Fora do M3, e para onde foi.** O plano aprovado (`plans/m3-mobiliar.md`) registra a lista completa. Os desvios que mudam outro milestone:
+
+- **Ferramenta Medir (`M`)** nunca foi alocada a milestone nenhum por este roadmap, e continua assim. A barra de ferramentas a mostra desabilitada, junto com Parede.
+- **Ferramenta Parede (`W`)** e `CreateWall`/`DeleteWall` seguem em aberto desde o M1, agora visíveis como botão desabilitado.
+- **Export CSV com tabela de móveis** (`05` § Export) vai com o resto do export, no M4.
 
 ## M4 — Persistir
 

@@ -107,16 +107,29 @@ interface FurnitureItem {
   width: Millimeters      // dimensão no eixo local X
   depth: Millimeters      // dimensão no eixo local Y
   center: { x: Millimeters; y: Millimeters }
-  rotation: Degrees       // 0..359, horário
+  rotation: Degrees       // 0..359, inteiro, horário
   color: HexColor | null
   locked: boolean
   clearance: Millimeters  // faixa de circulação desenhada ao redor, 0 = nenhuma
+  outline?: boolean       // desenhado só como contorno tracejado, sem massa física
 }
 ```
 
 `clearance` é o que torna o app útil de verdade: uma cama com 600 mm de folga mostra visualmente se sobra passagem.
 
 `catalogId` nulo significa móvel criado à mão. Se não nulo, é rastreabilidade — as dimensões continuam editáveis e divergem do catálogo livremente.
+
+`rotation` é **grau inteiro**. Rotação livre por handle arredonda para grau antes de virar comando, pela mesma razão que coordenada é milímetro inteiro (`02-unidades-e-geometria.md` § Unidade interna). Nenhuma medida de trena, e nenhum móvel real, distingue frações de grau.
+
+`outline` marca item **sem massa física** — os gabaritos de `circulacao` do catálogo (`06-catalogo-de-mobilia.md` § Circulação). Consequências, todas por não ser massa:
+
+- Desenhado só com contorno tracejado, sem preenchimento (`04-renderizacao.md` § Mobília).
+- Não entra na área ocupada nem na taxa de ocupação (§ Grandezas derivadas).
+- Não dispara W4 contra nenhum outro móvel: sobrepor um gabarito de giro a uma cadeira é exatamente o gesto que ele existe para permitir.
+
+O campo mora no documento, e não é derivado do `catalogId`, porque quem desenha é o `renderer`, que não conhece o pacote `catalog` — a direção de dependência de `08-arquitetura.md` não admite. Inferir pelo prefixo do id amarraria o renderer aos ids do catálogo e não valeria para item criado pelo usuário.
+
+Campo opcional: ausente significa `false`, e acrescentá-lo não sobe `schemaVersion` (`05-formato-de-arquivo.md` § Migrações).
 
 ### Underlay (v1.5)
 
@@ -187,6 +200,12 @@ W1 e W2 são avisos e não erros porque o usuário pode estar no meio de uma edi
 
 Nós órfãos (W5) são removidos por garbage collection ao salvar, nunca durante a edição.
 
+**W3 é "total ou parcialmente".** Um móvel com três cantos dentro e um fora está parcialmente fora e dispara o aviso. Acusar só o caso totalmente fora deixaria passar o caso mais comum de erro real: a cama que não cabe e invade o corredor.
+
+**W4 usa SAT, não caixa envolvente** (`02-unidades-e-geometria.md` § Geometria de mobília). Dois retângulos girados cujas caixas envolventes se cruzam sem que os retângulos se toquem são a situação normal de dois móveis em diagonal num canto; acusá-los seria aviso falso em posição correta.
+
+**A fronteira do polígono conta como dentro.** Um canto exatamente sobre uma aresta do cômodo está contido, para W3 e para a área ocupada. A regra não é cosmética: o snap a parede (`02-unidades-e-geometria.md` § Snap a parede) põe dois cantos exatamente sobre a aresta, por construção, e o ray casting de § Hit testing é assimétrico na fronteira — com o retângulo `(0,0) (3200,0) (3200,2500) (0,2500)`, o ponto `(1000, 0)` cai dentro e o ponto `(1000, 2500)` cai fora. Sem a regra, a mesma cama encostada na parede de cima ficaria contida e encostada na de baixo dispararia W3, e o app acusaria erro na posição que ele mesmo acabou de produzir.
+
 ## Grandezas derivadas
 
 Nunca armazenadas. Sempre calculadas a partir da geometria.
@@ -197,11 +216,13 @@ Nunca armazenadas. Sempre calculadas a partir da geometria.
 | Perímetro do cômodo | Soma dos comprimentos das arestas do ciclo |
 | Área útil | Soma das áreas dos cômodos com `includeInUsableArea === true` |
 | Área total | Soma das áreas de todos os cômodos |
-| Área ocupada por mobília | Soma de `width × depth` dos móveis dentro do cômodo |
+| Área ocupada por mobília | Soma de `width × depth` dos móveis **contidos** no cômodo, exceto os `outline` |
 | Taxa de ocupação | Área ocupada / área do cômodo |
 | Centroide do cômodo | Centroide do polígono, usado para posicionar o rótulo |
 
 Taxa de ocupação é o número que responde "esse quarto está lotado?". Acima de 40% um quarto fica apertado; é um sinal útil, não uma regra imposta.
+
+**Contido**, e não "que encosta": os quatro cantos dentro do polígono, com a fronteira contando como dentro (§ Invariantes). Um móvel parcialmente fora já tem aviso próprio (W3), e somar a área inteira dele faria a taxa passar de 100% sem o cômodo estar cheio. Somar só a parte de dentro exigiria recortar o retângulo contra o polígono para produzir um número que ninguém pediu.
 
 ## Critérios de aceitação
 

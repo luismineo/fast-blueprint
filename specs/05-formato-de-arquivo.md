@@ -56,10 +56,14 @@ O arquivo é legível e editável em qualquer editor de texto, e diffa bem em Gi
 ## Regras
 
 - Ids são strings opacas. Geradas como `nanoid(8)`. O leitor nunca deve inferir significado do id.
-- Ordem dos arrays é significativa apenas para `furniture` (ordem de desenho).
-- Campos com valor default podem ser omitidos na escrita. O leitor aplica defaults.
+- Ordem dos arrays é significativa apenas para `furniture` (ordem de desenho). Nenhum comando reordena esse array de passagem.
+- Campos com valor default podem ser omitidos na escrita. O leitor aplica defaults. `furniture[].outline` é um deles: ausente significa `false`.
 - Campos desconhecidos são preservados no round-trip sempre que possível, para tolerar arquivos de versões futuras.
-- Números são inteiros, exceto `rotation` (float, graus) e `underlay.opacity`/`underlay.scale`.
+- Números são inteiros, exceto `underlay.opacity` e `underlay.scale`.
+
+`rotation` é **grau inteiro**, 0–359. Uma versão anterior desta seção o dava como float, contra `01-modelo-de-dominio.md` § FurnitureItem e contra o schema Zod; a regra do domínio em inteiro (`02-unidades-e-geometria.md` § Unidade interna) vale para ângulo pelo mesmo motivo que vale para coordenada, e nenhum móvel real distingue frações de grau.
+
+Acrescentar `outline` não subiu `schemaVersion`: é campo opcional, e a regra de § Migrações é explícita — "adicionar campo opcional não sobe versão". Um arquivo escrito antes dele carrega com `outline` ausente, que é o mesmo que `false`.
 
 ## Validação
 

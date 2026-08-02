@@ -209,15 +209,25 @@ hw = width / 2, hd = depth / 2
 canto[k] = center + R · (±hw, ±hd)
 ```
 
-Colisão móvel-móvel usa SAT (separating axis theorem) sobre os 4 eixos candidatos. Só gera aviso visual, nunca bloqueia movimento.
+`rotation` é grau inteiro (`01-modelo-de-dominio.md` § FurnitureItem). O cosseno e o seno são float durante o cálculo, como qualquer ângulo; o canto resultante volta a milímetro inteiro por `Math.round`.
+
+Colisão móvel-móvel usa SAT (separating axis theorem) sobre os 4 eixos candidatos. Só gera aviso visual, nunca bloqueia movimento. Item `outline` não participa: ele não tem massa física.
 
 Contenção móvel-cômodo testa os 4 cantos com ponto-em-polígono. Todos dentro = contido; alguns = parcial; nenhum = fora.
 
+**A fronteira conta como dentro.** O ray casting de § Hit testing é assimétrico na borda — no retângulo `(0,0) (3200,0) (3200,2500) (0,2500)` o ponto `(1000, 0)` cai dentro e `(1000, 2500)` cai fora —, e o snap a parede abaixo põe dois cantos exatamente sobre a aresta. Sem tratar a fronteira, a contenção de um móvel encostado dependeria de qual parede o usuário escolheu. A justificativa completa está em `01-modelo-de-dominio.md` § Invariantes; a implementação testa "sobre a fronteira" antes de recorrer ao ray casting.
+
 ### Snap a parede
 
-Quando um móvel é arrastado a menos de 150 mm de uma aresta, ele encosta: a face traseira do móvel (borda no `+depth` local) alinha com a aresta, e a rotação se ajusta para a direção da aresta.
+Quando um móvel é arrastado a menos de 150 mm de uma aresta, ele encosta: a face traseira do móvel alinha com a aresta, e a rotação se ajusta para a direção da aresta.
 
 A face traseira é a que encosta porque é a convenção de catálogo — cama, sofá e armário têm frente e fundo, e o fundo vai na parede.
+
+**Qual borda é a traseira.** A borda em `−depth` local. `depth` cresce da parede para dentro do cômodo (`06-catalogo-de-mobilia.md` § Convenção de orientação, que é a dona desta regra): o fundo fica em `−hd`, a frente em `+hd`, e a marca de orientação do render vai na frente. Uma versão anterior deste documento dizia "borda no `+depth` local", o que contradizia a convenção do catálogo — se `+Y` entra no cômodo, a borda em `+depth` é a da frente.
+
+**Qual distância são os 150 mm.** A menor distância entre o **retângulo do móvel** e o segmento da aresta, ou seja, a mínima entre os quatro cantos e o segmento. Não é a distância do centro: essa faria o limiar depender do tamanho do móvel, e "arrastar a 100 mm de uma parede" é uma frase sobre a borda do móvel, não sobre o meio dele.
+
+**O snap a parede é exclusivo em relação às três classes**, pela mesma razão que a Classe 1 é exclusiva dentro do resolvedor: se uma aresta dispara, ela decide o centro **e** a rotação, e nem grid nem restrição de reta participam depois. Sem isso o grid arredondaria o centro e tiraria o móvel da parede em que ele acabou de encostar.
 
 `Alt` desliga.
 

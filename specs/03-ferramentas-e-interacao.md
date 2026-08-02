@@ -126,7 +126,7 @@ Dígitos (`0`–`9`) sem modificador são **reservados para entrada numérica** 
 | `Ctrl/Cmd+s` | Global | Salvar | 05 § Persistência |
 | `Ctrl/Cmd+o` | Global | Abrir | 05 § Persistência |
 | `Ctrl/Cmd+a` | Global (fora de campo de texto) | Seleciona tudo | 03 § Selecionar |
-| `Ctrl/Cmd+d` | Global (seleção contém entidades) | Duplicar seleção — **M3** | 03 § Mobília |
+| `Ctrl/Cmd+d` | Global (seleção contém mobília) | Duplica os móveis da seleção, deslocados 200 mm | 03 § Mobília |
 | `Home` | Global (regra D0: fora de campo/widget composto) | Enquadrar tudo | 03 § Câmera |
 | `Ctrl/Cmd+b` | Global | Recolher/expandir painel direito | 07 § Layout |
 | `Backspace` | Ferramenta Cômodo em Drawing, campo de comprimento vazio | Remove último segmento | 03 § Cômodo/Cancelar |
@@ -296,6 +296,7 @@ type SelectionRef =
   | { kind: 'room'; roomId: RoomId }
   | { kind: 'node'; nodeId: NodeId }
   | { kind: 'edge'; edge: EdgeRef }
+  | { kind: 'furniture'; furnitureId: FurnitureId }
 
 type Selection = readonly SelectionRef[]
 ```
@@ -308,6 +309,10 @@ histórico — vive em runes Svelte, como a câmera e a ferramenta ativa.
 Aresta é referenciada por `EdgeRef` (`01-modelo-de-dominio.md`), não por par de nós:
 `EdgeRef` é a referência que o resto do domínio já usa, e um par de nós seria ambíguo
 quando dois cômodos compartilham a mesma aresta.
+
+`furniture` está na união porque a seleção de móvel não é diferente de nenhuma outra:
+o painel de propriedades lê dela, o pass 12 desenha handles a partir dela, e `Q`, `E`,
+`Ctrl/Cmd+D` e as setas são escopados a ela (§ Mobília).
 
 Depois de um undo a seleção é podada por **melhor esforço**: refs cujos ids ainda existem
 permanecem, as demais saem (`08-arquitetura.md` § Histórico).
@@ -323,18 +328,21 @@ permanecem, as demais saem (`08-arquitetura.md` § Histórico).
 | Duplo clique no interior de um cômodo | Entra em edição de nome |
 | Duplo clique numa aresta | Abre campo de comprimento da aresta |
 | `Ctrl/Cmd + A` | Seleciona tudo |
-| `Delete` / `Backspace` | Exclui os **cômodos** da seleção |
+| `Delete` / `Backspace` | Exclui os **cômodos** e os **móveis** da seleção |
 
-**`Delete` exclui cômodo, não nó nem aresta.** A lista de comandos de
+**`Delete` exclui cômodo e móvel, não nó nem aresta.** A lista de comandos de
 `08-arquitetura.md` não tem `DeleteNode` nem `DeleteEdge`, e não é a tecla que decide
 que eles deveriam existir: apagar um nó de um ciclo fechado ou deixa o cômodo com menos
 de 3 nós (E3) ou muda a forma dele de um jeito que arrastar já resolve melhor. Nó e
-aresta selecionados ignoram a tecla.
+aresta selecionados ignoram a tecla. Móvel tem `DeleteFurniture` e é excluído — inclusive
+quando `locked`, que bloqueia mover e transformar mas não uma ação explícita e desfazível
+(§ Mobília).
 
 ### Máquina de estados
 
 ```
-Idle → (Marquee | DraggingNode | DraggingEdge | DraggingRoom) → Idle
+Idle → (Marquee | DraggingNode | DraggingEdge | DraggingRoom
+              | DraggingFurniture | ResizingFurniture | RotatingFurniture) → Idle
 ```
 
 **Idle.** Sem interação em curso. Hover atualiza `hover` a cada `pointermove`.
@@ -344,6 +352,11 @@ muda no `pointerup`, com quem estiver **completamente** envolvido.
 
 **DraggingNode / DraggingEdge / DraggingRoom.** `pointerdown` sobre nó, aresta ou
 interior de cômodo. Nada é emitido no `pointerdown`.
+
+**DraggingFurniture / ResizingFurniture / RotatingFurniture.** `pointerdown` sobre um
+móvel ou sobre um handle de móvel selecionado. Seguem exatamente a mesma tabela abaixo,
+com `MoveFurniture` e `TransformFurniture` transientes no lugar de `MoveNode`. Item
+`locked` não entra em nenhum dos três.
 
 | Gatilho | Comportamento |
 |---|---|
@@ -382,6 +395,10 @@ Default é "Mover junto". A escolha é lembrada durante a sessão.
 
 Nó selecionado: quadrado de 8 px. Nó sob o cursor: quadrado de 8 px com contorno. Aresta selecionada: espessura dobrada mais rótulo de comprimento sempre visível.
 
+Móvel selecionado: contorno na cor de seleção, um handle de canto de 8 px em cada vértice do retângulo, e um handle de rotação a 24 px da face frontal, ligado a ela por uma haste. Todos em pixels de tela, constantes com o zoom (`04-renderizacao.md` § Espessura constante). Móvel `locked` não desenha handle nenhum — não há o que agarrar.
+
+Os handles de móvel só existem enquanto ele está selecionado, e por isso ocupam a prioridade 1 do hit testing (`02-unidades-e-geometria.md` § Hit testing) sem o problema que o nó tem: um nó que só ganhasse prioridade depois de selecionado seria inalcançável, porque o clique que o selecionaria acertaria a aresta; o corpo do móvel continua agarrável de qualquer jeito.
+
 ## Ferramenta Mobília (`F`)
 
 ### Inserir
@@ -393,7 +410,21 @@ Duas formas:
 
 Item inserido nasce selecionado, com snap a parede ativo.
 
+```
+Idle → Armed → (posiciona) → Idle, na Ferramenta Selecionar
+```
+
+**Idle.** `F` sem item escolhido. O painel de catálogo é o próximo passo, e o HUD do canvas fica vazio.
+
+**Armed.** Um item do catálogo está escolhido. O cursor arrasta um fantasma do retângulo, com snap a parede resolvido a cada `pointermove`. `Esc` volta para Idle sem inserir.
+
+**Ao posicionar**, emite `AddFurniture` e **a ferramenta ativa volta para Selecionar**, com o item selecionado. É o que faz a próxima ação do usuário — arrastar, girar, redimensionar — funcionar sem trocar de ferramenta, e é o estado que a própria escopagem de `Q`/`E` à seleção antecipa (§ Manipular). Inserir vários itens em sequência se faz arrastando do painel, que não passa por ferramenta nenhuma.
+
 ### Manipular
+
+**Manipulação de móvel vive na Ferramenta Selecionar**, não aqui. A Ferramenta Mobília só insere.
+
+A separação não é arbitrária: a rotação por teclado já é escopada à seleção e não à ferramenta (nota ao fim desta seção), e o estado logo depois de inserir é "móvel selecionado, Ferramenta Selecionar ativa". Duas implementações de arraste de móvel — uma em cada ferramenta — seriam duas chances de divergir no snap a parede, no limiar de arraste e na fronteira de histórico.
 
 | Ação | Resultado |
 |---|---|
@@ -409,15 +440,21 @@ Item inserido nasce selecionado, com snap a parede ativo.
 
 Rotação por teclado (`Q`/`E`) é escopada à seleção, não à ferramenta ativa. Se a seleção contém mobília, `Q` e `E` rotacionam — funciona tanto na Ferramenta Selecionar quanto na Ferramenta Mobília, cobrindo o estado mais comum (mobília inserida, ferramenta voltou para Selecionar).
 
+Item `locked` ignora arraste, handle, setas e rotação. A recusa é do **comando**, não da ferramenta (`08-arquitetura.md` § Comandos do M3): o painel de propriedades é outro caminho até o mesmo estado, e uma trava que só vale no canvas não é trava.
+
+`Ctrl/Cmd+D` duplica só móveis. Não existe comando de duplicação de cômodo em `08-arquitetura.md`, e o único caso de uso que esta spec descreve é mobília.
+
 Dimensões exatas se editam no painel de propriedades, em centímetros.
 
 ### Feedback visual
 
-- Móvel fora de qualquer cômodo: contorno tracejado
+- Móvel total ou parcialmente fora de qualquer cômodo: contorno tracejado
 - Móvel sobrepondo outro móvel: preenchimento hachurado na região de sobreposição
 - Faixa de circulação (`clearance`): preenchimento translúcido ao redor, sem contorno
 
 Nenhum desses estados bloqueia a ação. São informação, não restrição.
+
+Item `outline` (gabarito de circulação, `01-modelo-de-dominio.md` § FurnitureItem) é sempre tracejado e sem preenchimento, e nunca hachura: sobrepor um gabarito de giro de cadeira de rodas a uma cadeira é o gesto que ele existe para permitir.
 
 ## Ferramenta Medir (`M`)
 
@@ -453,6 +490,9 @@ Zoom e pan nunca entram no histórico de undo.
 - [ ] `pointerdown` seguido de `pointerup` sem movimento não abre entrada pendente nem empilha histórico
 - [ ] `Delete` com nó ou aresta selecionada não altera o documento; com cômodo selecionado, exclui
 - [ ] Móvel arrastado a 100 mm de uma parede encosta e alinha rotação; a 200 mm, não
+- [ ] Posicionar um item com `F` devolve a ferramenta ativa para Selecionar, com o item selecionado
+- [ ] Móvel `locked` ignora arraste, handle e setas, e o comando correspondente é rejeitado sem tocar no documento
+- [ ] `Ctrl/Cmd+D` duplica os móveis da seleção deslocados 200 mm, e não duplica cômodo
 - [ ] `Alt` durante qualquer arraste desativa todos os snaps
 - [ ] Zoom no cursor mantém a coordenada de mundo sob o cursor invariante dentro de 1 px
 - [ ] Nenhuma ferramenta acessa o objeto documento fora de `ToolContext`
