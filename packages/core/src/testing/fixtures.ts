@@ -164,11 +164,15 @@ export function buildFurnished(): PlanDocument {
 
   for (let index = 0; index < 40; index += 1) {
     const size = sizes[index % sizes.length]!;
+    const catalogId =
+      size.name === 'Cama queen' && index === 0 ? 'cama-queen' :
+      size.name === 'Criado-mudo' && index === 1 ? 'criado-mudo' :
+      null;
     doc = applyCommand(doc, {
       type: 'AddFurniture',
       payload: {
         furnitureId: `f_fx${index + 1}` as FurnitureId,
-        catalogId: null,
+        catalogId,
         name: size.name,
         width: size.width,
         depth: size.depth,
@@ -181,6 +185,18 @@ export function buildFurnished(): PlanDocument {
       },
     }).document;
   }
+
+  // Duas paredes avulsas: bancada da cozinha e divisória
+  doc = applyCommand(doc, {
+    type: 'CreateWall',
+    payload: {
+      nodes: [],
+      segments: [
+        { a: 'n_fx3' as NodeId, b: 'n_fx4' as NodeId, wallId: 'w_bancada_cozinha' as unknown as never },
+        { a: 'n_fx6' as NodeId, b: 'n_fx21' as NodeId, wallId: 'w_divisoria' as unknown as never },
+      ],
+    },
+  }).document;
 
   return withFixtureMeta(doc, 'Apartamento mobiliado');
 }
