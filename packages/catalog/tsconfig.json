@@ -4,7 +4,12 @@
     "composite": true,
     "declaration": true,
     "outDir": "dist",
-    "rootDir": "src"
+    // O catálogo default é JSON em `data/`, fora de `src/`, porque é onde a
+    // spec 06 § Estrutura o coloca. Com `rootDir: "src"` o import dele não
+    // compila.
+    "rootDir": "."
   },
-  "include": ["src"]
+  // O glob de `data` precisa da extensão: a expansão de diretório do
+  // TypeScript não recolhe `.json` sozinha, nem com `resolveJsonModule`.
+  "include": ["src", "data/**/*.json"]
 }
