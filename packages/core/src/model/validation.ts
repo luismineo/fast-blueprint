@@ -2,7 +2,14 @@
 // Validação de invariantes — spec 01 § Invariantes
 // ============================================================
 
-import type { PlanDocument, FurnitureItem, EdgeRef, NodeId } from './types';
+import type { PlanDocument, EdgeRef, NodeId } from './types';
+import {
+  containment,
+  obbCorners,
+  pointInPolygon,
+  satOverlap,
+  type Point,
+} from '../geometry';
 
 export type ValidationLevel = 'error' | 'warning';
 
@@ -321,36 +328,55 @@ function checkW2(doc: PlanDocument, _issues: ValidationIssue[]): void {
   }
 }
 
-function checkW3(doc: PlanDocument, _issues: ValidationIssue[]): void {
-  // W3: Móvel está total ou parcialmente fora de qualquer cômodo
+/**
+ * W3: móvel total **ou parcialmente** fora de qualquer cômodo.
+ *
+ * Contido é contido num cômodo só: um móvel com dois cantos num quarto e dois
+ * no corredor está parcialmente fora dos dois, e é justamente o erro que o
+ * aviso existe para pegar.
+ */
+function checkW3(doc: PlanDocument, issues: ValidationIssue[]): void {
+  if (doc.rooms.length === 0) return;
+
   for (const item of doc.furniture) {
-    const corners = getFurnitureCorners(item);
-    const allOutside = doc.rooms.every((room) => {
-      const roomPoints = resolveLoop(doc, room.loop);
-      if (!roomPoints) return true;
-      return corners.every((c) => !pointInPolygon(c, roomPoints));
+    const corners = obbCorners(item.center, item.width, item.depth, item.rotation);
+    const contained = doc.rooms.some((room) => {
+      const points = resolveLoop(doc, room.loop);
+      return points !== null && containment(corners, points) === 'inside';
     });
-    if (allOutside && doc.rooms.length > 0) {
-      _issues.push({
+
+    if (!contained) {
+      issues.push({
         code: 'W3',
         level: 'warning',
-        message: `Móvel ${item.name} (${item.id}) está fora de todos os cômodos`,
+        message: `Móvel ${item.name} (${item.id}) está total ou parcialmente fora dos cômodos`,
         ids: [item.id],
       });
     }
   }
 }
 
-function checkW4(doc: PlanDocument, _issues: ValidationIssue[]): void {
-  // W4: Móvel colide com outro móvel
-  for (let i = 0; i < doc.furniture.length; i++) {
-    for (let j = i + 1; j < doc.furniture.length; j++) {
-      if (furnitureOverlap(doc.furniture[i]!, doc.furniture[j]!)) {
-        _issues.push({
+/**
+ * W4: móvel colide com outro móvel, por SAT (`02-unidades-e-geometria.md`
+ * § Geometria de mobília).
+ *
+ * Item `outline` não participa: sobrepor um gabarito de giro de cadeira de
+ * rodas a uma cadeira é o gesto que ele existe para permitir.
+ */
+function checkW4(doc: PlanDocument, issues: ValidationIssue[]): void {
+  const solid = doc.furniture.filter((item) => item.outline !== true);
+  const corners = solid.map((item) =>
+    obbCorners(item.center, item.width, item.depth, item.rotation),
+  );
+
+  for (let i = 0; i < solid.length; i++) {
+    for (let j = i + 1; j < solid.length; j++) {
+      if (satOverlap(corners[i]!, corners[j]!)) {
+        issues.push({
           code: 'W4',
           level: 'warning',
-          message: `Móveis ${doc.furniture[i]!.name} e ${doc.furniture[j]!.name} colidem`,
-          ids: [doc.furniture[i]!.id, doc.furniture[j]!.id],
+          message: `Móveis ${solid[i]!.name} e ${solid[j]!.name} colidem`,
+          ids: [solid[i]!.id, solid[j]!.id],
         });
       }
     }
@@ -382,41 +408,22 @@ function checkW5(doc: PlanDocument, _issues: ValidationIssue[]): void {
 }
 
 // ============================================================
-// Helpers de geometria (locais, duplicados de core/geometry
-// para evitar dependência circular)
+// Helpers locais
+//
+// A geometria vem de `core/geometry`, que não importa `model` — a direção
+// é de mão única e não há ciclo. O que sobra aqui é resolução de referência
+// e a interseção de segmentos que só W1 e W2 usam.
 // ============================================================
 
-function resolveLoop(
-  doc: PlanDocument,
-  loop: string[],
-): { x: number; y: number }[] | null {
+function resolveLoop(doc: PlanDocument, loop: string[]): Point[] | null {
   const nodeMap = new Map(doc.nodes.map((n) => [n.id, n]));
-  const result: { x: number; y: number }[] = [];
+  const result: Point[] = [];
   for (const id of loop) {
     const n = nodeMap.get(id as unknown as NodeId);
     if (!n) return null;
     result.push({ x: n.x, y: n.y });
   }
   return result;
-}
-
-function pointInPolygon(
-  p: { x: number; y: number },
-  poly: { x: number; y: number }[],
-): boolean {
-  let inside = false;
-  const n = poly.length;
-  for (let i = 0, j = n - 1; i < n; j = i++) {
-    const xi = poly[i]!.x;
-    const yi = poly[i]!.y;
-    const xj = poly[j]!.x;
-    const yj = poly[j]!.y;
-
-    if (yi > p.y !== yj > p.y && p.x < ((xj - xi) * (p.y - yi)) / (yj - yi) + xi) {
-      inside = !inside;
-    }
-  }
-  return inside;
 }
 
 function isSelfIntersecting(points: { x: number; y: number }[]): boolean {
@@ -488,46 +495,6 @@ function polygonsOverlap(
     }
   }
   return false;
-}
-
-function getFurnitureCorners(item: FurnitureItem): { x: number; y: number }[] {
-  const hw = item.width / 2;
-  const hd = item.depth / 2;
-  const angle = (item.rotation * Math.PI) / 180;
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
-  const cx = item.center.x;
-  const cy = item.center.y;
-
-  const localCorners = [
-    { x: -hw, y: -hd },
-    { x: hw, y: -hd },
-    { x: hw, y: hd },
-    { x: -hw, y: hd },
-  ];
-
-  return localCorners.map((c) => ({
-    x: cx + c.x * cos - c.y * sin,
-    y: cy + c.x * sin + c.y * cos,
-  }));
-}
-
-function furnitureOverlap(a: FurnitureItem, b: FurnitureItem): boolean {
-  // Simplificação: bounding-box overlap
-  const ca = getFurnitureCorners(a);
-  const cb = getFurnitureCorners(b);
-
-  const aMinX = Math.min(...ca.map((c) => c.x));
-  const aMaxX = Math.max(...ca.map((c) => c.x));
-  const aMinY = Math.min(...ca.map((c) => c.y));
-  const aMaxY = Math.max(...ca.map((c) => c.y));
-
-  const bMinX = Math.min(...cb.map((c) => c.x));
-  const bMaxX = Math.max(...cb.map((c) => c.x));
-  const bMinY = Math.min(...cb.map((c) => c.y));
-  const bMaxY = Math.max(...cb.map((c) => c.y));
-
-  return aMinX < bMaxX && aMaxX > bMinX && aMinY < bMaxY && aMaxY > bMinY;
 }
 
 function getEdgeLength(

@@ -60,16 +60,16 @@ export default tseslint.config(
         {
           selector: 'Literal[value=/^#[0-9a-fA-F]{3,8}$/]',
           message:
-            'Cor hexadecimal fora de renderer/theme.ts e core/model/roomPalette.ts. Ver CLAUDE.md § Convenções de código.',
+            'Cor hexadecimal fora de renderer/theme.ts e core/model/palette.ts. Ver CLAUDE.md § Convenções de código.',
         },
       ],
     },
   },
   {
-    // theme.ts é dono dos tokens de apresentação; roomPalette.ts é dono da cor
-    // de cômodo, que é dado de documento e vai para o arquivo salvo
-    // (specs/04-renderizacao.md § Cor de cômodo não é token de tema).
-    files: ['packages/renderer/src/theme.ts', 'packages/core/src/model/roomPalette.ts'],
+    // theme.ts é dono dos tokens de apresentação; palette.ts é dono da cor
+    // de cômodo e de móvel, que é dado de documento e vai para o arquivo
+    // salvo (specs/04-renderizacao.md § Cor de cômodo não é token de tema).
+    files: ['packages/renderer/src/theme.ts', 'packages/core/src/model/palette.ts'],
     rules: {
       'no-restricted-syntax': 'off',
     },

@@ -12,7 +12,7 @@
   } from '@planta/renderer'
   import {
     DocumentStore,
-    ROOM_COLORS,
+    DOCUMENT_COLORS,
     generateNodeId,
     generateRoomId,
     hitTest,
@@ -279,7 +279,7 @@
     const roomId = selectedRoomId()
     if (!roomId) return
 
-    const color = index === null ? null : (ROOM_COLORS[index] ?? null)
+    const color = index === null ? null : (DOCUMENT_COLORS[index] ?? null)
     store.dispatch({ type: 'SetRoomColor', payload: { roomId, color } })
   }
 

@@ -10,15 +10,22 @@ import type {
   Node,
   Room,
   EdgeRef,
+  FurnitureItem,
   HexColor,
 } from '../model';
 import {
   generateNodeId,
   generateRoomId,
   generateDefaultRoomName,
-  isRoomColor,
+  isDocumentColor,
 } from '../model';
-import { isClockwise, polygonArea } from '../geometry';
+import {
+  containment,
+  isClockwise,
+  obbCorners,
+  polygonArea,
+  type Point,
+} from '../geometry';
 
 // Habilita suporte a patches no Immer (precisa ser chamado uma vez)
 enablePatches();
@@ -517,7 +524,7 @@ function applySetRoomColor(
   if (!room) {
     return rejected(doc, label, { code: 'ROOM_NOT_FOUND', ids: [payload.roomId] });
   }
-  if (payload.color !== null && !isRoomColor(payload.color)) {
+  if (payload.color !== null && !isDocumentColor(payload.color)) {
     return rejected(doc, label, { code: 'UNKNOWN_COLOR', ids: [payload.roomId] });
   }
 
@@ -862,4 +869,52 @@ export function computeUsableArea(doc: PlanDocument): number {
     }
   }
   return total;
+}
+
+/** Móveis contidos num cômodo, excluídos os gabaritos de circulação. */
+export function furnitureInRoom(doc: PlanDocument, roomId: RoomId): FurnitureItem[] {
+  const points = roomPolygon(doc, roomId);
+  if (!points) return [];
+
+  return doc.furniture.filter((item) => {
+    if (item.outline === true) return false;
+    const corners = obbCorners(item.center, item.width, item.depth, item.rotation);
+    return containment(corners, points) === 'inside';
+  });
+}
+
+/**
+ * Área ocupada por mobília num cômodo, em mm²
+ * (`01-modelo-de-dominio.md` § Grandezas derivadas).
+ *
+ * Soma `width × depth` dos móveis **contidos**. Um móvel parcialmente fora já
+ * tem aviso próprio (W3), e somar a área inteira dele faria a taxa passar de
+ * 100% sem o cômodo estar cheio.
+ */
+export function computeFurnitureArea(doc: PlanDocument, roomId: RoomId): number {
+  let total = 0;
+  for (const item of furnitureInRoom(doc, roomId)) {
+    total += item.width * item.depth;
+  }
+  return total;
+}
+
+/** Área ocupada dividida pela área do cômodo. Zero quando o cômodo não resolve. */
+export function computeOccupancy(doc: PlanDocument, roomId: RoomId): number {
+  const area = computeRoomArea(doc, roomId);
+  if (area === 0) return 0;
+  return computeFurnitureArea(doc, roomId) / area;
+}
+
+function roomPolygon(doc: PlanDocument, roomId: RoomId): Point[] | null {
+  const room = doc.rooms.find((candidate) => candidate.id === roomId);
+  if (!room) return null;
+
+  const points: Point[] = [];
+  for (const nodeId of room.loop) {
+    const node = doc.nodes.find((candidate) => candidate.id === nodeId);
+    if (!node) return null;
+    points.push({ x: node.x, y: node.y });
+  }
+  return points;
 }

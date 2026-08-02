@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  ROOM_COLORS,
+  DOCUMENT_COLORS,
   applyCommand,
   createEmptyDocument,
   type NodeId,
@@ -81,7 +81,7 @@ describe('describeSelection', () => {
   it('cômodo com cor da paleta reporta o índice dela', () => {
     const colored = applyCommand(twoAdjacentRooms(), {
       type: 'SetRoomColor',
-      payload: { roomId: LEFT, color: ROOM_COLORS[2]! },
+      payload: { roomId: LEFT, color: DOCUMENT_COLORS[2]! },
     }).document
 
     const model = describeSelection(colored, [{ kind: 'room', roomId: LEFT }])

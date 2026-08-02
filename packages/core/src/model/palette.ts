@@ -1,7 +1,7 @@
 import type { HexColor } from './types';
 
 /**
- * Cores oferecidas para preenchimento de cômodo.
+ * Cores oferecidas para preenchimento de cômodo e de móvel.
  *
  * Isto é **dado de documento**, não token de tema: o usuário escolhe, o valor
  * é serializado no arquivo, e trocar o tema não o altera
@@ -11,7 +11,7 @@ import type { HexColor } from './types';
  * Dessaturadas de propósito: o preenchimento é fundo de uma planta que precisa
  * continuar legível sob cotas, rótulos e mobília.
  */
-export const ROOM_COLORS: readonly HexColor[] = [
+export const DOCUMENT_COLORS: readonly HexColor[] = [
   '#EDE7DC',
   '#E3E9E1',
   '#DDE5EC',
@@ -22,6 +22,6 @@ export const ROOM_COLORS: readonly HexColor[] = [
   '#E6E4E0',
 ] as unknown as readonly HexColor[];
 
-export function isRoomColor(value: string): value is HexColor {
-  return (ROOM_COLORS as readonly string[]).includes(value);
+export function isDocumentColor(value: string): value is HexColor {
+  return (DOCUMENT_COLORS as readonly string[]).includes(value);
 }

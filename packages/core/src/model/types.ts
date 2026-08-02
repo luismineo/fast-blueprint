@@ -79,6 +79,13 @@ export interface FurnitureItem {
   color: HexColor | null;
   locked: boolean;
   clearance: Millimeters;
+  /**
+   * Item sem massa física — os gabaritos de circulação do catálogo.
+   *
+   * Desenhado só com contorno tracejado, não entra na taxa de ocupação e não
+   * dispara W4 (`01-modelo-de-dominio.md` § FurnitureItem). Ausente é `false`.
+   */
+  outline?: boolean;
 }
 
 export interface Underlay {

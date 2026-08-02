@@ -64,6 +64,9 @@ export const furnitureItemSchema = z.object({
   color: hexColorSchema.nullable(),
   locked: z.boolean(),
   clearance: z.number().int().min(0),
+  // Opcional, e ausente significa false: acrescentá-lo não subiu
+  // schemaVersion (`05-formato-de-arquivo.md` § Migrações).
+  outline: z.boolean().optional(),
 });
 
 export const underlaySchema = z.object({

@@ -1,5 +1,5 @@
 import {
-  ROOM_COLORS,
+  DOCUMENT_COLORS,
   computeRoomArea,
   computeUsableArea,
   edgePoints,
@@ -95,7 +95,7 @@ function roomModel(doc: PlanDocument, ref: SelectionRef & { kind: 'room' }): Pan
     perimeter += Math.hypot(to.x - from.x, to.y - from.y)
   }
 
-  const colorIndex = room.color === null ? null : ROOM_COLORS.indexOf(room.color)
+  const colorIndex = room.color === null ? null : DOCUMENT_COLORS.indexOf(room.color)
 
   return {
     kind: 'room',
@@ -103,7 +103,7 @@ function roomModel(doc: PlanDocument, ref: SelectionRef & { kind: 'room' }): Pan
     area: formatArea(computeRoomArea(doc, room.id)),
     perimeter: formatLength(perimeter, 'm'),
     colorIndex: colorIndex === -1 ? null : colorIndex,
-    palette: ROOM_COLORS,
+    palette: DOCUMENT_COLORS,
     includeInUsableArea: room.includeInUsableArea,
   }
 }
