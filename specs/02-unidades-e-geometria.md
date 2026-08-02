@@ -123,7 +123,7 @@ Produz um ponto exato. **Exclusiva:** se qualquer âncora disparar, a mais próx
 
 `merged` é preenchido apenas quando a âncora vencedora foi um nó. Ponto médio preenche `targets` mas deixa `merged = null`.
 
-Tolerância: 12 px de tela, limitada a [2, 30] mm.
+Tolerância: 12 px de tela, limitada a [2, 200] mm (`adr/0005-tolerancias-de-snap.md`).
 
 #### Classe 2 — Restrição de reta
 
@@ -146,7 +146,7 @@ Prioridade entre restrições (maior para menor):
 
 Ângulo entre retas < 15° descarta a de menor prioridade (evita instabilidade numérica). Se a interseção cair fora da tolerância de 40 mm do cursor, projeta sobre a restrição de maior prioridade.
 
-Tolerância: 8 px de tela, limitada a [2, 40] mm.
+Tolerância: 8 px de tela, limitada a [2, 250] mm (`adr/0005-tolerancias-de-snap.md`).
 
 **Fronteira aresta/extensão:** pé da projeção estritamente entre os extremos do segmento é aresta; fora, é extensão. Extensão avalia todas as arestas do documento — com ~30 arestas típicas, projeção ponto-reta é O(arestas) e cabe no orçamento de 8 ms.
 
@@ -160,7 +160,7 @@ Fallback. Só se **nenhuma** restrição de reta disparou, e só se o grid está
 
 Arredonda cada coordenada para o múltiplo mais próximo de `meta.gridSize`.
 
-Tolerância: 6 px de tela, limitada a [1, gridSize/2] mm. Distância > gridSize/2 → grid não dispara.
+Tolerância: 6 px de tela, limitada a [1, min(300, gridSize/2)] mm. Distância > gridSize/2 → grid não dispara. Com o `gridSize` default de 100 mm, quem manda é a metade da célula (`adr/0005-tolerancias-de-snap.md`).
 
 ### Modificadores
 
@@ -169,7 +169,7 @@ Tolerância: 6 px de tela, limitada a [1, gridSize/2] mm. Distância > gridSize/
 | `Shift` | Inclui múltiplos de 45° nos eixos da Classe 2 |
 | `Alt` | Desliga as três classes; resolvedor devolve o ponto de entrada sem alteração |
 
-Todos os valores de tolerância vivem em `SnapConfig`, exposta nas preferências. Os limites em mm são ponto de partida a validar no protótipo com a fixture `apto-44m2`.
+Todos os valores de tolerância vivem em `SnapConfig`, exposta nas preferências. Os limites em mm foram validados no M2 dirigindo o aplicativo; a medição e o raciocínio estão em `adr/0005-tolerancias-de-snap.md`.
 
 ### Guias visuais
 
@@ -237,6 +237,7 @@ A mensagem é informativa, sem limiar de recusa, sem algoritmo de ajuste, sem n�
 - [ ] Ponto médio de aresta preenche `targets` mas deixa `merged = null`
 - [ ] Duas restrições de reta com ângulo < 15° descartam a de menor prioridade
 - [ ] Tolerância de snap respeita clamping em mm, independente da escala da câmera
+- [ ] Em escala 0,06 px/mm, clique a 10 px de um nó existente dispara a âncora de nó; em 0,01 px/mm, clique a 500 mm não dispara (`adr/0005-tolerancias-de-snap.md`)
 - [ ] `Alt` pressionado faz o resolvedor devolver o ponto de entrada sem alteração
 - [ ] SAT detecta sobreposição entre dois retângulos rotacionados 30° e 60° com centros a 400 mm
 - [ ] Property test: para qualquer polígono simples gerado, área calculada por shoelace é igual à soma das áreas dos triângulos da sua triangulação por fan
