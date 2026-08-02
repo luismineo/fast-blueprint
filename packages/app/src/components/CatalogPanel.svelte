@@ -1,0 +1,198 @@
+<script lang="ts">
+  import type { CatalogItem } from '@planta/catalog'
+  import { messages } from '../messages'
+  import { describeCatalog, type CatalogEntry } from './catalogModel'
+
+  interface Props {
+    items: readonly CatalogItem[]
+    recentIds: readonly string[]
+    onChoose: (entry: CatalogEntry) => void
+    onDragStart: (entry: CatalogEntry) => void
+  }
+
+  const { items, recentIds, onChoose, onDragStart }: Props = $props()
+
+  let query = $state('')
+
+  const model = $derived(describeCatalog(items, query, recentIds))
+</script>
+
+<section class="catalog" aria-label={messages.catalogTitle}>
+  <h2 class="catalog-title">{messages.catalogTitle}</h2>
+
+  <input
+    class="search"
+    type="search"
+    autocomplete="off"
+    aria-label={messages.catalogSearchLabel}
+    placeholder={messages.catalogSearchPlaceholder}
+    data-testid="catalog-search"
+    bind:value={query}
+  />
+
+  {#if model.empty}
+    <p class="empty">{messages.catalogNoResults}</p>
+  {/if}
+
+  {#if model.recent.length > 0}
+    <details class="group" open>
+      <summary>{messages.catalogRecent}</summary>
+      <ul class="items">
+        {#each model.recent as entry (entry.id)}
+          <li>
+            <button
+              type="button"
+              class="item"
+              draggable="true"
+              data-testid="catalog-item-{entry.id}"
+              onclick={() => onChoose(entry)}
+              ondragstart={() => onDragStart(entry)}
+            >
+              <span
+                class="thumb"
+                style="width: {entry.thumbnail.width}px; height: {entry.thumbnail.height}px;"
+              ></span>
+              <span class="item-name">{entry.name}</span>
+              <span class="item-size">{entry.dimensions} {messages.unitCm}</span>
+            </button>
+          </li>
+        {/each}
+      </ul>
+    </details>
+  {/if}
+
+  {#each model.groups as group (group.category)}
+    <details class="group" open={model.searching}>
+      <summary>{messages.catalogCategory[group.category]}</summary>
+      <ul class="items">
+        {#each group.items as entry (entry.id)}
+          <li>
+            <button
+              type="button"
+              class="item"
+              draggable="true"
+              data-testid="catalog-item-{entry.id}"
+              onclick={() => onChoose(entry)}
+              ondragstart={() => onDragStart(entry)}
+            >
+              <span
+                class="thumb"
+                style="width: {entry.thumbnail.width}px; height: {entry.thumbnail.height}px;"
+              ></span>
+              <span class="item-name">{entry.name}</span>
+              <span class="item-size">{entry.dimensions} {messages.unitCm}</span>
+            </button>
+          </li>
+        {/each}
+      </ul>
+    </details>
+  {/each}
+</section>
+
+<style>
+  .catalog {
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+    margin-top: 12px;
+  }
+
+  .catalog-title {
+    margin: 0 0 8px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+  }
+
+  .search {
+    width: 100%;
+    padding: 4px 6px;
+    box-sizing: border-box;
+    margin-bottom: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-field);
+    background: var(--surface-raised);
+    font: inherit;
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  .search:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -1px;
+  }
+
+  .group {
+    margin-bottom: 4px;
+  }
+
+  .group summary {
+    cursor: pointer;
+    padding: 2px 0;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .group summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  .items {
+    list-style: none;
+    margin: 2px 0 0;
+    padding: 0;
+  }
+
+  .item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 3px 4px;
+    border: none;
+    border-radius: var(--radius-field);
+    background: transparent;
+    font: inherit;
+    font-size: 12px;
+    color: var(--text);
+    text-align: left;
+    cursor: grab;
+  }
+
+  .item:hover {
+    background: var(--surface-raised);
+  }
+
+  .item:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -1px;
+  }
+
+  .thumb {
+    flex: none;
+    display: block;
+    border: 1px solid var(--text-muted);
+    background: var(--surface-raised);
+  }
+
+  .item-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .item-size {
+    flex: none;
+    font-family: 'IBM Plex Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .empty {
+    margin: 8px 0;
+    color: var(--text-muted);
+  }
+</style>

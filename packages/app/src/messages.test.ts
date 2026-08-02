@@ -31,6 +31,33 @@ function definedKeys(value: unknown, prefix = ''): string[] {
   return keys
 }
 
+/** Caminhos que levam a uma tabela, não a um texto: `catalogCategory`. */
+function definedTables(value: unknown, prefix = ''): string[] {
+  if (typeof value !== 'object' || value === null) return []
+
+  const tables = prefix === '' ? [] : [prefix]
+  for (const [name, nested] of Object.entries(value)) {
+    tables.push(...definedTables(nested, prefix === '' ? name : `${prefix}.${name}`))
+  }
+  return tables
+}
+
+/**
+ * Uma tabela consultada por índice — `messages.catalogCategory[category]` — usa
+ * todas as entradas dela, mas aparece na varredura só pelo nome da tabela.
+ *
+ * É a forma que a própria spec 07 § Convenção de nomeação prescreve para erro
+ * de I/O (`messages.ioErrors[code]`), então tratá-la como chave órfã acusaria
+ * exatamente o padrão recomendado.
+ */
+function coveredByTable(key: string, referenced: ReadonlySet<string>): boolean {
+  const parts = key.split('.')
+  for (let i = 1; i < parts.length; i += 1) {
+    if (referenced.has(parts.slice(0, i).join('.'))) return true
+  }
+  return false
+}
+
 function referencedKeys(): Set<string> {
   const pattern = /\bmessages\.([A-Za-z0-9_.]+)/g
   const found = new Set<string>()
@@ -54,16 +81,27 @@ function referencedKeys(): Set<string> {
 describe('messages.ts', () => {
   it('toda chave definida é referenciada por algum arquivo de origem', () => {
     const referenced = referencedKeys()
-    const unused = definedKeys(messages).filter((key) => !referenced.has(key))
+    const unused = definedKeys(messages).filter(
+      (key) => !referenced.has(key) && !coveredByTable(key, referenced),
+    )
 
     expect(unused).toEqual([])
   })
 
   it('toda chave referenciada existe em messages.ts', () => {
-    const defined = new Set(definedKeys(messages))
+    const defined = new Set([...definedKeys(messages), ...definedTables(messages)])
     const missing = [...referencedKeys()].filter((key) => !defined.has(key))
 
     expect(missing).toEqual([])
+  })
+
+  it('tabela consultada por índice conta como uso de todas as entradas', () => {
+    const referenced = referencedKeys()
+
+    expect(referenced.has('catalogCategory')).toBe(true)
+    expect(referenced.has('catalogCategory.quarto')).toBe(false)
+    expect(coveredByTable('catalogCategory.quarto', referenced)).toBe(true)
+    expect(coveredByTable('panelArea', referenced)).toBe(false)
   })
 
   it('encontra os arquivos de origem que deveria varrer', () => {

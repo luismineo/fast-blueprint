@@ -59,6 +59,9 @@ importers:
 
   packages/app:
     dependencies:
+      '@planta/catalog':
+        specifier: workspace:*
+        version: link:../catalog
       '@planta/core':
         specifier: workspace:*
         version: link:../core

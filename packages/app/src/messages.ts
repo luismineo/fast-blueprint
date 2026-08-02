@@ -50,5 +50,20 @@ export const messages = {
   sharedNodeMoveTogether: 'Mover junto',
   sharedNodeDetachOnly: 'Só este cômodo',
 
+  catalogTitle: 'Catálogo',
+  catalogSearchLabel: 'Buscar no catálogo',
+  catalogSearchPlaceholder: 'cama, geladeira, mesa',
+  catalogNoResults: 'Nenhum item com esse termo',
+  catalogRecent: 'Recentes',
+  catalogCategory: {
+    quarto: 'Quarto',
+    sala: 'Sala',
+    cozinha: 'Cozinha',
+    banheiro: 'Banheiro',
+    servico: 'Área de serviço',
+    escritorio: 'Escritório',
+    circulacao: 'Circulação',
+  },
+
   emptyCanvas: 'Pressione R e clique para começar a desenhar um cômodo',
 } as const

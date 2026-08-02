@@ -79,6 +79,9 @@
     type ToolId,
   } from './tools/toolShortcuts'
   import PropertiesPanel from './components/PropertiesPanel.svelte'
+  import CatalogPanel from './components/CatalogPanel.svelte'
+  import { pushRecent, type CatalogEntry } from './components/catalogModel'
+  import { loadDefaultCatalog } from '@planta/catalog'
 
   const HUD_OFFSET_PX = 16
 
@@ -108,6 +111,12 @@
   let tool: ToolId = $state('select')
   let panelCollapsed = $state(false)
   let perfSummary = $state('')
+
+  // Recentes é estado de sessão: a spec 06 não pede persistência, e só o
+  // catálogo do usuário vai para o IndexedDB.
+  let recentIds: readonly string[] = $state.raw([])
+  let dragged: CatalogEntry | null = $state.raw(null)
+  const catalogItems = loadDefaultCatalog()
 
   const store = new DocumentStore()
   let doc: PlanDocument = $state.raw(store.current)
@@ -245,6 +254,22 @@
       hover = null
       dispatchTool({ type: 'activate' })
     }
+  }
+
+  /**
+   * Escolher um item arma a Ferramenta Mobília; o próximo clique no canvas
+   * posiciona (`03-ferramentas-e-interacao.md` § Mobília, forma 2).
+   */
+  function chooseCatalogItem(entry: CatalogEntry): void {
+    recentIds = pushRecent(recentIds, entry.id)
+    tool = 'furniture'
+    dispatchFurniture({ type: 'choose', draft: entry.draft })
+  }
+
+  /** Forma 1: arrastar do painel e soltar no canvas. */
+  function beginCatalogDrag(entry: CatalogEntry): void {
+    dragged = entry
+    chooseCatalogItem(entry)
   }
 
   function applyFurnitureAction(action: FurnitureAction): void {
@@ -769,11 +794,31 @@
       if (event.code === 'Space') spacePressed = false
     }
 
+    function onDragOver(event: DragEvent): void {
+      if (dragged) event.preventDefault()
+    }
+
+    /**
+     * Soltar do painel passa pelo mesmo caminho de inserção do clique: o item
+     * já está armado, então só falta o `pointerDown` na posição da soltura.
+     */
+    function onDrop(event: DragEvent): void {
+      if (!dragged) return
+      event.preventDefault()
+      dragged = null
+
+      cursorPx = toLocalPoint(event.clientX, event.clientY, canvas.getBoundingClientRect())
+      dispatchFurniture({ type: 'pointerDown' }, event.altKey)
+      scheduler.markDirty()
+    }
+
     canvas.addEventListener('wheel', onWheel, { passive: false })
     canvas.addEventListener('pointerdown', onPointerDown)
     canvas.addEventListener('dblclick', onDoubleClick)
     canvas.addEventListener('pointermove', onPointerMove)
     canvas.addEventListener('pointerup', onPointerUp)
+    canvas.addEventListener('dragover', onDragOver)
+    canvas.addEventListener('drop', onDrop)
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
 
@@ -796,6 +841,8 @@
       canvas.removeEventListener('dblclick', onDoubleClick)
       canvas.removeEventListener('pointermove', onPointerMove)
       canvas.removeEventListener('pointerup', onPointerUp)
+      canvas.removeEventListener('dragover', onDragOver)
+      canvas.removeEventListener('drop', onDrop)
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
       if (perfInterval) clearInterval(perfInterval)
@@ -816,16 +863,25 @@
   tabindex="-1"
 ></canvas>
 
-<PropertiesPanel
-  {doc}
-  {selection}
-  onRename={renameSelectedRoom}
-  onColor={colorSelectedRoom}
-  onUsable={setSelectedRoomUsable}
-  onEdgeLength={applyPanelEdgeLength}
-  onNodeCoordinate={applyNodeCoordinate}
-  onDelete={deleteSelection}
-/>
+<aside class="side-panel" class:collapsed={panelCollapsed}>
+  <PropertiesPanel
+    {doc}
+    {selection}
+    onRename={renameSelectedRoom}
+    onColor={colorSelectedRoom}
+    onUsable={setSelectedRoomUsable}
+    onEdgeLength={applyPanelEdgeLength}
+    onNodeCoordinate={applyNodeCoordinate}
+    onDelete={deleteSelection}
+  />
+
+  <CatalogPanel
+    items={catalogItems}
+    {recentIds}
+    onChoose={chooseCatalogItem}
+    onDragStart={beginCatalogDrag}
+  />
+</aside>
 
 {#if hud}
   <div class="hud" role="group" aria-label={messages.hudLabel} style="left: {hudLeft}px; top: {hudTop}px;">
@@ -934,6 +990,23 @@
 
   .canvas-fullscreen.tool-active {
     cursor: crosshair;
+  }
+
+  .side-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 264px;
+    height: 100vh;
+    padding: 12px 16px;
+    box-sizing: border-box;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+  }
+
+  .side-panel.collapsed {
+    display: none;
   }
 
   .hud {

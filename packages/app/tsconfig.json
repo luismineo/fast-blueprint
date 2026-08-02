@@ -8,5 +8,5 @@
     "types": ["node"]
   },
   "include": ["src"],
-  "references": [{ "path": "../renderer" }]
+  "references": [{ "path": "../catalog" }, { "path": "../renderer" }]
 }

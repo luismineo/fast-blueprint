@@ -179,17 +179,7 @@
 
 <style>
   .panel {
-    position: fixed;
-    top: 0;
-    right: 0;
-    width: 264px;
-    height: 100vh;
-    padding: 12px 16px;
-    background: var(--surface);
-    border-left: 1px solid var(--border);
-    box-sizing: border-box;
     font-size: 13px;
-    overflow-y: auto;
   }
 
   .panel-title {
