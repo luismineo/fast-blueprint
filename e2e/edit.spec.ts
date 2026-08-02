@@ -102,6 +102,36 @@ test('corrigir a medida de uma aresta sem redesenhar o comodo', async ({ page })
   await expect(page.getByTestId('usable-area')).toHaveText('9,00 m²')
 })
 
+test('duplo clique numa aresta abre o campo de comprimento', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.locator('canvas')).toBeVisible()
+
+  const origin = await canvasOrigin(page)
+  await drawRoom(page, origin, 0)
+
+  await page.keyboard.press('v')
+  await page.mouse.dblclick(origin.x + 100, origin.y)
+
+  // `PointerEvent.detail` é 0 em `pointerdown`; só o evento `dblclick` traz a
+  // contagem. Ler a contagem do lugar errado deixava este fluxo inalcançável.
+  const inline = page.getByLabel('Comprimento da aresta em centímetros')
+  await expect(inline).toBeVisible()
+  await expect(inline).toHaveValue('320')
+})
+
+test('duplo clique no interior de um comodo abre a edicao de nome', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.locator('canvas')).toBeVisible()
+
+  const origin = await canvasOrigin(page)
+  await drawRoom(page, origin, 0)
+
+  await page.keyboard.press('v')
+  await page.mouse.dblclick(origin.x + 100, origin.y + 100)
+
+  await expect(page.getByLabel('Nome do cômodo')).toBeVisible()
+})
+
 test('selecionar um comodo e excluir com Delete', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('canvas')).toBeVisible()

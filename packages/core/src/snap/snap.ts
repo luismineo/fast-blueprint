@@ -63,15 +63,23 @@ export interface SnapContext {
   alt: boolean;
 }
 
+/**
+ * Tetos em mm medidos no protótipo (`adr/0005-tolerancias-de-snap.md`).
+ *
+ * O teto existe para o zoom aberto, onde 12 px viram metros de mundo e o
+ * cursor agarraria um nó do outro lado da planta. Os valores da ADR-0003 eram
+ * baixos demais: 30 mm valem 1,8 px de tela no zoom em que um cômodo inteiro
+ * aparece, o que tornava o clique no nó compartilhado inalcançável.
+ */
 const DEFAULT_CONFIG: SnapConfig = {
   nodeTolerancePx: 12,
   nodeToleranceMinMm: 2,
-  nodeToleranceMaxMm: 30,
+  nodeToleranceMaxMm: 200,
   lineTolerancePx: 8,
   lineToleranceMinMm: 2,
-  lineToleranceMaxMm: 40,
+  lineToleranceMaxMm: 250,
   gridTolerancePx: 6,
-  gridToleranceMaxMm: 50,
+  gridToleranceMaxMm: 300,
   gridSize: 100,
   intersectionToleranceMm: 40,
   minConstraintAngleDeg: 15,

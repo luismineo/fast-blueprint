@@ -55,7 +55,17 @@ test('roteiro manual: dois comodos adjacentes, arraste, medida, undo, angulo', a
   const nodeCount = await page.evaluate(() => document.title)
   expect(nodeCount).toBeTruthy()
 
-  // 2. Arrastar o nó compartilhado: as duas áreas mudam juntas.
+  // 2. Duplo clique na aresta compartilhada: os dois botões inline.
+  // A aresta está no canto para onde o segundo cômodo ancorou, ou seja em
+  // 3200 mm de o.x — 192 px na escala em que o documento vazio abre. A
+  // tolerância de aresta é de 6 px, então o alvo precisa ser a aresta mesmo.
+  await page.keyboard.press('v')
+  await page.mouse.dblclick(o.x + 192, o.y + 100)
+  await expect(page.getByTestId('shared-move-together')).toBeVisible()
+  await page.screenshot({ path: `${SHOTS}/4-no-compartilhado.png` })
+  await page.keyboard.press('Escape')
+
+  // 3. Arrastar o nó compartilhado: as duas áreas mudam juntas.
   await page.keyboard.press('v')
   await page.mouse.move(o.x + 200, o.y)
   await page.mouse.down()
@@ -64,11 +74,6 @@ test('roteiro manual: dois comodos adjacentes, arraste, medida, undo, angulo', a
   await page.mouse.up()
   await page.keyboard.press('Escape')
   await page.screenshot({ path: `${SHOTS}/3-apos-arraste.png` })
-
-  // 3. Duplo clique na aresta compartilhada: os dois botões inline.
-  await page.mouse.dblclick(o.x + 220, o.y + 100)
-  await page.screenshot({ path: `${SHOTS}/4-no-compartilhado.png` })
-  await page.keyboard.press('Escape')
 
   // 4. Undo do arraste devolve o ponto de partida.
   await page.keyboard.press('Control+z')

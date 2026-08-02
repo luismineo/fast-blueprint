@@ -484,17 +484,36 @@
       cursorPx = toLocalPoint(event.clientX, event.clientY, canvas.getBoundingClientRect())
 
       if (toolActive) {
-        dispatchTool({ type: 'pointerDown', clickCount: event.detail }, event.shiftKey)
+        dispatchTool({ type: 'pointerDown', clickCount: 1 }, event.shiftKey)
       } else {
         canvas.setPointerCapture(event.pointerId)
         dispatchSelect(
           {
             type: 'pointerDown',
-            clickCount: event.detail,
+            clickCount: 1,
             additive: event.ctrlKey || event.metaKey,
           },
           event.altKey,
         )
+      }
+
+      scheduler.markDirty()
+      event.preventDefault()
+    }
+
+    /**
+     * `PointerEvent.detail` é sempre 0 em `pointerdown` — medido no navegador,
+     * os dois cliques de um duplo chegam com 0 e só o evento `dblclick` traz 2.
+     * Ler a contagem do `pointerdown` deixava o duplo clique inalcançável nas
+     * duas ferramentas.
+     */
+    function onDoubleClick(event: MouseEvent): void {
+      cursorPx = toLocalPoint(event.clientX, event.clientY, canvas.getBoundingClientRect())
+
+      if (toolActive) {
+        dispatchTool({ type: 'pointerDown', clickCount: 2 }, event.shiftKey)
+      } else {
+        dispatchSelect({ type: 'pointerDown', clickCount: 2, additive: false }, event.altKey)
       }
 
       scheduler.markDirty()
@@ -641,6 +660,7 @@
 
     canvas.addEventListener('wheel', onWheel, { passive: false })
     canvas.addEventListener('pointerdown', onPointerDown)
+    canvas.addEventListener('dblclick', onDoubleClick)
     canvas.addEventListener('pointermove', onPointerMove)
     canvas.addEventListener('pointerup', onPointerUp)
     window.addEventListener('keydown', onKeyDown)
@@ -662,6 +682,7 @@
       dprQuery.removeEventListener('change', onDprChange)
       canvas.removeEventListener('wheel', onWheel)
       canvas.removeEventListener('pointerdown', onPointerDown)
+      canvas.removeEventListener('dblclick', onDoubleClick)
       canvas.removeEventListener('pointermove', onPointerMove)
       canvas.removeEventListener('pointerup', onPointerUp)
       window.removeEventListener('keydown', onKeyDown)

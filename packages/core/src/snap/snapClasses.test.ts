@@ -195,6 +195,64 @@ describe('Classe 2 — composição de restrições', () => {
   });
 });
 
+describe('tolerâncias medidas no protótipo (ADR-0005)', () => {
+  const scaleOf = (result: { point: { x: number; y: number } }) => result;
+
+  it('em 0,06 px/mm — zoom do documento vazio — 10 px de distância ainda pegam o nó', () => {
+    const scale = 0.06;
+    const distanceMm = 10 / scale; // 10 px de tela
+
+    const result = resolveSnap(
+      { x: distanceMm, y: 0 },
+      ctx({ nodes: [node('n1', 0, 0)], scale }),
+    );
+
+    expect(result.merged).toBe('n1');
+    expect(scaleOf(result).point).toEqual({ x: 0, y: 0 });
+  });
+
+  it('em 0,126 px/mm — apto-44m2 enquadrado — 10 px de distância ainda pegam o nó', () => {
+    const scale = 0.126;
+
+    const result = resolveSnap(
+      { x: 10 / scale, y: 0 },
+      ctx({ nodes: [node('n1', 0, 0)], scale }),
+    );
+
+    expect(result.merged).toBe('n1');
+  });
+
+  it('o teto continua valendo: em zoom muito aberto, 500 mm não pegam o nó', () => {
+    const result = resolveSnap(
+      { x: 500, y: 0 },
+      ctx({ nodes: [node('n1', 0, 0)], scale: 0.01 }),
+    );
+
+    expect(result.merged).toBeNull();
+  });
+
+  it('com o grid default quem corta é metade da célula, não o teto de 300 mm', () => {
+    // 6 px a 0,01 px/mm são 600 mm. O teto de 300 nem chega a ser consultado:
+    // gridSize/2 = 50 mm corta antes, e nenhum ponto fica a mais de 50 mm do
+    // múltiplo mais próximo de 100 — então o grid sempre dispara neste zoom.
+    for (const x of [10, 40, 49, 60, 90]) {
+      const result = resolveSnap({ x, y: 0 }, ctx({ scale: 0.01 }));
+      expect(result.point.x % 100).toBe(0);
+    }
+  });
+
+  it('o teto de 300 mm morde quando a célula é grande', () => {
+    // gridSize 1000: metade da célula são 500 mm, então quem corta é o teto.
+    const grande = ctx({ scale: 0.01, gridSize: 1000 });
+
+    const dentro = resolveSnap({ x: 250, y: 0 }, grande);
+    expect(dentro.point).toEqual({ x: 0, y: 0 });
+
+    const fora = resolveSnap({ x: 400, y: 0 }, grande);
+    expect(fora.point).toEqual({ x: 400, y: 0 });
+  });
+});
+
 describe('Modificadores e fallback', () => {
   it('Alt devolve o ponto de entrada mesmo com aresta e nó por perto', () => {
     const result = resolveSnap(
