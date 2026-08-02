@@ -82,7 +82,15 @@
   import PropertiesPanel from './components/PropertiesPanel.svelte'
   import CatalogPanel from './components/CatalogPanel.svelte'
   import { pushRecent, type CatalogEntry } from './components/catalogModel'
-  import { loadDefaultCatalog } from '@planta/catalog'
+  import {
+    loadDefaultCatalog,
+    mergeCatalogs,
+    upsertUserItem,
+    userItemFrom,
+    type CatalogCategory,
+    type CatalogItem,
+  } from '@planta/catalog'
+  import { loadUserCatalog, saveUserCatalog } from './persistence/userCatalog'
 
   const HUD_OFFSET_PX = 16
 
@@ -117,7 +125,10 @@
   // catálogo do usuário vai para o IndexedDB.
   let recentIds: readonly string[] = $state.raw([])
   let dragged: CatalogEntry | null = $state.raw(null)
-  const catalogItems = loadDefaultCatalog()
+  let userItems: readonly CatalogItem[] = $state.raw([])
+
+  const defaultCatalog = loadDefaultCatalog()
+  const catalogItems = $derived(mergeCatalogs(defaultCatalog, userItems))
 
   const store = new DocumentStore()
   let doc: PlanDocument = $state.raw(store.current)
@@ -529,6 +540,36 @@
     applyFurnitureAction({ kind: 'duplicate' })
   }
 
+  /**
+   * "Salvar como item" cria sempre um item novo, com id próprio.
+   *
+   * Sobrescrever o item do default acontece por id colidente
+   * (`06-catalogo-de-mobilia.md` § Catálogo do usuário), e salvar um móvel já
+   * editado sob o id de origem apagaria a medida original do catálogo sem o
+   * usuário ter pedido isso.
+   */
+  function saveSelectionToCatalog(category: CatalogCategory): void {
+    const furnitureId = selectedFurnitureId()
+    if (!furnitureId) return
+
+    const item = store.current.furniture.find((candidate) => candidate.id === furnitureId)
+    if (!item) return
+
+    userItems = upsertUserItem(
+      userItems,
+      userItemFrom({
+        id: `user_${crypto.randomUUID()}`,
+        name: item.name,
+        category,
+        width: item.width,
+        depth: item.depth,
+        clearance: item.clearance,
+      }),
+    )
+
+    void saveUserCatalog(userItems)
+  }
+
   function onEdgeKeyDown(event: KeyboardEvent): void {
     if (event.key === 'Enter') {
       event.preventDefault()
@@ -920,6 +961,11 @@
 
   onMount(() => {
     if (!canvasEl) return
+
+    void loadUserCatalog().then((items) => {
+      userItems = items
+    })
+
     return setupCanvas(canvasEl, debugPerf ? new Profiler() : undefined)
   })
 </script>
@@ -946,6 +992,7 @@
     onFurnitureClearance={setSelectedFurnitureClearance}
     onFurnitureLocked={setSelectedFurnitureLocked}
     onDuplicate={duplicateSelection}
+    onSaveToCatalog={saveSelectionToCatalog}
   />
 
   <CatalogPanel

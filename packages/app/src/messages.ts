@@ -47,6 +47,10 @@ export const messages = {
   panelClearance: 'Circulação',
   panelLocked: 'Travar',
   panelDuplicate: 'Duplicar',
+  panelSaveToCatalog: 'Salvar como item',
+  panelSaveCategory: 'Categoria',
+  panelSaveConfirm: 'Salvar',
+  panelSavedToCatalog: 'Salvo no seu catálogo',
   panelOccupancy: 'Ocupação',
   panelWarnings: 'Avisos',
 

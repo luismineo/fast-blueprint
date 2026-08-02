@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { PlanDocument, Selection } from '@planta/core'
+  import { CATALOG_CATEGORIES, type CatalogCategory } from '@planta/catalog'
   import { messages } from '../messages'
   import { describeSelection, type PanelModel } from './panelModel'
 
@@ -17,6 +18,7 @@
     onFurnitureClearance: (text: string) => void
     onFurnitureLocked: (locked: boolean) => void
     onDuplicate: () => void
+    onSaveToCatalog: (category: CatalogCategory) => void
   }
 
   const {
@@ -33,14 +35,25 @@
     onFurnitureClearance,
     onFurnitureLocked,
     onDuplicate,
+    onSaveToCatalog,
   }: Props = $props()
 
   const model: PanelModel = $derived(describeSelection(doc, selection))
+
+  let saving = $state(false)
+  let saved = $state(false)
+  let saveCategory: CatalogCategory = $state('quarto')
 
   function applyOnEnter(event: KeyboardEvent, apply: (text: string) => void): void {
     if (event.key !== 'Enter') return
     event.preventDefault()
     apply((event.currentTarget as HTMLInputElement).value)
+  }
+
+  function confirmSave(): void {
+    onSaveToCatalog(saveCategory)
+    saving = false
+    saved = true
   }
 </script>
 
@@ -268,6 +281,35 @@
       <span>{messages.panelLocked}</span>
     </label>
 
+    {#if saving}
+      <div class="save-form">
+        <label class="field">
+          <span class="label">{messages.panelSaveCategory}</span>
+          <select class="input" bind:value={saveCategory} aria-label={messages.panelSaveCategory}>
+            {#each CATALOG_CATEGORIES as category (category)}
+              <option value={category}>{messages.catalogCategory[category]}</option>
+            {/each}
+          </select>
+        </label>
+        <button type="button" class="danger" data-testid="confirm-save-item" onclick={confirmSave}>
+          {messages.panelSaveConfirm}
+        </button>
+      </div>
+    {:else}
+      <button
+        type="button"
+        class="danger"
+        data-testid="save-to-catalog"
+        onclick={() => (saving = true)}
+      >
+        {messages.panelSaveToCatalog}
+      </button>
+    {/if}
+
+    {#if saved}
+      <p class="saved">{messages.panelSavedToCatalog}</p>
+    {/if}
+
     <button type="button" class="danger" onclick={onDuplicate}>
       {messages.panelDuplicate}
     </button>
@@ -433,5 +475,14 @@
 
   .danger + .danger {
     margin-top: 4px;
+  }
+
+  .save-form {
+    margin-bottom: 4px;
+  }
+
+  .saved {
+    margin: 4px 0;
+    color: var(--text-muted);
   }
 </style>
