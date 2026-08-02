@@ -195,12 +195,23 @@
       "includeInUsableArea": false
     }
   ],
-  "walls": [],
+  "walls": [
+    {
+      "id": "w_bancada_cozinha",
+      "a": "n_fx3",
+      "b": "n_fx4"
+    },
+    {
+      "id": "w_divisoria",
+      "a": "n_fx6",
+      "b": "n_fx21"
+    }
+  ],
   "openings": [],
   "furniture": [
     {
       "id": "f_fx1",
-      "catalogId": null,
+      "catalogId": "cama-queen",
       "name": "Cama queen",
       "width": 1580,
       "depth": 1980,
@@ -215,7 +226,7 @@
     },
     {
       "id": "f_fx2",
-      "catalogId": null,
+      "catalogId": "criado-mudo",
       "name": "Criado-mudo",
       "width": 500,
       "depth": 400,

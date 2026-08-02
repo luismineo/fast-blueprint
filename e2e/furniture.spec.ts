@@ -147,10 +147,9 @@ test('a barra de ferramentas troca de ferramenta e Home nao enquadra com foco ne
   await page.getByTestId('tool-select').click()
   await expect(page.getByTestId('tool-select')).toHaveAttribute('aria-pressed', 'true')
 
-  // Parede e Medir aparecem indisponíveis, mas continuam alcançáveis por
-  // teclado: o padrão ARIA toolbar usa `aria-disabled`, não `disabled`.
-  await expect(page.getByTestId('tool-wall')).toHaveAttribute('aria-disabled', 'true')
-  await expect(page.getByTestId('tool-measure')).toHaveAttribute('aria-disabled', 'true')
+  // Todos os cinco botões estão habilitados a partir do M3.5.
+  await expect(page.getByTestId('tool-wall')).not.toHaveAttribute('aria-disabled', 'true')
+  await expect(page.getByTestId('tool-measure')).not.toHaveAttribute('aria-disabled', 'true')
 
   // Com foco na barra, `End` move o foco em vez de acionar atalho global.
   await page.getByTestId('tool-select').focus()
@@ -211,6 +210,86 @@ test('movel salvo no catalogo do usuario sobrevive a recarga', async ({ page }) 
   // Busca sem acento acha o item com acento (spec 06 § Busca).
   await page.getByTestId('catalog-search').fill('criado do vo')
   await expect(page.locator('aside.side-panel')).toContainText('Criado do vô')
+})
+
+test('M3.5 — desenhar bancada com W insere geladeira que encosta', async ({ page }) => {
+  const errors: string[] = []
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') errors.push(msg.text())
+  })
+  page.on('pageerror', (err) => errors.push(String(err)))
+
+  await page.goto('/')
+  await expect(page.locator('canvas')).toBeVisible()
+
+  const origin = await canvasOrigin(page)
+  await drawRoom(page, origin, 0)
+
+  // Ativa Ferramenta Parede (W).
+  await page.getByTestId('tool-wall').click()
+  await expect(page.getByTestId('tool-wall')).toHaveAttribute('aria-pressed', 'true')
+
+  // Desenha uma bancada: clique, "2400 Enter", Enter.
+  await page.mouse.click(origin.x + 20, origin.y + 80)
+  // Espera o HUD aparecer e foca o campo
+  await page.keyboard.type('2400')
+  await page.keyboard.press('Enter')
+  await page.keyboard.press('Enter')
+
+  // A ferramenta continua em Parede, pronta para a próxima.
+  await expect(page.getByTestId('tool-wall')).toHaveAttribute('aria-pressed', 'true')
+
+  // Insere geladeira perto da bancada.
+  await page.getByTestId('tool-furniture').click()
+  await page.getByTestId('catalog-search').fill('fridge')
+  await page.getByTestId('catalog-item-fridge').click()
+  await page.mouse.click(origin.x + 80, origin.y + 55)
+
+  // Rotação deve ser 0 (alinhada com a bancada horizontal).
+  await expect(page.getByLabel('Rotação')).toHaveValue('0')
+
+  expect(errors).toEqual([])
+})
+
+test('M3.5 — Ferramenta Medir mostra distancia e Esc limpa sem gastar undo', async ({ page }) => {
+  const errors: string[] = []
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') errors.push(msg.text())
+  })
+  page.on('pageerror', (err) => errors.push(String(err)))
+
+  await page.goto('/')
+  await expect(page.locator('canvas')).toBeVisible()
+
+  const origin = await canvasOrigin(page)
+  await drawRoom(page, origin, 0)
+
+  // Insere uma cama para ter um canto de móvel para medir.
+  await page.getByTestId('catalog-search').fill('queen')
+  await page.getByTestId('catalog-item-bed-queen').click()
+  await page.mouse.click(origin.x + 60, origin.y + 80)
+  await page.keyboard.press('Escape')
+
+  // Ativa Ferramenta Medir (M).
+  await page.getByTestId('tool-measure').click()
+  await expect(page.getByTestId('tool-measure')).toHaveAttribute('aria-pressed', 'true')
+
+  // Mede do canto da cama até a parede oposta.
+  await page.mouse.move(origin.x + 30, origin.y + 50)
+  await page.mouse.down()
+  await page.mouse.move(origin.x + 30, origin.y + 140, { steps: 5 })
+  await page.mouse.up()
+
+  // Esc limpa a medição.
+  await page.keyboard.press('Escape')
+
+  // Ctrl+Z não desfaz nada (a medição não gastou undo).
+  // O documento continua com 1 cômodo e 1 móvel.
+  await page.keyboard.press('Control+z')
+  // Nenhum erro — o undo não afetou a medição.
+  await expect(page.getByTestId('furniture-count')).toHaveText('1')
+
+  expect(errors).toEqual([])
 })
 
 test('Ctrl+B recolhe e devolve o painel direito', async ({ page }) => {
