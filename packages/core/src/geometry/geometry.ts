@@ -205,6 +205,19 @@ export function snapToGrid(value: number, gridSize: number): number {
 const BOUNDARY_TOLERANCE_MM = 1;
 
 /**
+ * Arredonda para milímetro inteiro, sem produzir `-0`.
+ *
+ * `Math.round` devolve `-0` para qualquer negativo minúsculo, e o resíduo de
+ * `Math.cos`/`Math.sin` em múltiplos de 90° é exatamente isso. `-0` passa em
+ * `===` mas falha em comparação estrutural — em `toEqual` de teste e no
+ * round-trip de arquivo.
+ */
+export function roundMm(value: number): number {
+  const rounded = Math.round(value);
+  return rounded === 0 ? 0 : rounded;
+}
+
+/**
  * Cantos de um retângulo orientado, em milímetros inteiros.
  *
  * Ordem: os dois primeiros são a face **traseira** (borda em `−depth`, a que
@@ -231,8 +244,8 @@ export function obbCorners(
   ];
 
   return local.map((point) => ({
-    x: Math.round(center.x + point.x * cos - point.y * sin),
-    y: Math.round(center.y + point.x * sin + point.y * cos),
+    x: roundMm(center.x + point.x * cos - point.y * sin),
+    y: roundMm(center.y + point.x * sin + point.y * cos),
   }));
 }
 
