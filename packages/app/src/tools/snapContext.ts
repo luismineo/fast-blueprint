@@ -18,6 +18,8 @@ export interface SnapInputs {
   readonly origin?: Point | null
   /** Nós que o resolvedor deve ignorar — os que estão sendo arrastados. */
   readonly exclude?: readonly NodeId[]
+  /** Cantos de móvel como âncora Classe 1 (só Ferramenta Medir). */
+  readonly furnitureCorners?: readonly Point[]
 }
 
 /**
@@ -50,6 +52,7 @@ export function resolveToolSnap(point: Point, inputs: SnapInputs): SnapResult {
     scale: inputs.scale,
     shift: inputs.shift,
     alt: inputs.alt,
+    furnitureCorners: inputs.furnitureCorners,
   })
 }
 
