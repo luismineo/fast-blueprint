@@ -7,8 +7,10 @@ import type {
   PlanDocument,
   NodeId,
   RoomId,
+  WallId,
   Node,
   Room,
+  Wall,
   EdgeRef,
   FurnitureId,
   FurnitureItem,
@@ -17,6 +19,7 @@ import type {
 import {
   generateNodeId,
   generateRoomId,
+  generateWallId,
   generateFurnitureId,
   generateDefaultRoomName,
   isDocumentColor,
@@ -51,6 +54,8 @@ export type Command =
   | TransformFurnitureCommand
   | UpdateFurnitureCommand
   | DeleteFurnitureCommand
+  | CreateWallCommand
+  | DeleteWallCommand
   | BatchCommand;
 
 export interface CreateRoomCommand {
@@ -244,6 +249,27 @@ export interface DeleteFurniturePayload {
   furnitureId: FurnitureId;
 }
 
+export interface CreateWallCommand {
+  type: 'CreateWall';
+  transient?: boolean;
+  payload: CreateWallPayload;
+}
+
+export interface CreateWallPayload {
+  nodes: { id: NodeId; x: number; y: number }[];
+  segments: { a: NodeId; b: NodeId; wallId?: WallId }[];
+}
+
+export interface DeleteWallCommand {
+  type: 'DeleteWall';
+  transient?: boolean;
+  payload: DeleteWallPayload;
+}
+
+export interface DeleteWallPayload {
+  wallId: WallId;
+}
+
 export interface BatchCommand {
   type: 'Batch';
   transient?: boolean;
@@ -279,7 +305,9 @@ export type CommandErrorCode =
   | 'FURNITURE_NOT_FOUND'
   | 'FURNITURE_LOCKED'
   | 'INVALID_DIMENSION'
-  | 'INVALID_ROTATION';
+  | 'INVALID_ROTATION'
+  | 'EMPTY_WALL'
+  | 'WALL_NOT_FOUND';
 
 export interface CommandError {
   code: CommandErrorCode;
@@ -362,6 +390,10 @@ export function applyCommand(
       return applyUpdateFurniture(doc, cmd.payload);
     case 'DeleteFurniture':
       return applyDeleteFurniture(doc, cmd.payload);
+    case 'CreateWall':
+      return applyCreateWall(doc, cmd.payload);
+    case 'DeleteWall':
+      return applyDeleteWall(doc, cmd.payload);
     case 'Batch':
       return applyBatch(doc, cmd.payload);
   }
@@ -1149,6 +1181,119 @@ function applyRenameRoom(
     inversePatches,
     `Renomear ${room.name} → ${payload.name}`,
   );
+}
+
+// ============================================================
+// CreateWall e DeleteWall — spec 08 § Comandos do M3.5
+// ============================================================
+
+function applyCreateWall(
+  doc: PlanDocument,
+  payload: CreateWallPayload,
+): CommandResult {
+  const label = 'Desenhar parede';
+  const rejection = validateCreateWall(doc, payload);
+  if (rejection) return rejected(doc, label, rejection);
+
+  const [nextDoc, patches, inversePatches] = produceWithPatches(doc, (draft) => {
+    const nodeIdMap = new Map<string, NodeId>();
+
+    for (const n of payload.nodes) {
+      const existing = draft.nodes.find(
+        (existing) => existing.x === n.x && existing.y === n.y,
+      );
+      if (existing) {
+        nodeIdMap.set(n.id, existing.id);
+      } else {
+        draft.nodes.push({
+          id: n.id,
+          x: n.x as Node['x'],
+          y: n.y as Node['y'],
+        });
+        nodeIdMap.set(n.id, n.id);
+      }
+    }
+
+    const position = new Map<NodeId, { x: number; y: number }>();
+    for (const node of draft.nodes) position.set(node.id, { x: node.x, y: node.y });
+
+    const existingPairs = new Set<string>();
+    for (const wall of draft.walls) {
+      existingPairs.add(pairKey(wall.a, wall.b));
+    }
+
+    for (const seg of payload.segments) {
+      const a = nodeIdMap.get(seg.a) ?? seg.a;
+      const b = nodeIdMap.get(seg.b) ?? seg.b;
+
+      if (a === b) continue;
+
+      const aPos = position.get(a);
+      const bPos = position.get(b);
+      if (!aPos || !bPos) continue;
+
+      if (existingPairs.has(pairKey(a, b))) continue;
+
+      const wallId = seg.wallId ?? generateWallId();
+      draft.walls.push({
+        id: wallId,
+        a,
+        b,
+      });
+      existingPairs.add(pairKey(a, b));
+    }
+  });
+
+  return applied(nextDoc, patches, inversePatches, label);
+}
+
+function pairKey(a: string, b: string): string {
+  return a < b ? `${a}|${b}` : `${b}|${a}`
+}
+
+function validateCreateWall(
+  doc: PlanDocument,
+  payload: CreateWallPayload,
+): CommandError | null {
+  if (payload.segments.length === 0) {
+    return { code: 'EMPTY_WALL', ids: [] };
+  }
+
+  const payloadIds = payload.nodes.map((n) => n.id);
+  for (const n of payload.nodes) {
+    if (!Number.isInteger(n.x) || !Number.isInteger(n.y)) {
+      return { code: 'NON_INTEGER_COORDINATE', ids: [n.id] };
+    }
+  }
+
+  const known = new Set<string>([...payloadIds, ...doc.nodes.map((n) => n.id)]);
+  for (const seg of payload.segments) {
+    if (!known.has(seg.a)) return { code: 'NODE_NOT_FOUND', ids: [seg.a] };
+    if (!known.has(seg.b)) return { code: 'NODE_NOT_FOUND', ids: [seg.b] };
+    if (seg.a === seg.b) return { code: 'DEGENERATE_WALL', ids: [seg.a] };
+  }
+
+  return null;
+}
+
+function applyDeleteWall(
+  doc: PlanDocument,
+  payload: DeleteWallPayload,
+): CommandResult {
+  const wall = doc.walls.find((candidate) => candidate.id === payload.wallId);
+  if (!wall) {
+    return rejected(doc, 'Excluir parede', {
+      code: 'WALL_NOT_FOUND',
+      ids: [payload.wallId],
+    });
+  }
+
+  const [nextDoc, patches, inversePatches] = produceWithPatches(doc, (draft) => {
+    const idx = draft.walls.findIndex((candidate) => candidate.id === payload.wallId);
+    if (idx !== -1) draft.walls.splice(idx, 1);
+  });
+
+  return applied(nextDoc, patches, inversePatches, 'Excluir parede');
 }
 
 // ============================================================
