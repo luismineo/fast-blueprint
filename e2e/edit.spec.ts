@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
+import { canvasOrigin, drawRoom } from './helpers'
 
 /**
  * Fluxo de edição do M2 (`specs/09-roadmap.md`), contra o build de produção.
@@ -6,40 +7,6 @@ import { expect, test, type Page } from '@playwright/test'
  * "Pronto quando: dá para corrigir um erro de medida sem redesenhar o cômodo,
  * e mover uma parede compartilhada atualiza os dois cômodos."
  */
-
-interface Origin {
-  readonly x: number
-  readonly y: number
-}
-
-async function canvasOrigin(page: Page): Promise<Origin> {
-  const box = await page.locator('canvas').boundingBox()
-  if (!box) throw new Error('canvas sem bounding box')
-  return { x: box.x + box.width * 0.3, y: box.y + box.height * 0.35 }
-}
-
-/** Desenha um cômodo 320 × 250 a partir de um deslocamento em pixels da origem. */
-async function drawRoom(page: Page, origin: Origin, offsetPx: number): Promise<void> {
-  const ox = origin.x + offsetPx
-  const oy = origin.y
-
-  await page.mouse.move(ox, oy)
-  await page.keyboard.press('r')
-  await page.mouse.click(ox, oy)
-
-  const segment = async (digits: string, dx: number, dy: number) => {
-    await page.mouse.move(ox + dx, oy + dy)
-    for (const digit of digits) await page.keyboard.press(digit)
-    await page.keyboard.press('Enter')
-  }
-
-  await segment('320', 200, 10)
-  await segment('250', 8, 200)
-  await segment('320', -200, 8)
-
-  await page.keyboard.press('c')
-  await page.keyboard.press('Enter')
-}
 
 test('arrastar uma parede compartilhada atualiza os dois comodos', async ({ page }) => {
   const errors: string[] = []

@@ -1,6 +1,6 @@
 import { applyCommand } from '../commands';
 import { createEmptyDocument } from '../model';
-import type { NodeId, PlanDocument, RoomId } from '../model';
+import type { FurnitureId, NodeId, PlanDocument, RoomId } from '../model';
 
 /**
  * Construtores das fixtures versionadas de `specs/fixtures/`.
@@ -131,9 +131,64 @@ export function buildApto44m2(): PlanDocument {
   return withFixtureMeta(doc, 'Apartamento 44m²');
 }
 
+/**
+ * `apto-44m2` mais 40 móveis, para o teste de performance
+ * (`04-renderizacao.md` § Orçamento, `10-testes.md` § Testes de performance).
+ *
+ * Os móveis saem das medidas do catálogo default, mas o payload é escrito
+ * aqui: `core` não conhece o pacote `catalog`.
+ *
+ * Distribuídos em grade sobre o envelope, eles se sobrepõem — 40 móveis num
+ * apartamento de 44 m² se sobrepõem de verdade. É deliberado: a fixture existe
+ * para medir o orçamento de 8 ms no **pior caso**, e o pior caso inclui a
+ * hachura de colisão e o contorno tracejado de quem ficou fora de cômodo.
+ */
+export function buildFurnished(): PlanDocument {
+  reset();
+  let doc = buildApto44m2();
+
+  const sizes: { name: string; width: number; depth: number; clearance: number }[] = [
+    { name: 'Cama queen', width: 1580, depth: 1980, clearance: 600 },
+    { name: 'Criado-mudo', width: 500, depth: 400, clearance: 0 },
+    { name: 'Guarda-roupa 4 portas', width: 1800, depth: 550, clearance: 700 },
+    { name: 'Sofá 3 lugares', width: 2000, depth: 900, clearance: 400 },
+    { name: 'Mesa de centro', width: 1000, depth: 600, clearance: 400 },
+    { name: 'Cadeira', width: 450, depth: 500, clearance: 0 },
+    { name: 'Geladeira duplex', width: 830, depth: 750, clearance: 900 },
+    { name: 'Fogão 4 bocas', width: 520, depth: 600, clearance: 900 },
+  ];
+
+  const COLUMNS = 5;
+  const STEP_X = 1300;
+  const STEP_Y = 1500;
+
+  for (let index = 0; index < 40; index += 1) {
+    const size = sizes[index % sizes.length]!;
+    doc = applyCommand(doc, {
+      type: 'AddFurniture',
+      payload: {
+        furnitureId: `f_fx${index + 1}` as FurnitureId,
+        catalogId: null,
+        name: size.name,
+        width: size.width,
+        depth: size.depth,
+        center: {
+          x: 400 + (index % COLUMNS) * STEP_X,
+          y: 400 + Math.floor(index / COLUMNS) * STEP_Y,
+        },
+        rotation: (index % 4) * 90,
+        clearance: size.clearance,
+      },
+    }).document;
+  }
+
+  return withFixtureMeta(doc, 'Apartamento mobiliado');
+}
+
 export const FIXTURE_BUILDERS = {
   'single-room.planta.json': buildSingleRoom,
   'shared-nodes.planta.json': buildSharedNodes,
   'concave.planta.json': buildConcave,
   'apto-44m2.planta.json': buildApto44m2,
+  'furnished.planta.json': buildFurnished,
 } as const;

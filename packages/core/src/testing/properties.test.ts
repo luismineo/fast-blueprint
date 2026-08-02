@@ -4,13 +4,21 @@ import { applyPatches } from 'immer';
 import {
   arbDocument,
   arbLengthInput,
+  arbOrientedRect,
   arbSimplePolygon,
   commandsFor,
 } from './arbitraries';
 import { applyCommand } from '../commands';
 import { DocumentStore } from '../history';
 import { formatLength, parseLength } from '../format';
-import { polygonArea, shoelaceArea } from '../geometry';
+import {
+  containment,
+  convexIntersection,
+  obbCorners,
+  polygonArea,
+  satOverlap,
+  shoelaceArea,
+} from '../geometry';
 import { resolveSnap, type SnapContext } from '../snap';
 import { validateDocumentErrors } from '../model';
 
@@ -150,6 +158,125 @@ describe('property — comandos', () => {
     );
   });
 });
+
+describe('property — mobília', () => {
+  it('SAT é simétrico', () => {
+    fc.assert(
+      fc.property(arbOrientedRect, arbOrientedRect, (a, b) => {
+        const cornersA = obbCorners(a.center, a.width, a.depth, a.rotation);
+        const cornersB = obbCorners(b.center, b.width, b.depth, b.rotation);
+
+        expect(satOverlap(cornersA, cornersB)).toBe(satOverlap(cornersB, cornersA));
+      }),
+      RUNS,
+    );
+  });
+
+  /**
+   * Sobreposição de retângulos orientados implica sobreposição das caixas
+   * envolventes — a recíproca é falsa, e é o que a implementação por caixa
+   * errava.
+   */
+  it('sobreposição por SAT implica sobreposição das caixas envolventes', () => {
+    fc.assert(
+      fc.property(arbOrientedRect, arbOrientedRect, (a, b) => {
+        const cornersA = obbCorners(a.center, a.width, a.depth, a.rotation);
+        const cornersB = obbCorners(b.center, b.width, b.depth, b.rotation);
+        if (!satOverlap(cornersA, cornersB)) return;
+
+        const boxA = boundsOf(cornersA);
+        const boxB = boundsOf(cornersB);
+
+        expect(boxA.minX).toBeLessThanOrEqual(boxB.maxX);
+        expect(boxB.minX).toBeLessThanOrEqual(boxA.maxX);
+        expect(boxA.minY).toBeLessThanOrEqual(boxB.maxY);
+        expect(boxB.minY).toBeLessThanOrEqual(boxA.maxY);
+      }),
+      RUNS,
+    );
+  });
+
+  it('um retângulo sempre colide consigo mesmo', () => {
+    fc.assert(
+      fc.property(arbOrientedRect, (rect) => {
+        const corners = obbCorners(rect.center, rect.width, rect.depth, rect.rotation);
+
+        expect(satOverlap(corners, corners)).toBe(true);
+      }),
+      RUNS,
+    );
+  });
+
+  it('contenção é invariante a transladar cômodo e móvel juntos', () => {
+    fc.assert(
+      fc.property(
+        arbSimplePolygon,
+        arbOrientedRect,
+        fc.integer({ min: -50_000, max: 50_000 }),
+        fc.integer({ min: -50_000, max: 50_000 }),
+        (polygon, rect, dx, dy) => {
+          const corners = obbCorners(rect.center, rect.width, rect.depth, rect.rotation);
+          const before = containment(corners, polygon);
+
+          const moved = obbCorners(
+            { x: rect.center.x + dx, y: rect.center.y + dy },
+            rect.width,
+            rect.depth,
+            rect.rotation,
+          );
+          const shifted = polygon.map((point) => ({ x: point.x + dx, y: point.y + dy }));
+
+          expect(containment(moved, shifted)).toBe(before);
+        },
+      ),
+      RUNS,
+    );
+  });
+
+  it('a região comum de dois retângulos nunca é maior que qualquer um deles', () => {
+    fc.assert(
+      fc.property(arbOrientedRect, arbOrientedRect, (a, b) => {
+        const cornersA = obbCorners(a.center, a.width, a.depth, a.rotation);
+        const cornersB = obbCorners(b.center, b.width, b.depth, b.rotation);
+        const common = polygonArea(convexIntersection(cornersA, cornersB));
+
+        expect(common).toBeLessThanOrEqual(polygonArea(cornersA) + 1);
+        expect(common).toBeLessThanOrEqual(polygonArea(cornersB) + 1);
+      }),
+      RUNS,
+    );
+  });
+
+  it('há região comum exatamente quando o SAT acusa colisão', () => {
+    fc.assert(
+      fc.property(arbOrientedRect, arbOrientedRect, (a, b) => {
+        const cornersA = obbCorners(a.center, a.width, a.depth, a.rotation);
+        const cornersB = obbCorners(b.center, b.width, b.depth, b.rotation);
+
+        const common = polygonArea(convexIntersection(cornersA, cornersB));
+        if (satOverlap(cornersA, cornersB)) expect(common).toBeGreaterThan(0);
+        else expect(common).toBeLessThan(1);
+      }),
+      RUNS,
+    );
+  });
+});
+
+function boundsOf(points: readonly { x: number; y: number }[]) {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const point of points) {
+    if (point.x < minX) minX = point.x;
+    if (point.y < minY) minY = point.y;
+    if (point.x > maxX) maxX = point.x;
+    if (point.y > maxY) maxY = point.y;
+  }
+
+  return { minX, minY, maxX, maxY };
+}
 
 describe('property — snap', () => {
   const context = (overrides: Partial<SnapContext> = {}): SnapContext => ({

@@ -67,7 +67,6 @@ export const messages = {
   overlappingRooms: 'cômodos sobrepostos',
   furnitureOutsideRoom: 'fora do cômodo',
   furnitureOverlap: (nameA: string, nameB: string) => `${nameA} e ${nameB} se sobrepõem`,
-  orphanNode: 'nó solto',
 
   edgeLengthLabel: 'Comprimento da aresta em centímetros',
   sharedNodeMoveTogether: 'Mover junto',

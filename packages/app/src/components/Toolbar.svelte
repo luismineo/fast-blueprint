@@ -63,7 +63,8 @@
       type="button"
       class="tool"
       class:active={button.id === tool}
-      disabled={!button.enabled}
+      class:unavailable={!button.enabled}
+      aria-disabled={!button.enabled}
       tabindex={index === focused ? 0 : -1}
       aria-pressed={button.id === tool}
       aria-label={button.enabled
@@ -110,7 +111,7 @@
     cursor: pointer;
   }
 
-  .tool:hover:not(:disabled) {
+  .tool:hover:not(.unavailable) {
     background: var(--surface-raised);
   }
 
@@ -119,7 +120,12 @@
     color: var(--accent);
   }
 
-  .tool:disabled {
+  /*
+    `aria-disabled`, e não o atributo `disabled`: botão desabilitado de verdade
+    sai da ordem de foco, e o padrão ARIA toolbar precisa que `Home` e `End`
+    alcancem o primeiro e o último item, existindo eles ou não.
+  */
+  .tool.unavailable {
     color: var(--border);
     cursor: default;
   }

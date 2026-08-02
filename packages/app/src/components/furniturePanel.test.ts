@@ -143,7 +143,9 @@ describe('lista de avisos', () => {
     const doc = withItem(room(), { name: 'Sofá', center: { x: 9000, y: 9000 } })
     const model = describeSelection(doc, [])
 
-    expect(model).toMatchObject({ warnings: ['Sofá · fora do cômodo'] })
+    expect(model).toMatchObject({
+      warnings: [{ key: 'W3:f1', text: 'Sofá · fora do cômodo' }],
+    })
   })
 
   it('nomeia os dois móveis sobrepostos', () => {
@@ -156,6 +158,41 @@ describe('lista de avisos', () => {
     })
     const model = describeSelection(doc, [])
 
-    expect(model).toMatchObject({ warnings: ['Cama e Criado-mudo se sobrepõem'] })
+    expect(model).toMatchObject({
+      warnings: [{ key: 'W4:f1,f2', text: 'Cama e Criado-mudo se sobrepõem' }],
+    })
+  })
+
+  /**
+   * Dois móveis de mesmo nome dão dois avisos de texto idêntico. Com o texto
+   * como chave, a lista quebrava a renderização do painel inteiro — foi o que
+   * o e2e pegou.
+   */
+  it('avisos de texto idêntico têm chaves distintas', () => {
+    let doc = withItem(room(), { name: 'Cadeira', center: { x: 9000, y: 9000 } })
+    doc = withItem(doc, { id: 'f2', name: 'Cadeira', center: { x: 12000, y: 12000 } })
+
+    const model = describeSelection(doc, [])
+    const keys = model.kind === 'empty' ? model.warnings.map((w) => w.key) : []
+
+    expect(keys).toEqual(['W3:f1', 'W3:f2'])
+    expect(new Set(keys).size).toBe(2)
+  })
+
+  /**
+   * Excluir um cômodo deixa os nós dele órfãos, e a spec 01 diz que eles saem
+   * na garbage collection ao salvar. Não há ação a tomar, e quatro linhas
+   * iguais afogariam os avisos que importam.
+   */
+  it('nó órfão não vira aviso no painel', () => {
+    const doc = applyCommand(withItem(room()), {
+      type: 'DeleteRoom',
+      payload: { roomId: ROOM },
+    }).document
+
+    const model = describeSelection(doc, [])
+    const codes = model.kind === 'empty' ? model.warnings.map((w) => w.key) : []
+
+    expect(codes.some((key) => key.startsWith('W5'))).toBe(false)
   })
 })

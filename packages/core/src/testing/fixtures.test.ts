@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { FIXTURE_BUILDERS, buildApto44m2, buildConcave, buildSharedNodes, buildSingleRoom } from './fixtures';
+import {
+  FIXTURE_BUILDERS,
+  buildApto44m2,
+  buildConcave,
+  buildFurnished,
+  buildSharedNodes,
+  buildSingleRoom,
+} from './fixtures';
 import { computeRoomArea, computeUsableArea } from '../commands';
-import { validateDocumentErrors } from '../model';
+import { validateDocument, validateDocumentErrors } from '../model';
 
 const FIXTURES_DIR = join(import.meta.dirname, '..', '..', '..', '..', 'specs', 'fixtures');
 
@@ -36,6 +43,28 @@ describe('fixtures', () => {
     expect(areaM2).toBeGreaterThan(37.4);
     expect(areaM2).toBeLessThan(38.4);
     expect(validateDocumentErrors(doc)).toEqual([]);
+  });
+
+  it('furnished tem 40 moveis sobre o apartamento de referencia', () => {
+    const doc = buildFurnished();
+
+    expect(doc.rooms).toHaveLength(7);
+    expect(doc.furniture).toHaveLength(40);
+    expect(validateDocumentErrors(doc)).toEqual([]);
+  });
+
+  /**
+   * A fixture existe para medir o orcamento de 8 ms no pior caso, e o pior
+   * caso inclui a hachura de colisao. Quarenta moveis num apartamento de
+   * 44 m2 se sobrepoem de verdade -- exigir uma planta arrumada aqui mediria
+   * um cenario que ninguem tem.
+   */
+  it('furnished exercita o caminho de colisao de proposito', () => {
+    const colliding = validateDocument(buildFurnished()).filter(
+      (issue) => issue.code === 'W4',
+    );
+
+    expect(colliding.length).toBeGreaterThan(0);
   });
 
   it('toda fixture tem ids de no distintos', () => {

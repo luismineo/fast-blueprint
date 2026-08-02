@@ -1,0 +1,803 @@
+{
+  "schemaVersion": 1,
+  "meta": {
+    "name": "Apartamento mobiliado",
+    "createdAt": "2026-07-30T00:00:00.000Z",
+    "modifiedAt": "2026-07-30T00:00:00.000Z",
+    "displayUnit": "m",
+    "gridSize": 100
+  },
+  "nodes": [
+    {
+      "id": "n_fx1",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "n_fx2",
+      "x": 3400,
+      "y": 0
+    },
+    {
+      "id": "n_fx3",
+      "x": 3400,
+      "y": 2100
+    },
+    {
+      "id": "n_fx4",
+      "x": 0,
+      "y": 2100
+    },
+    {
+      "id": "n_fx6",
+      "x": 2400,
+      "y": 2100
+    },
+    {
+      "id": "n_fx7",
+      "x": 2400,
+      "y": 7000
+    },
+    {
+      "id": "n_fx8",
+      "x": 0,
+      "y": 7000
+    },
+    {
+      "id": "n_fx10",
+      "x": 6600,
+      "y": 0
+    },
+    {
+      "id": "n_fx11",
+      "x": 6600,
+      "y": 2500
+    },
+    {
+      "id": "n_fx12",
+      "x": 3400,
+      "y": 2500
+    },
+    {
+      "id": "n_fx14",
+      "x": 5600,
+      "y": 2500
+    },
+    {
+      "id": "n_fx15",
+      "x": 5600,
+      "y": 3700
+    },
+    {
+      "id": "n_fx16",
+      "x": 3400,
+      "y": 3700
+    },
+    {
+      "id": "n_fx18",
+      "x": 6600,
+      "y": 3700
+    },
+    {
+      "id": "n_fx19",
+      "x": 6600,
+      "y": 6000
+    },
+    {
+      "id": "n_fx20",
+      "x": 3400,
+      "y": 6000
+    },
+    {
+      "id": "n_fx21",
+      "x": 2400,
+      "y": 6000
+    },
+    {
+      "id": "n_fx23",
+      "x": 3400,
+      "y": 7000
+    },
+    {
+      "id": "n_fx27",
+      "x": 2400,
+      "y": 7900
+    },
+    {
+      "id": "n_fx28",
+      "x": 0,
+      "y": 7900
+    }
+  ],
+  "rooms": [
+    {
+      "id": "r_fx1",
+      "name": "Cozinha/A.S.",
+      "loop": [
+        "n_fx1",
+        "n_fx2",
+        "n_fx3",
+        "n_fx4"
+      ],
+      "color": null,
+      "includeInUsableArea": true
+    },
+    {
+      "id": "r_fx2",
+      "name": "Estar/Jantar",
+      "loop": [
+        "n_fx4",
+        "n_fx6",
+        "n_fx7",
+        "n_fx8"
+      ],
+      "color": null,
+      "includeInUsableArea": true
+    },
+    {
+      "id": "r_fx3",
+      "name": "Dormitório 01",
+      "loop": [
+        "n_fx2",
+        "n_fx10",
+        "n_fx11",
+        "n_fx12"
+      ],
+      "color": null,
+      "includeInUsableArea": true
+    },
+    {
+      "id": "r_fx4",
+      "name": "Banheiro",
+      "loop": [
+        "n_fx12",
+        "n_fx14",
+        "n_fx15",
+        "n_fx16"
+      ],
+      "color": null,
+      "includeInUsableArea": true
+    },
+    {
+      "id": "r_fx5",
+      "name": "Dormitório 02",
+      "loop": [
+        "n_fx16",
+        "n_fx18",
+        "n_fx19",
+        "n_fx20"
+      ],
+      "color": null,
+      "includeInUsableArea": true
+    },
+    {
+      "id": "r_fx6",
+      "name": "Circulação",
+      "loop": [
+        "n_fx21",
+        "n_fx20",
+        "n_fx23",
+        "n_fx7"
+      ],
+      "color": null,
+      "includeInUsableArea": true
+    },
+    {
+      "id": "r_fx7",
+      "name": "Sacada",
+      "loop": [
+        "n_fx8",
+        "n_fx7",
+        "n_fx27",
+        "n_fx28"
+      ],
+      "color": null,
+      "includeInUsableArea": false
+    }
+  ],
+  "walls": [],
+  "openings": [],
+  "furniture": [
+    {
+      "id": "f_fx1",
+      "catalogId": null,
+      "name": "Cama queen",
+      "width": 1580,
+      "depth": 1980,
+      "center": {
+        "x": 400,
+        "y": 400
+      },
+      "rotation": 0,
+      "color": null,
+      "locked": false,
+      "clearance": 600
+    },
+    {
+      "id": "f_fx2",
+      "catalogId": null,
+      "name": "Criado-mudo",
+      "width": 500,
+      "depth": 400,
+      "center": {
+        "x": 1700,
+        "y": 400
+      },
+      "rotation": 90,
+      "color": null,
+      "locked": false,
+      "clearance": 0
+    },
+    {
+      "id": "f_fx3",
+      "catalogId": null,
+      "name": "Guarda-roupa 4 portas",
+      "width": 1800,
+      "depth": 550,
+      "center": {
+        "x": 3000,
+        "y": 400
+      },
+      "rotation": 180,
+      "color": null,
+      "locked": false,
+      "clearance": 700
+    },
+    {
+      "id": "f_fx4",
+      "catalogId": null,
+      "name": "Sofá 3 lugares",
+      "width": 2000,
+      "depth": 900,
+      "center": {
+        "x": 4300,
+        "y": 400
+      },
+      "rotation": 270,
+      "color": null,
+      "locked": false,
+      "clearance": 400
+    },
+    {
+      "id": "f_fx5",
+      "catalogId": null,
+      "name": "Mesa de centro",
+      "width": 1000,
+      "depth": 600,
+      "center": {
+        "x": 5600,
+        "y": 400
+      },
+      "rotation": 0,
+      "color": null,
+      "locked": false,
+      "clearance": 400
+    },
+    {
+      "id": "f_fx6",
+      "catalogId": null,
+      "name": "Cadeira",
+      "width": 450,
+      "depth": 500,
+      "center": {
+        "x": 400,
+        "y": 1900
+      },
+      "rotation": 90,
+      "color": null,
+      "locked": false,
+      "clearance": 0
+    },
+    {
+      "id": "f_fx7",
+      "catalogId": null,
+      "name": "Geladeira duplex",
+      "width": 830,
+      "depth": 750,
+      "center": {
+        "x": 1700,
+        "y": 1900
+      },
+      "rotation": 180,
+      "color": null,
+      "locked": false,
+      "clearance": 900
+    },
+    {
+      "id": "f_fx8",
+      "catalogId": null,
+      "name": "Fogão 4 bocas",
+      "width": 520,
+      "depth": 600,
+      "center": {
+        "x": 3000,
+        "y": 1900
+      },
+      "rotation": 270,
+      "color": null,
+      "locked": false,
+      "clearance": 900
+    },
+    {
+      "id": "f_fx9",
+      "catalogId": null,
+      "name": "Cama queen",
+      "width": 1580,
+      "depth": 1980,
+      "center": {
+        "x": 4300,
+        "y": 1900
+      },
+      "rotation": 0,
+      "color": null,
+      "locked": false,
+      "clearance": 600
+    },
+    {
+      "id": "f_fx10",
+      "catalogId": null,
+      "name": "Criado-mudo",
+      "width": 500,
+      "depth": 400,
+      "center": {
+        "x": 5600,
+        "y": 1900
+      },
+      "rotation": 90,
+      "color": null,
+      "locked": false,
+      "clearance": 0
+    },
+    {
+      "id": "f_fx11",
+      "catalogId": null,
+      "name": "Guarda-roupa 4 portas",
+      "width": 1800,
+      "depth": 550,
+      "center": {
+        "x": 400,
+        "y": 3400
+      },
+      "rotation": 180,
+      "color": null,
+      "locked": false,
+      "clearance": 700
+    },
+    {
+      "id": "f_fx12",
+      "catalogId": null,
+      "name": "Sofá 3 lugares",
+      "width": 2000,
+      "depth": 900,
+      "center": {
+        "x": 1700,
+        "y": 3400
+      },
+      "rotation": 270,
+      "color": null,
+      "locked": false,
+      "clearance": 400
+    },
+    {
+      "id": "f_fx13",
+      "catalogId": null,
+      "name": "Mesa de centro",
+      "width": 1000,
+      "depth": 600,
+      "center": {
+        "x": 3000,
+        "y": 3400
+      },
+      "rotation": 0,
+      "color": null,
+      "locked": false,
+      "clearance": 400
+    },
+    {
+      "id": "f_fx14",
+      "catalogId": null,
+      "name": "Cadeira",
+      "width": 450,
+      "depth": 500,
+      "center": {
+        "x": 4300,
+        "y": 3400
+      },
+      "rotation": 90,
+      "color": null,
+      "locked": false,
+      "clearance": 0
+    },
+    {
+      "id": "f_fx15",
+      "catalogId": null,
+      "name": "Geladeira duplex",
+      "width": 830,
+      "depth": 750,
+      "center": {
+        "x": 5600,
+        "y": 3400
+      },
+      "rotation": 180,
+      "color": null,
+      "locked": false,
+      "clearance": 900
+    },
+    {
+      "id": "f_fx16",
+      "catalogId": null,
+      "name": "Fogão 4 bocas",
+      "width": 520,
+      "depth": 600,
+      "center": {
+        "x": 400,
+        "y": 4900
+      },
+      "rotation": 270,
+      "color": null,
+      "locked": false,
+      "clearance": 900
+    },
+    {
+      "id": "f_fx17",
+      "catalogId": null,
+      "name": "Cama queen",
+      "width": 1580,
+      "depth": 1980,
+      "center": {
+        "x": 1700,
+        "y": 4900
+      },
+      "rotation": 0,
+      "color": null,
+      "locked": false,
+      "clearance": 600
+    },
+    {
+      "id": "f_fx18",
+      "catalogId": null,
+      "name": "Criado-mudo",
+      "width": 500,
+      "depth": 400,
+      "center": {
+        "x": 3000,
+        "y": 4900
+      },
+      "rotation": 90,
+      "color": null,
+      "locked": false,
+      "clearance": 0
+    },
+    {
+      "id": "f_fx19",
+      "catalogId": null,
+      "name": "Guarda-roupa 4 portas",
+      "width": 1800,
+      "depth": 550,
+      "center": {
+        "x": 4300,
+        "y": 4900
+      },
+      "rotation": 180,
+      "color": null,
+      "locked": false,
+      "clearance": 700
+    },
+    {
+      "id": "f_fx20",
+      "catalogId": null,
+      "name": "Sofá 3 lugares",
+      "width": 2000,
+      "depth": 900,
+      "center": {
+        "x": 5600,
+        "y": 4900
+      },
+      "rotation": 270,
+      "color": null,
+      "locked": false,
+      "clearance": 400
+    },
+    {
+      "id": "f_fx21",
+      "catalogId": null,
+      "name": "Mesa de centro",
+      "width": 1000,
+      "depth": 600,
+      "center": {
+        "x": 400,
+        "y": 6400
+      },
+      "rotation": 0,
+      "color": null,
+      "locked": false,
+      "clearance": 400
+    },
+    {
+      "id": "f_fx22",
+      "catalogId": null,
+      "name": "Cadeira",
+      "width": 450,
+      "depth": 500,
+      "center": {
+        "x": 1700,
+        "y": 6400
+      },
+      "rotation": 90,
+      "color": null,
+      "locked": false,
+      "clearance": 0
+    },
+    {
+      "id": "f_fx23",
+      "catalogId": null,
+      "name": "Geladeira duplex",
+      "width": 830,
+      "depth": 750,
+      "center": {
+        "x": 3000,
+        "y": 6400
+      },
+      "rotation": 180,
+      "color": null,
+      "locked": false,
+      "clearance": 900
+    },
+    {
+      "id": "f_fx24",
+      "catalogId": null,
+      "name": "Fogão 4 bocas",
+      "width": 520,
+      "depth": 600,
+      "center": {
+        "x": 4300,
+        "y": 6400
+      },
+      "rotation": 270,
+      "color": null,
+      "locked": false,
+      "clearance": 900
+    },
+    {
+      "id": "f_fx25",
+      "catalogId": null,
+      "name": "Cama queen",
+      "width": 1580,
+      "depth": 1980,
+      "center": {
+        "x": 5600,
+        "y": 6400
+      },
+      "rotation": 0,
+      "color": null,
+      "locked": false,
+      "clearance": 600
+    },
+    {
+      "id": "f_fx26",
+      "catalogId": null,
+      "name": "Criado-mudo",
+      "width": 500,
+      "depth": 400,
+      "center": {
+        "x": 400,
+        "y": 7900
+      },
+      "rotation": 90,
+      "color": null,
+      "locked": false,
+      "clearance": 0
+    },
+    {
+      "id": "f_fx27",
+      "catalogId": null,
+      "name": "Guarda-roupa 4 portas",
+      "width": 1800,
+      "depth": 550,
+      "center": {
+        "x": 1700,
+        "y": 7900
+      },
+      "rotation": 180,
+      "color": null,
+      "locked": false,
+      "clearance": 700
+    },
+    {
+      "id": "f_fx28",
+      "catalogId": null,
+      "name": "Sofá 3 lugares",
+      "width": 2000,
+      "depth": 900,
+      "center": {
+        "x": 3000,
+        "y": 7900
+      },
+      "rotation": 270,
+      "color": null,
+      "locked": false,
+      "clearance": 400
+    },
+    {
+      "id": "f_fx29",
+      "catalogId": null,
+      "name": "Mesa de centro",
+      "width": 1000,
+      "depth": 600,
+      "center": {
+        "x": 4300,
+        "y": 7900
+      },
+      "rotation": 0,
+      "color": null,
+      "locked": false,
+      "clearance": 400
+    },
+    {
+      "id": "f_fx30",
+      "catalogId": null,
+      "name": "Cadeira",
+      "width": 450,
+      "depth": 500,
+      "center": {
+        "x": 5600,
+        "y": 7900
+      },
+      "rotation": 90,
+      "color": null,
+      "locked": false,
+      "clearance": 0
+    },
+    {
+      "id": "f_fx31",
+      "catalogId": null,
+      "name": "Geladeira duplex",
+      "width": 830,
+      "depth": 750,
+      "center": {
+        "x": 400,
+        "y": 9400
+      },
+      "rotation": 180,
+      "color": null,
+      "locked": false,
+      "clearance": 900
+    },
+    {
+      "id": "f_fx32",
+      "catalogId": null,
+      "name": "Fogão 4 bocas",
+      "width": 520,
+      "depth": 600,
+      "center": {
+        "x": 1700,
+        "y": 9400
+      },
+      "rotation": 270,
+      "color": null,
+      "locked": false,
+      "clearance": 900
+    },
+    {
+      "id": "f_fx33",
+      "catalogId": null,
+      "name": "Cama queen",
+      "width": 1580,
+      "depth": 1980,
+      "center": {
+        "x": 3000,
+        "y": 9400
+      },
+      "rotation": 0,
+      "color": null,
+      "locked": false,
+      "clearance": 600
+    },
+    {
+      "id": "f_fx34",
+      "catalogId": null,
+      "name": "Criado-mudo",
+      "width": 500,
+      "depth": 400,
+      "center": {
+        "x": 4300,
+        "y": 9400
+      },
+      "rotation": 90,
+      "color": null,
+      "locked": false,
+      "clearance": 0
+    },
+    {
+      "id": "f_fx35",
+      "catalogId": null,
+      "name": "Guarda-roupa 4 portas",
+      "width": 1800,
+      "depth": 550,
+      "center": {
+        "x": 5600,
+        "y": 9400
+      },
+      "rotation": 180,
+      "color": null,
+      "locked": false,
+      "clearance": 700
+    },
+    {
+      "id": "f_fx36",
+      "catalogId": null,
+      "name": "Sofá 3 lugares",
+      "width": 2000,
+      "depth": 900,
+      "center": {
+        "x": 400,
+        "y": 10900
+      },
+      "rotation": 270,
+      "color": null,
+      "locked": false,
+      "clearance": 400
+    },
+    {
+      "id": "f_fx37",
+      "catalogId": null,
+      "name": "Mesa de centro",
+      "width": 1000,
+      "depth": 600,
+      "center": {
+        "x": 1700,
+        "y": 10900
+      },
+      "rotation": 0,
+      "color": null,
+      "locked": false,
+      "clearance": 400
+    },
+    {
+      "id": "f_fx38",
+      "catalogId": null,
+      "name": "Cadeira",
+      "width": 450,
+      "depth": 500,
+      "center": {
+        "x": 3000,
+        "y": 10900
+      },
+      "rotation": 90,
+      "color": null,
+      "locked": false,
+      "clearance": 0
+    },
+    {
+      "id": "f_fx39",
+      "catalogId": null,
+      "name": "Geladeira duplex",
+      "width": 830,
+      "depth": 750,
+      "center": {
+        "x": 4300,
+        "y": 10900
+      },
+      "rotation": 180,
+      "color": null,
+      "locked": false,
+      "clearance": 900
+    },
+    {
+      "id": "f_fx40",
+      "catalogId": null,
+      "name": "Fogão 4 bocas",
+      "width": 520,
+      "depth": 600,
+      "center": {
+        "x": 5600,
+        "y": 10900
+      },
+      "rotation": 270,
+      "color": null,
+      "locked": false,
+      "clearance": 900
+    }
+  ],
+  "underlay": null
+}

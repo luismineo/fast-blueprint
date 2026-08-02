@@ -27,7 +27,7 @@ export type PanelModel =
       readonly totalArea: string
       readonly roomCount: number
       readonly furnitureCount: number
-      readonly warnings: readonly string[]
+      readonly warnings: readonly PanelWarning[]
     }
   | {
       readonly kind: 'room'
@@ -109,31 +109,57 @@ function emptyModel(doc: PlanDocument): PanelModel {
   }
 }
 
+export interface PanelWarning {
+  /** Identidade estável do aviso, para a lista renderizada. */
+  readonly key: string
+  readonly text: string
+}
+
 /**
- * Avisos ativos, um texto por issue de nível `warning`
+ * Avisos ativos, um por issue de nível `warning`
  * (`07-ui-e-layout.md` § Painel de propriedades).
  *
  * A composição "qual entidade" + "qual aviso" vive aqui, e não no componente:
  * é derivação. `core` devolve issue estruturada com código e ids, e o texto sai
  * de `messages` — a mesma divisão que a spec 07 § Erros de `core` prescreve.
+ *
+ * A chave vem do código e dos ids, nunca do texto: dois móveis com o mesmo
+ * nome produzem dois avisos com o mesmo texto, e uma lista com chave repetida
+ * quebra a renderização inteira.
+ *
+ * **W5 fica de fora.** Nó órfão é estado normal de edição — excluir um cômodo
+ * deixa quatro deles de uma vez —, e a spec 01 diz que eles são removidos por
+ * garbage collection ao salvar, nunca durante a edição. Não há ação que o
+ * usuário possa tomar, e quatro linhas iguais afogariam os avisos que importam.
  */
-function describeWarnings(doc: PlanDocument): string[] {
-  return documentWarnings(doc).map((issue) => {
+function describeWarnings(doc: PlanDocument): PanelWarning[] {
+  const warnings: PanelWarning[] = []
+
+  for (const issue of documentWarnings(doc)) {
+    if (issue.code === 'W5') continue
+
     const names = issue.ids.map((id) => entityName(doc, id))
+    const key = `${issue.code}:${issue.ids.join(',')}`
 
     switch (issue.code) {
       case 'W1':
-        return `${names[0] ?? ''} · ${messages.selfIntersectingRoom}`
+        warnings.push({ key, text: `${names[0] ?? ''} · ${messages.selfIntersectingRoom}` })
+        break
       case 'W2':
-        return `${names.join(' · ')} · ${messages.overlappingRooms}`
+        warnings.push({ key, text: `${names.join(' · ')} · ${messages.overlappingRooms}` })
+        break
       case 'W3':
-        return `${names[0] ?? ''} · ${messages.furnitureOutsideRoom}`
-      case 'W4':
-        return messages.furnitureOverlap(names[0] ?? '', names[1] ?? '')
+        warnings.push({ key, text: `${names[0] ?? ''} · ${messages.furnitureOutsideRoom}` })
+        break
       default:
-        return messages.orphanNode
+        warnings.push({
+          key,
+          text: messages.furnitureOverlap(names[0] ?? '', names[1] ?? ''),
+        })
     }
-  })
+  }
+
+  return warnings
 }
 
 function entityName(doc: PlanDocument, id: string): string {

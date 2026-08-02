@@ -74,8 +74,8 @@
     {#if model.warnings.length > 0}
       <h3 class="section">{messages.panelWarnings}</h3>
       <ul class="warnings" data-testid="warnings">
-        {#each model.warnings as warning (warning)}
-          <li>{warning}</li>
+        {#each model.warnings as warning (warning.key)}
+          <li>{warning.text}</li>
         {/each}
       </ul>
     {/if}

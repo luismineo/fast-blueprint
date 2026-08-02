@@ -1,5 +1,5 @@
 import fc from 'fast-check';
-import type { NodeId, PlanDocument, RoomId } from '../model';
+import type { FurnitureId, NodeId, PlanDocument, RoomId } from '../model';
 import { createEmptyDocument } from '../model';
 import { applyCommand, type Command } from '../commands';
 import type { Point } from '../geometry';
@@ -148,8 +148,103 @@ export function commandsFor(doc: PlanDocument): fc.Arbitrary<Command> {
     );
   }
 
+  options.push(arbAddFurniture);
+
+  if (doc.furniture.length > 0) {
+    const ids = doc.furniture.map((item) => item.id);
+    options.push(
+      fc
+        .record({
+          furnitureId: fc.constantFrom(...ids),
+          x: COORD,
+          y: COORD,
+        })
+        .map(
+          ({ furnitureId, x, y }): Command => ({
+            type: 'MoveFurniture',
+            payload: { furnitureId, center: { x, y } },
+          }),
+        ),
+    );
+    options.push(
+      fc
+        .record({
+          furnitureId: fc.constantFrom(...ids),
+          width: fc.integer({ min: 100, max: 3000 }),
+          depth: fc.integer({ min: 100, max: 3000 }),
+          rotation: fc.integer({ min: 0, max: 359 }),
+          x: COORD,
+          y: COORD,
+        })
+        .map(
+          ({ furnitureId, width, depth, rotation, x, y }): Command => ({
+            type: 'TransformFurniture',
+            payload: { furnitureId, width, depth, rotation, center: { x, y } },
+          }),
+        ),
+    );
+    options.push(
+      fc
+        .record({
+          furnitureId: fc.constantFrom(...ids),
+          name: fc.string({ maxLength: 12 }),
+          locked: fc.boolean(),
+          clearance: fc.integer({ min: 0, max: 1200 }),
+        })
+        .map(
+          ({ furnitureId, name, locked, clearance }): Command => ({
+            type: 'UpdateFurniture',
+            payload: { furnitureId, name, locked, clearance },
+          }),
+        ),
+    );
+    options.push(
+      fc
+        .constantFrom(...ids)
+        .map(
+          (furnitureId): Command => ({ type: 'DeleteFurniture', payload: { furnitureId } }),
+        ),
+    );
+  }
+
   return fc.oneof(...options);
 }
+
+/** Móvel plausível: dimensão de móvel real, rotação inteira, centro inteiro. */
+const arbAddFurniture: fc.Arbitrary<Command> = fc
+  .record({
+    name: fc.string({ maxLength: 12 }),
+    width: fc.integer({ min: 100, max: 3000 }),
+    depth: fc.integer({ min: 100, max: 3000 }),
+    rotation: fc.integer({ min: 0, max: 359 }),
+    clearance: fc.integer({ min: 0, max: 1200 }),
+    x: COORD,
+    y: COORD,
+  })
+  .map(({ name, width, depth, rotation, clearance, x, y }): Command => {
+    sequence += 1;
+    return {
+      type: 'AddFurniture',
+      payload: {
+        furnitureId: `f_p${sequence}` as FurnitureId,
+        catalogId: null,
+        name,
+        width,
+        depth,
+        rotation,
+        clearance,
+        center: { x, y },
+      },
+    };
+  });
+
+/** Retângulo orientado plausível, para as propriedades de colisão. */
+export const arbOrientedRect = fc.record({
+  center: arbNode,
+  width: fc.integer({ min: 100, max: 3000 }),
+  depth: fc.integer({ min: 100, max: 3000 }),
+  rotation: fc.integer({ min: 0, max: 359 }),
+});
 
 export const arbLengthInput = fc
   .oneof(

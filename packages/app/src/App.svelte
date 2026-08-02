@@ -976,6 +976,7 @@
   bind:this={canvasEl}
   class="canvas-fullscreen"
   class:tool-active={tool !== 'select'}
+  class:panel-open={!panelCollapsed}
   tabindex="-1"
 ></canvas>
 
@@ -1104,12 +1105,25 @@
     color: var(--text);
   }
 
+  /*
+    O canvas ocupa a coluna entre a barra de ferramentas e o painel, e não a
+    viewport inteira (`07-ui-e-layout.md` § Layout). Com `100vw` os 48 px da
+    esquerda e os 264 px da direita ficavam sob chrome fixo, e o clique ali
+    nunca chegava ao canvas.
+  */
   .canvas-fullscreen {
+    position: fixed;
+    top: 0;
+    left: 48px;
     display: block;
-    width: 100vw;
+    width: calc(100vw - 48px);
     height: 100vh;
     touch-action: none;
     outline: none;
+  }
+
+  .canvas-fullscreen.panel-open {
+    width: calc(100vw - 48px - 264px);
   }
 
   .canvas-fullscreen.tool-active {

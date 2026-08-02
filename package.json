@@ -16,7 +16,8 @@
     "depcruise": "depcruise --config .dependency-cruiser.cjs packages",
     "version:sync": "node scripts/version-sync.mjs",
     "version:check": "node scripts/version-check.mjs",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "bench": "vitest bench --run --config bench/vitest.config.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
