@@ -17,6 +17,7 @@ export interface Theme {
   readonly selectionFill: string
   readonly snapGuide: string
   readonly snapNode: string
+  readonly glyph: string
   readonly collision: string
   readonly outsideRoom: string
 }
@@ -40,6 +41,7 @@ export const lightTheme: Theme = {
   selectionFill: 'rgba(47,111,237,0.10)',
   snapGuide: '#E0645A',
   snapNode: '#2F6FED',
+  glyph: '#5B6775',
   collision: '#D4735E',
   outsideRoom: '#B9B4A8',
 }
