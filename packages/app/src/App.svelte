@@ -787,6 +787,10 @@
 
       if (tool === 'room') {
         dispatchTool({ type: 'pointerDown', clickCount: 1 }, event.shiftKey)
+      } else if (tool === 'wall') {
+        dispatchWall({ type: 'pointerDown', clickCount: 1 }, event.shiftKey)
+      } else if (tool === 'measure') {
+        dispatchMeasure({ type: 'pointerDown' })
       } else if (tool === 'furniture') {
         dispatchFurniture({ type: 'pointerDown' }, event.altKey)
       } else {
@@ -845,6 +849,10 @@
 
       if (tool === 'room') {
         dispatchTool({ type: 'pointerMove' }, event.shiftKey)
+      } else if (tool === 'wall') {
+        dispatchWall({ type: 'pointerMove' }, event.shiftKey)
+      } else if (tool === 'measure') {
+        dispatchMeasure({ type: 'pointerMove' })
       } else if (tool === 'furniture') {
         dispatchFurniture({ type: 'pointerMove' }, event.altKey)
       } else {
