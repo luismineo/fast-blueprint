@@ -23,6 +23,7 @@
     resolveFurnitureSnap,
     tryParseAngle,
     tryParseLength,
+    type FurnitureGlyph,
     type FurnitureId,
     type OverlayPrimitive,
     type PlanDocument,
@@ -148,7 +149,19 @@
 
   const defaultCatalog = loadDefaultCatalog()
   const catalogItems = $derived(mergeCatalogs(defaultCatalog, userItems))
-  const glyphs = new Map(loadGlyphs().map((g) => [g.id, g]))
+
+  const allGlyphs = loadGlyphs()
+  const glyphs = $derived.by(() => {
+    const glyphsById = new Map(allGlyphs.map((g) => [g.id, g]))
+    const map = new Map<string, FurnitureGlyph>()
+    for (const item of catalogItems) {
+      if (item.glyph) {
+        const g = glyphsById.get(item.glyph)
+        if (g) map.set(item.id, g)
+      }
+    }
+    return map
+  })
 
   const store = new DocumentStore()
   let doc: PlanDocument = $state.raw(store.current)

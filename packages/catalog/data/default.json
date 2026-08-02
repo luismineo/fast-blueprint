@@ -1,66 +1,722 @@
 {
   "version": 1,
   "items": [
-    { "id": "bed-single", "name": "Cama solteiro", "category": "quarto", "width": 880, "depth": 1880, "clearance": 600, "tags": ["cama", "solteiro", "dormir"] },
-    { "id": "bed-single-xl", "name": "Cama solteiro king", "category": "quarto", "width": 960, "depth": 2030, "clearance": 600, "tags": ["cama", "solteiro", "dormir"] },
-    { "id": "bed-double", "name": "Cama casal", "category": "quarto", "width": 1380, "depth": 1880, "clearance": 600, "tags": ["cama", "casal", "dormir"] },
-    { "id": "bed-queen", "name": "Cama queen", "category": "quarto", "width": 1580, "depth": 1980, "clearance": 600, "tags": ["cama", "casal", "dormir"] },
-    { "id": "bed-king", "name": "Cama king", "category": "quarto", "width": 1930, "depth": 2030, "clearance": 600, "tags": ["cama", "casal", "dormir"] },
-    { "id": "bed-bunk", "name": "Beliche", "category": "quarto", "width": 980, "depth": 1980, "clearance": 600, "tags": ["cama", "beliche", "dormir", "crianca"] },
-    { "id": "nightstand", "name": "Criado-mudo", "category": "quarto", "width": 500, "depth": 400, "clearance": 0, "tags": ["mesa de cabeceira", "apoio"] },
-    { "id": "wardrobe-2d", "name": "Guarda-roupa 2 portas", "category": "quarto", "width": 900, "depth": 550, "clearance": 700, "tags": ["armario", "roupa"] },
-    { "id": "wardrobe-4d", "name": "Guarda-roupa 4 portas", "category": "quarto", "width": 1800, "depth": 550, "clearance": 700, "tags": ["armario", "roupa"] },
-    { "id": "wardrobe-6d", "name": "Guarda-roupa 6 portas", "category": "quarto", "width": 2700, "depth": 600, "clearance": 700, "tags": ["armario", "roupa"] },
-    { "id": "dresser", "name": "Cômoda", "category": "quarto", "width": 900, "depth": 450, "clearance": 700, "tags": ["gaveta", "roupa"] },
-
-    { "id": "sofa-2", "name": "Sofá 2 lugares", "category": "sala", "width": 1600, "depth": 900, "clearance": 400, "tags": ["sofa", "estar"] },
-    { "id": "sofa-3", "name": "Sofá 3 lugares", "category": "sala", "width": 2000, "depth": 900, "clearance": 400, "tags": ["sofa", "estar"] },
-    { "id": "sofa-retratil-3", "name": "Sofá retrátil 3 lugares", "category": "sala", "width": 2100, "depth": 1000, "clearance": 400, "tags": ["sofa", "estar", "reclinavel"] },
-    { "id": "sofa-l", "name": "Sofá de canto", "category": "sala", "width": 2400, "depth": 1700, "clearance": 400, "tags": ["sofa", "estar", "chaise"] },
-    { "id": "armchair", "name": "Poltrona", "category": "sala", "width": 800, "depth": 800, "clearance": 300, "tags": ["estar", "leitura"] },
-    { "id": "coffee-table", "name": "Mesa de centro", "category": "sala", "width": 1000, "depth": 600, "clearance": 400, "tags": ["mesa", "estar"] },
-    { "id": "side-table", "name": "Mesa lateral", "category": "sala", "width": 450, "depth": 450, "clearance": 0, "tags": ["mesa", "apoio"] },
-    { "id": "tv-rack-15", "name": "Rack 1,50 m", "category": "sala", "width": 1500, "depth": 400, "clearance": 0, "tags": ["tv", "estar"] },
-    { "id": "tv-rack-18", "name": "Rack 1,80 m", "category": "sala", "width": 1800, "depth": 450, "clearance": 0, "tags": ["tv", "estar"] },
-    { "id": "bookshelf", "name": "Estante", "category": "sala", "width": 800, "depth": 350, "clearance": 600, "tags": ["livro", "prateleira"] },
-    { "id": "dining-4", "name": "Mesa de jantar 4 lugares", "category": "sala", "width": 1200, "depth": 800, "clearance": 750, "tags": ["mesa", "jantar"] },
-    { "id": "dining-6", "name": "Mesa de jantar 6 lugares", "category": "sala", "width": 1600, "depth": 900, "clearance": 750, "tags": ["mesa", "jantar"] },
-    { "id": "dining-round-4", "name": "Mesa redonda 4 lugares", "category": "sala", "width": 1100, "depth": 1100, "clearance": 750, "tags": ["mesa", "jantar", "redonda"] },
-    { "id": "chair", "name": "Cadeira", "category": "sala", "width": 450, "depth": 500, "clearance": 0, "tags": ["jantar", "assento"] },
-    { "id": "bench-corner", "name": "Canto alemão", "category": "sala", "width": 1600, "depth": 1600, "clearance": 600, "tags": ["banco", "jantar"] },
-
-    { "id": "counter-run", "name": "Bancada (por metro)", "category": "cozinha", "width": 1000, "depth": 600, "clearance": 900, "tags": ["bancada", "armario"] },
-    { "id": "sink-cabinet", "name": "Gabinete de pia", "category": "cozinha", "width": 1200, "depth": 550, "clearance": 900, "tags": ["pia", "bancada"] },
-    { "id": "stove-4", "name": "Fogão 4 bocas", "category": "cozinha", "width": 520, "depth": 600, "clearance": 900, "tags": ["fogao", "cozinhar"] },
-    { "id": "stove-5", "name": "Fogão 5 bocas", "category": "cozinha", "width": 760, "depth": 600, "clearance": 900, "tags": ["fogao", "cozinhar"] },
-    { "id": "cooktop-4", "name": "Cooktop 4 bocas", "category": "cozinha", "width": 580, "depth": 500, "clearance": 900, "tags": ["fogao", "cozinhar", "embutido"] },
-    { "id": "fridge-frost-free", "name": "Geladeira frost free", "category": "cozinha", "width": 700, "depth": 700, "clearance": 900, "tags": ["geladeira", "refrigerador"] },
-    { "id": "fridge-duplex", "name": "Geladeira duplex", "category": "cozinha", "width": 830, "depth": 750, "clearance": 900, "tags": ["geladeira", "refrigerador"] },
-    { "id": "microwave", "name": "Micro-ondas", "category": "cozinha", "width": 500, "depth": 400, "clearance": 0, "tags": ["forno", "bancada"] },
-    { "id": "dishwasher", "name": "Lava-louças", "category": "cozinha", "width": 600, "depth": 600, "clearance": 900, "tags": ["louca", "embutido"] },
-    { "id": "island-small", "name": "Ilha compacta", "category": "cozinha", "width": 1200, "depth": 700, "clearance": 900, "tags": ["bancada", "ilha"] },
-
-    { "id": "toilet", "name": "Vaso sanitário", "category": "banheiro", "width": 380, "depth": 700, "clearance": 500, "tags": ["sanitario", "privada"] },
-    { "id": "sink-pedestal", "name": "Lavatório com coluna", "category": "banheiro", "width": 550, "depth": 450, "clearance": 600, "tags": ["pia", "lavatorio"] },
-    { "id": "vanity-60", "name": "Gabinete 60 cm", "category": "banheiro", "width": 600, "depth": 450, "clearance": 600, "tags": ["pia", "armario"] },
-    { "id": "vanity-80", "name": "Gabinete 80 cm", "category": "banheiro", "width": 800, "depth": 480, "clearance": 600, "tags": ["pia", "armario"] },
-    { "id": "shower-90", "name": "Box 90 × 90", "category": "banheiro", "width": 900, "depth": 900, "clearance": 0, "tags": ["chuveiro", "box"] },
-    { "id": "shower-120", "name": "Box 120 × 90", "category": "banheiro", "width": 1200, "depth": 900, "clearance": 0, "tags": ["chuveiro", "box"] },
-    { "id": "bathtub", "name": "Banheira", "category": "banheiro", "width": 1700, "depth": 750, "clearance": 0, "tags": ["banho"] },
-
-    { "id": "washer", "name": "Máquina de lavar", "category": "servico", "width": 600, "depth": 650, "clearance": 900, "tags": ["lavar", "roupa"] },
-    { "id": "washer-dryer", "name": "Lava e seca", "category": "servico", "width": 600, "depth": 700, "clearance": 900, "tags": ["lavar", "secar", "roupa"] },
-    { "id": "laundry-sink", "name": "Tanque", "category": "servico", "width": 550, "depth": 550, "clearance": 700, "tags": ["lavar", "pia"] },
-    { "id": "laundry-cabinet", "name": "Armário de serviço", "category": "servico", "width": 800, "depth": 400, "clearance": 700, "tags": ["armario", "guardar"] },
-
-    { "id": "desk-120", "name": "Escrivaninha 1,20 m", "category": "escritorio", "width": 1200, "depth": 600, "clearance": 800, "tags": ["mesa", "trabalho", "estudo"] },
-    { "id": "desk-140", "name": "Escrivaninha 1,40 m", "category": "escritorio", "width": 1400, "depth": 700, "clearance": 800, "tags": ["mesa", "trabalho", "estudo"] },
-    { "id": "desk-l", "name": "Mesa em L", "category": "escritorio", "width": 1600, "depth": 1400, "clearance": 800, "tags": ["mesa", "trabalho"] },
-    { "id": "office-chair", "name": "Cadeira de escritório", "category": "escritorio", "width": 650, "depth": 650, "clearance": 0, "tags": ["assento", "trabalho"] },
-    { "id": "filing-cabinet", "name": "Gaveteiro", "category": "escritorio", "width": 400, "depth": 500, "clearance": 600, "tags": ["arquivo", "gaveta"] },
-
-    { "id": "clearance-person", "name": "Passagem de pessoa", "category": "circulacao", "width": 600, "depth": 600, "tags": ["gabarito", "passagem"] },
-    { "id": "clearance-wheelchair", "name": "Giro de cadeira de rodas", "category": "circulacao", "width": 1500, "depth": 1500, "tags": ["gabarito", "acessibilidade", "nbr 9050"] },
-    { "id": "clearance-door-swing", "name": "Abertura de porta 80", "category": "circulacao", "width": 800, "depth": 800, "tags": ["gabarito", "porta"] }
+    {
+      "id": "bed-single",
+      "name": "Cama solteiro",
+      "category": "quarto",
+      "width": 880,
+      "depth": 1880,
+      "clearance": 600,
+      "tags": [
+        "cama",
+        "solteiro",
+        "dormir"
+      ],
+      "glyph": "bed"
+    },
+    {
+      "id": "bed-single-xl",
+      "name": "Cama solteiro king",
+      "category": "quarto",
+      "width": 960,
+      "depth": 2030,
+      "clearance": 600,
+      "tags": [
+        "cama",
+        "solteiro",
+        "dormir"
+      ],
+      "glyph": "bed"
+    },
+    {
+      "id": "bed-double",
+      "name": "Cama casal",
+      "category": "quarto",
+      "width": 1380,
+      "depth": 1880,
+      "clearance": 600,
+      "tags": [
+        "cama",
+        "casal",
+        "dormir"
+      ],
+      "glyph": "bed"
+    },
+    {
+      "id": "bed-queen",
+      "name": "Cama queen",
+      "category": "quarto",
+      "width": 1580,
+      "depth": 1980,
+      "clearance": 600,
+      "tags": [
+        "cama",
+        "casal",
+        "dormir"
+      ],
+      "glyph": "bed"
+    },
+    {
+      "id": "bed-king",
+      "name": "Cama king",
+      "category": "quarto",
+      "width": 1930,
+      "depth": 2030,
+      "clearance": 600,
+      "tags": [
+        "cama",
+        "casal",
+        "dormir"
+      ],
+      "glyph": "bed"
+    },
+    {
+      "id": "bed-bunk",
+      "name": "Beliche",
+      "category": "quarto",
+      "width": 980,
+      "depth": 1980,
+      "clearance": 600,
+      "tags": [
+        "cama",
+        "beliche",
+        "dormir",
+        "crianca"
+      ],
+      "glyph": "bed"
+    },
+    {
+      "id": "nightstand",
+      "name": "Criado-mudo",
+      "category": "quarto",
+      "width": 500,
+      "depth": 400,
+      "clearance": 0,
+      "tags": [
+        "mesa de cabeceira",
+        "apoio"
+      ],
+      "glyph": "nightstand"
+    },
+    {
+      "id": "wardrobe-2d",
+      "name": "Guarda-roupa 2 portas",
+      "category": "quarto",
+      "width": 900,
+      "depth": 550,
+      "clearance": 700,
+      "tags": [
+        "armario",
+        "roupa"
+      ],
+      "glyph": "wardrobe"
+    },
+    {
+      "id": "wardrobe-4d",
+      "name": "Guarda-roupa 4 portas",
+      "category": "quarto",
+      "width": 1800,
+      "depth": 550,
+      "clearance": 700,
+      "tags": [
+        "armario",
+        "roupa"
+      ],
+      "glyph": "wardrobe"
+    },
+    {
+      "id": "wardrobe-6d",
+      "name": "Guarda-roupa 6 portas",
+      "category": "quarto",
+      "width": 2700,
+      "depth": 600,
+      "clearance": 700,
+      "tags": [
+        "armario",
+        "roupa"
+      ],
+      "glyph": "wardrobe"
+    },
+    {
+      "id": "dresser",
+      "name": "Cômoda",
+      "category": "quarto",
+      "width": 900,
+      "depth": 450,
+      "clearance": 700,
+      "tags": [
+        "gaveta",
+        "roupa"
+      ]
+    },
+    {
+      "id": "sofa-2",
+      "name": "Sofá 2 lugares",
+      "category": "sala",
+      "width": 1600,
+      "depth": 900,
+      "clearance": 400,
+      "tags": [
+        "sofa",
+        "estar"
+      ],
+      "glyph": "sofa"
+    },
+    {
+      "id": "sofa-3",
+      "name": "Sofá 3 lugares",
+      "category": "sala",
+      "width": 2000,
+      "depth": 900,
+      "clearance": 400,
+      "tags": [
+        "sofa",
+        "estar"
+      ],
+      "glyph": "sofa"
+    },
+    {
+      "id": "sofa-retratil-3",
+      "name": "Sofá retrátil 3 lugares",
+      "category": "sala",
+      "width": 2100,
+      "depth": 1000,
+      "clearance": 400,
+      "tags": [
+        "sofa",
+        "estar",
+        "reclinavel"
+      ],
+      "glyph": "sofa"
+    },
+    {
+      "id": "sofa-l",
+      "name": "Sofá de canto",
+      "category": "sala",
+      "width": 2400,
+      "depth": 1700,
+      "clearance": 400,
+      "tags": [
+        "sofa",
+        "estar",
+        "chaise"
+      ],
+      "glyph": "sofa"
+    },
+    {
+      "id": "armchair",
+      "name": "Poltrona",
+      "category": "sala",
+      "width": 800,
+      "depth": 800,
+      "clearance": 300,
+      "tags": [
+        "estar",
+        "leitura"
+      ],
+      "glyph": "sofa"
+    },
+    {
+      "id": "coffee-table",
+      "name": "Mesa de centro",
+      "category": "sala",
+      "width": 1000,
+      "depth": 600,
+      "clearance": 400,
+      "tags": [
+        "mesa",
+        "estar"
+      ],
+      "glyph": "coffee-table"
+    },
+    {
+      "id": "side-table",
+      "name": "Mesa lateral",
+      "category": "sala",
+      "width": 450,
+      "depth": 450,
+      "clearance": 0,
+      "tags": [
+        "mesa",
+        "apoio"
+      ],
+      "glyph": "coffee-table"
+    },
+    {
+      "id": "tv-rack-15",
+      "name": "Rack 1,50 m",
+      "category": "sala",
+      "width": 1500,
+      "depth": 400,
+      "clearance": 0,
+      "tags": [
+        "tv",
+        "estar"
+      ],
+      "glyph": "rack"
+    },
+    {
+      "id": "tv-rack-18",
+      "name": "Rack 1,80 m",
+      "category": "sala",
+      "width": 1800,
+      "depth": 450,
+      "clearance": 0,
+      "tags": [
+        "tv",
+        "estar"
+      ],
+      "glyph": "rack"
+    },
+    {
+      "id": "bookshelf",
+      "name": "Estante",
+      "category": "sala",
+      "width": 800,
+      "depth": 350,
+      "clearance": 600,
+      "tags": [
+        "livro",
+        "prateleira"
+      ],
+      "glyph": "bookshelf"
+    },
+    {
+      "id": "dining-4",
+      "name": "Mesa de jantar 4 lugares",
+      "category": "sala",
+      "width": 1200,
+      "depth": 800,
+      "clearance": 750,
+      "tags": [
+        "mesa",
+        "jantar"
+      ],
+      "glyph": "dining-table"
+    },
+    {
+      "id": "dining-6",
+      "name": "Mesa de jantar 6 lugares",
+      "category": "sala",
+      "width": 1600,
+      "depth": 900,
+      "clearance": 750,
+      "tags": [
+        "mesa",
+        "jantar"
+      ],
+      "glyph": "dining-table"
+    },
+    {
+      "id": "dining-round-4",
+      "name": "Mesa redonda 4 lugares",
+      "category": "sala",
+      "width": 1100,
+      "depth": 1100,
+      "clearance": 750,
+      "tags": [
+        "mesa",
+        "jantar",
+        "redonda"
+      ],
+      "glyph": "dining-table"
+    },
+    {
+      "id": "chair",
+      "name": "Cadeira",
+      "category": "sala",
+      "width": 450,
+      "depth": 500,
+      "clearance": 0,
+      "tags": [
+        "jantar",
+        "assento"
+      ],
+      "glyph": "chair"
+    },
+    {
+      "id": "bench-corner",
+      "name": "Canto alemão",
+      "category": "sala",
+      "width": 1600,
+      "depth": 1600,
+      "clearance": 600,
+      "tags": [
+        "banco",
+        "jantar"
+      ],
+      "glyph": "dining-table"
+    },
+    {
+      "id": "counter-run",
+      "name": "Bancada (por metro)",
+      "category": "cozinha",
+      "width": 1000,
+      "depth": 600,
+      "clearance": 900,
+      "tags": [
+        "bancada",
+        "armario"
+      ],
+      "glyph": "cabinet"
+    },
+    {
+      "id": "sink-cabinet",
+      "name": "Gabinete de pia",
+      "category": "cozinha",
+      "width": 1200,
+      "depth": 550,
+      "clearance": 900,
+      "tags": [
+        "pia",
+        "bancada"
+      ],
+      "glyph": "sink-kitchen"
+    },
+    {
+      "id": "stove-4",
+      "name": "Fogão 4 bocas",
+      "category": "cozinha",
+      "width": 520,
+      "depth": 600,
+      "clearance": 900,
+      "tags": [
+        "fogao",
+        "cozinhar"
+      ],
+      "glyph": "stove"
+    },
+    {
+      "id": "stove-5",
+      "name": "Fogão 5 bocas",
+      "category": "cozinha",
+      "width": 760,
+      "depth": 600,
+      "clearance": 900,
+      "tags": [
+        "fogao",
+        "cozinhar"
+      ],
+      "glyph": "stove"
+    },
+    {
+      "id": "cooktop-4",
+      "name": "Cooktop 4 bocas",
+      "category": "cozinha",
+      "width": 580,
+      "depth": 500,
+      "clearance": 900,
+      "tags": [
+        "fogao",
+        "cozinhar",
+        "embutido"
+      ],
+      "glyph": "stove"
+    },
+    {
+      "id": "fridge-frost-free",
+      "name": "Geladeira frost free",
+      "category": "cozinha",
+      "width": 700,
+      "depth": 700,
+      "clearance": 900,
+      "tags": [
+        "geladeira",
+        "refrigerador"
+      ],
+      "glyph": "fridge"
+    },
+    {
+      "id": "fridge-duplex",
+      "name": "Geladeira duplex",
+      "category": "cozinha",
+      "width": 830,
+      "depth": 750,
+      "clearance": 900,
+      "tags": [
+        "geladeira",
+        "refrigerador"
+      ],
+      "glyph": "fridge"
+    },
+    {
+      "id": "microwave",
+      "name": "Micro-ondas",
+      "category": "cozinha",
+      "width": 500,
+      "depth": 400,
+      "clearance": 0,
+      "tags": [
+        "forno",
+        "bancada"
+      ]
+    },
+    {
+      "id": "dishwasher",
+      "name": "Lava-louças",
+      "category": "cozinha",
+      "width": 600,
+      "depth": 600,
+      "clearance": 900,
+      "tags": [
+        "louca",
+        "embutido"
+      ]
+    },
+    {
+      "id": "island-small",
+      "name": "Ilha compacta",
+      "category": "cozinha",
+      "width": 1200,
+      "depth": 700,
+      "clearance": 900,
+      "tags": [
+        "bancada",
+        "ilha"
+      ]
+    },
+    {
+      "id": "toilet",
+      "name": "Vaso sanitário",
+      "category": "banheiro",
+      "width": 380,
+      "depth": 700,
+      "clearance": 500,
+      "tags": [
+        "sanitario",
+        "privada"
+      ],
+      "glyph": "toilet"
+    },
+    {
+      "id": "sink-pedestal",
+      "name": "Lavatório com coluna",
+      "category": "banheiro",
+      "width": 550,
+      "depth": 450,
+      "clearance": 600,
+      "tags": [
+        "pia",
+        "lavatorio"
+      ],
+      "glyph": "sink-bath"
+    },
+    {
+      "id": "vanity-60",
+      "name": "Gabinete 60 cm",
+      "category": "banheiro",
+      "width": 600,
+      "depth": 450,
+      "clearance": 600,
+      "tags": [
+        "pia",
+        "armario"
+      ],
+      "glyph": "sink-bath"
+    },
+    {
+      "id": "vanity-80",
+      "name": "Gabinete 80 cm",
+      "category": "banheiro",
+      "width": 800,
+      "depth": 480,
+      "clearance": 600,
+      "tags": [
+        "pia",
+        "armario"
+      ],
+      "glyph": "sink-bath"
+    },
+    {
+      "id": "shower-90",
+      "name": "Box 90 × 90",
+      "category": "banheiro",
+      "width": 900,
+      "depth": 900,
+      "clearance": 0,
+      "tags": [
+        "chuveiro",
+        "box"
+      ],
+      "glyph": "shower"
+    },
+    {
+      "id": "shower-120",
+      "name": "Box 120 × 90",
+      "category": "banheiro",
+      "width": 1200,
+      "depth": 900,
+      "clearance": 0,
+      "tags": [
+        "chuveiro",
+        "box"
+      ],
+      "glyph": "shower"
+    },
+    {
+      "id": "bathtub",
+      "name": "Banheira",
+      "category": "banheiro",
+      "width": 1700,
+      "depth": 750,
+      "clearance": 0,
+      "tags": [
+        "banho"
+      ],
+      "glyph": "bathtub"
+    },
+    {
+      "id": "washer",
+      "name": "Máquina de lavar",
+      "category": "servico",
+      "width": 600,
+      "depth": 650,
+      "clearance": 900,
+      "tags": [
+        "lavar",
+        "roupa"
+      ],
+      "glyph": "washing-machine"
+    },
+    {
+      "id": "washer-dryer",
+      "name": "Lava e seca",
+      "category": "servico",
+      "width": 600,
+      "depth": 700,
+      "clearance": 900,
+      "tags": [
+        "lavar",
+        "secar",
+        "roupa"
+      ],
+      "glyph": "washing-machine"
+    },
+    {
+      "id": "laundry-sink",
+      "name": "Tanque",
+      "category": "servico",
+      "width": 550,
+      "depth": 550,
+      "clearance": 700,
+      "tags": [
+        "lavar",
+        "pia"
+      ]
+    },
+    {
+      "id": "laundry-cabinet",
+      "name": "Armário de serviço",
+      "category": "servico",
+      "width": 800,
+      "depth": 400,
+      "clearance": 700,
+      "tags": [
+        "armario",
+        "guardar"
+      ]
+    },
+    {
+      "id": "desk-120",
+      "name": "Escrivaninha 1,20 m",
+      "category": "escritorio",
+      "width": 1200,
+      "depth": 600,
+      "clearance": 800,
+      "tags": [
+        "mesa",
+        "trabalho",
+        "estudo"
+      ],
+      "glyph": "desk"
+    },
+    {
+      "id": "desk-140",
+      "name": "Escrivaninha 1,40 m",
+      "category": "escritorio",
+      "width": 1400,
+      "depth": 700,
+      "clearance": 800,
+      "tags": [
+        "mesa",
+        "trabalho",
+        "estudo"
+      ],
+      "glyph": "desk"
+    },
+    {
+      "id": "desk-l",
+      "name": "Mesa em L",
+      "category": "escritorio",
+      "width": 1600,
+      "depth": 1400,
+      "clearance": 800,
+      "tags": [
+        "mesa",
+        "trabalho"
+      ],
+      "glyph": "desk"
+    },
+    {
+      "id": "office-chair",
+      "name": "Cadeira de escritório",
+      "category": "escritorio",
+      "width": 650,
+      "depth": 650,
+      "clearance": 0,
+      "tags": [
+        "assento",
+        "trabalho"
+      ],
+      "glyph": "office-chair"
+    },
+    {
+      "id": "filing-cabinet",
+      "name": "Gaveteiro",
+      "category": "escritorio",
+      "width": 400,
+      "depth": 500,
+      "clearance": 600,
+      "tags": [
+        "arquivo",
+        "gaveta"
+      ],
+      "glyph": "wardrobe"
+    },
+    {
+      "id": "clearance-person",
+      "name": "Passagem de pessoa",
+      "category": "circulacao",
+      "width": 600,
+      "depth": 600,
+      "tags": [
+        "gabarito",
+        "passagem"
+      ]
+    },
+    {
+      "id": "clearance-wheelchair",
+      "name": "Giro de cadeira de rodas",
+      "category": "circulacao",
+      "width": 1500,
+      "depth": 1500,
+      "tags": [
+        "gabarito",
+        "acessibilidade",
+        "nbr 9050"
+      ]
+    },
+    {
+      "id": "clearance-door-swing",
+      "name": "Abertura de porta 80",
+      "category": "circulacao",
+      "width": 800,
+      "depth": 800,
+      "tags": [
+        "gabarito",
+        "porta"
+      ]
+    }
   ]
 }
