@@ -85,6 +85,7 @@
   import { pushRecent, type CatalogEntry } from './components/catalogModel'
   import {
     loadDefaultCatalog,
+    loadGlyphs,
     mergeCatalogs,
     upsertUserItem,
     userItemFrom,
@@ -130,6 +131,7 @@
 
   const defaultCatalog = loadDefaultCatalog()
   const catalogItems = $derived(mergeCatalogs(defaultCatalog, userItems))
+  const glyphs = new Map(loadGlyphs().map((g) => [g.id, g]))
 
   const store = new DocumentStore()
   let doc: PlanDocument = $state.raw(store.current)
@@ -644,6 +646,7 @@
         overlays,
         selection,
         hover,
+        glyphs,
       })
     })
 
