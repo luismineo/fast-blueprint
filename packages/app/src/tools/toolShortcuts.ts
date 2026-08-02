@@ -5,7 +5,13 @@ import { NUDGE_COARSE_MM, NUDGE_MM } from './furnitureActions'
 /** Ferramentas que existem. Parede e Medir seguem em aberto desde o M1. */
 export type ToolId = 'select' | 'room' | 'furniture'
 
-export type FocusKind = 'canvas' | 'hudLength' | 'hudAngle' | 'roomName' | 'other'
+export type FocusKind =
+  | 'canvas'
+  | 'hudLength'
+  | 'hudAngle'
+  | 'roomName'
+  | 'toolbar'
+  | 'other'
 
 export interface KeyContext {
   readonly key: string
@@ -77,6 +83,12 @@ export function classifyKey(ctx: KeyContext): KeyAction {
     }
     return { kind: 'selectEvent', event: { type: 'escape' } }
   }
+
+  // Widget composto gerencia a própria navegação: com foco na barra de
+  // ferramentas, `Home` move o foco em vez de enquadrar, e nenhum atalho
+  // global dispara. É a mesma regra D0 que vale para campo de texto — o
+  // elemento com foco consome a tecla.
+  if (ctx.focus === 'toolbar') return { kind: 'none' }
 
   // Dígitos são permanentemente reservados para a entrada numérica
   // (`03-ferramentas-e-interacao.md`). Roteá-los sempre pela ferramenta, mesmo

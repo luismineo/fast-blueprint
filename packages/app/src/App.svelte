@@ -81,6 +81,7 @@
   } from './tools/toolShortcuts'
   import PropertiesPanel from './components/PropertiesPanel.svelte'
   import CatalogPanel from './components/CatalogPanel.svelte'
+  import Toolbar from './components/Toolbar.svelte'
   import { pushRecent, type CatalogEntry } from './components/catalogModel'
   import {
     loadDefaultCatalog,
@@ -155,6 +156,7 @@
     if (active === lengthEl) return 'hudLength'
     if (active === angleEl) return 'hudAngle'
     if (active === nameEl || active === edgeEl) return 'roomName'
+    if (active.closest('[role="toolbar"]')) return 'toolbar'
     if (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') return 'other'
     return 'canvas'
   }
@@ -976,6 +978,8 @@
   class:tool-active={tool !== 'select'}
   tabindex="-1"
 ></canvas>
+
+<Toolbar {tool} onSelect={activateTool} />
 
 <aside class="side-panel" class:collapsed={panelCollapsed}>
   <PropertiesPanel

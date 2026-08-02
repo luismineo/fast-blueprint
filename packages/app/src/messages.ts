@@ -16,6 +16,15 @@ export const messages = {
 
   roomNameLabel: 'Nome do cômodo',
 
+  toolbarLabel: 'Ferramentas',
+  toolSelect: 'Selecionar',
+  toolRoom: 'Cômodo',
+  toolWall: 'Parede',
+  toolFurniture: 'Mobília',
+  toolMeasure: 'Medir',
+  toolTooltip: (name: string, shortcut: string) => `${name} (${shortcut})`,
+  toolUnavailable: (name: string) => `${name} — ainda não disponível`,
+
   summaryUsableArea: 'Área útil',
   summaryTotalArea: 'Área total',
   summaryRoomCount: 'Cômodos',
