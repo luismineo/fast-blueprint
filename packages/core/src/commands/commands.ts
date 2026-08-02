@@ -10,12 +10,14 @@ import type {
   Node,
   Room,
   EdgeRef,
+  FurnitureId,
   FurnitureItem,
   HexColor,
 } from '../model';
 import {
   generateNodeId,
   generateRoomId,
+  generateFurnitureId,
   generateDefaultRoomName,
   isDocumentColor,
 } from '../model';
@@ -44,6 +46,11 @@ export type Command =
   | SetEdgeLengthCommand
   | SetRoomColorCommand
   | SetRoomUsableCommand
+  | AddFurnitureCommand
+  | MoveFurnitureCommand
+  | TransformFurnitureCommand
+  | UpdateFurnitureCommand
+  | DeleteFurnitureCommand
   | BatchCommand;
 
 export interface CreateRoomCommand {
@@ -153,6 +160,90 @@ export interface SetRoomUsablePayload {
   includeInUsableArea: boolean;
 }
 
+export interface AddFurnitureCommand {
+  type: 'AddFurniture';
+  transient?: boolean;
+  payload: AddFurniturePayload;
+}
+
+/**
+ * Dimensões **resolvidas**, nunca um id de catálogo.
+ *
+ * `core` não conhece o pacote `catalog`, e a direção de dependência da spec 08
+ * não admite que conheça. `catalogId` viaja junto só como rastreabilidade — é
+ * o que faz "editar a dimensão do móvel não altera o catálogo" valer por
+ * construção.
+ */
+export interface AddFurniturePayload {
+  furnitureId?: FurnitureId;
+  catalogId: string | null;
+  name: string;
+  width: number;
+  depth: number;
+  center: { x: number; y: number };
+  rotation: number;
+  clearance: number;
+  color?: HexColor | null;
+  locked?: boolean;
+  outline?: boolean;
+}
+
+export interface MoveFurnitureCommand {
+  type: 'MoveFurniture';
+  transient?: boolean;
+  payload: MoveFurniturePayload;
+}
+
+export interface MoveFurniturePayload {
+  furnitureId: FurnitureId;
+  center: { x: number; y: number };
+}
+
+export interface TransformFurnitureCommand {
+  type: 'TransformFurniture';
+  transient?: boolean;
+  payload: TransformFurniturePayload;
+}
+
+/**
+ * Rotação e redimensionamento numa operação só.
+ *
+ * Carrega `center` porque redimensionar por handle de canto mantém o canto
+ * oposto fixo, o que move o centro; separar as duas faria o retângulo pular a
+ * cada frame do arraste.
+ */
+export interface TransformFurniturePayload {
+  furnitureId: FurnitureId;
+  width: number;
+  depth: number;
+  rotation: number;
+  center: { x: number; y: number };
+}
+
+export interface UpdateFurnitureCommand {
+  type: 'UpdateFurniture';
+  transient?: boolean;
+  payload: UpdateFurniturePayload;
+}
+
+export interface UpdateFurniturePayload {
+  furnitureId: FurnitureId;
+  name?: string;
+  color?: HexColor | null;
+  clearance?: number;
+  locked?: boolean;
+}
+
+export interface DeleteFurnitureCommand {
+  type: 'DeleteFurniture';
+  transient?: boolean;
+  payload: DeleteFurniturePayload;
+}
+
+export interface DeleteFurniturePayload {
+  furnitureId: FurnitureId;
+}
+
 export interface BatchCommand {
   type: 'Batch';
   transient?: boolean;
@@ -184,7 +275,11 @@ export type CommandErrorCode =
   | 'DEGENERATE_WALL'
   | 'EDGE_NOT_FOUND'
   | 'INVALID_LENGTH'
-  | 'UNKNOWN_COLOR';
+  | 'UNKNOWN_COLOR'
+  | 'FURNITURE_NOT_FOUND'
+  | 'FURNITURE_LOCKED'
+  | 'INVALID_DIMENSION'
+  | 'INVALID_ROTATION';
 
 export interface CommandError {
   code: CommandErrorCode;
@@ -257,9 +352,232 @@ export function applyCommand(
       return applySetRoomColor(doc, cmd.payload);
     case 'SetRoomUsable':
       return applySetRoomUsable(doc, cmd.payload);
+    case 'AddFurniture':
+      return applyAddFurniture(doc, cmd.payload);
+    case 'MoveFurniture':
+      return applyMoveFurniture(doc, cmd.payload);
+    case 'TransformFurniture':
+      return applyTransformFurniture(doc, cmd.payload);
+    case 'UpdateFurniture':
+      return applyUpdateFurniture(doc, cmd.payload);
+    case 'DeleteFurniture':
+      return applyDeleteFurniture(doc, cmd.payload);
     case 'Batch':
       return applyBatch(doc, cmd.payload);
   }
+}
+
+// ============================================================
+// Mobília — spec 08 § Comandos do M3
+// ============================================================
+
+function applyAddFurniture(
+  doc: PlanDocument,
+  payload: AddFurniturePayload,
+): CommandResult {
+  const label = `Inserir ${payload.name}`;
+
+  const rejection =
+    checkDimensions(payload.width, payload.depth, payload.clearance) ??
+    checkRotation(payload.rotation) ??
+    checkCenter(payload.center) ??
+    checkColor(payload.color ?? null);
+  if (rejection) return rejected(doc, label, rejection);
+
+  const item: FurnitureItem = {
+    id: payload.furnitureId ?? generateFurnitureId(),
+    catalogId: payload.catalogId,
+    name: payload.name,
+    width: payload.width as FurnitureItem['width'],
+    depth: payload.depth as FurnitureItem['depth'],
+    center: payload.center as FurnitureItem['center'],
+    rotation: payload.rotation as FurnitureItem['rotation'],
+    color: payload.color ?? null,
+    locked: payload.locked ?? false,
+    clearance: payload.clearance as FurnitureItem['clearance'],
+  };
+
+  if (payload.outline === true) item.outline = true;
+
+  const [nextDoc, patches, inversePatches] = produceWithPatches(doc, (draft) => {
+    // Fim do array: `furniture` é o único cuja ordem é significativa, e ela é
+    // a ordem de desenho (spec 05 § Regras).
+    draft.furniture.push(item);
+  });
+
+  return applied(nextDoc, patches, inversePatches, label);
+}
+
+function applyMoveFurniture(
+  doc: PlanDocument,
+  payload: MoveFurniturePayload,
+): CommandResult {
+  const label = 'Mover móvel';
+
+  const item = doc.furniture.find((candidate) => candidate.id === payload.furnitureId);
+  if (!item) {
+    return rejected(doc, label, {
+      code: 'FURNITURE_NOT_FOUND',
+      ids: [payload.furnitureId],
+    });
+  }
+  if (item.locked) {
+    return rejected(doc, label, { code: 'FURNITURE_LOCKED', ids: [item.id] });
+  }
+
+  const rejection = checkCenter(payload.center);
+  if (rejection) return rejected(doc, label, rejection);
+
+  const [nextDoc, patches, inversePatches] = produceWithPatches(doc, (draft) => {
+    const target = draft.furniture.find((candidate) => candidate.id === payload.furnitureId);
+    if (target) target.center = payload.center as FurnitureItem['center'];
+  });
+
+  return applied(nextDoc, patches, inversePatches, label);
+}
+
+function applyTransformFurniture(
+  doc: PlanDocument,
+  payload: TransformFurniturePayload,
+): CommandResult {
+  const label = 'Transformar móvel';
+
+  const item = doc.furniture.find((candidate) => candidate.id === payload.furnitureId);
+  if (!item) {
+    return rejected(doc, label, {
+      code: 'FURNITURE_NOT_FOUND',
+      ids: [payload.furnitureId],
+    });
+  }
+  if (item.locked) {
+    return rejected(doc, label, { code: 'FURNITURE_LOCKED', ids: [item.id] });
+  }
+
+  const rejection =
+    checkDimensions(payload.width, payload.depth, 0) ??
+    checkRotation(payload.rotation) ??
+    checkCenter(payload.center);
+  if (rejection) return rejected(doc, label, rejection);
+
+  const [nextDoc, patches, inversePatches] = produceWithPatches(doc, (draft) => {
+    const target = draft.furniture.find((candidate) => candidate.id === payload.furnitureId);
+    if (!target) return;
+    target.width = payload.width as FurnitureItem['width'];
+    target.depth = payload.depth as FurnitureItem['depth'];
+    target.rotation = payload.rotation as FurnitureItem['rotation'];
+    target.center = payload.center as FurnitureItem['center'];
+  });
+
+  return applied(nextDoc, patches, inversePatches, label);
+}
+
+/**
+ * Campos não geométricos.
+ *
+ * **Não** é bloqueado por `locked`: é por aqui que se destrava, e uma trava que
+ * impedisse a própria remoção seria irreversível.
+ */
+function applyUpdateFurniture(
+  doc: PlanDocument,
+  payload: UpdateFurniturePayload,
+): CommandResult {
+  const label = 'Editar móvel';
+
+  const item = doc.furniture.find((candidate) => candidate.id === payload.furnitureId);
+  if (!item) {
+    return rejected(doc, label, {
+      code: 'FURNITURE_NOT_FOUND',
+      ids: [payload.furnitureId],
+    });
+  }
+
+  if (payload.clearance !== undefined) {
+    if (!Number.isInteger(payload.clearance) || payload.clearance < 0) {
+      return rejected(doc, label, { code: 'INVALID_DIMENSION', ids: [item.id] });
+    }
+  }
+
+  const colorRejection =
+    payload.color === undefined ? null : checkColor(payload.color, item.id);
+  if (colorRejection) return rejected(doc, label, colorRejection);
+
+  const [nextDoc, patches, inversePatches] = produceWithPatches(doc, (draft) => {
+    const target = draft.furniture.find((candidate) => candidate.id === payload.furnitureId);
+    if (!target) return;
+    if (payload.name !== undefined) target.name = payload.name;
+    if (payload.color !== undefined) target.color = payload.color;
+    if (payload.clearance !== undefined) {
+      target.clearance = payload.clearance as FurnitureItem['clearance'];
+    }
+    if (payload.locked !== undefined) target.locked = payload.locked;
+  });
+
+  return applied(nextDoc, patches, inversePatches, label);
+}
+
+/**
+ * Excluir vale mesmo com o móvel travado.
+ *
+ * A trava existe contra arraste acidental; excluir é ação explícita e
+ * desfazível, e exigir destravar antes só acrescentaria um passo
+ * (`03-ferramentas-e-interacao.md` § Mobília).
+ */
+function applyDeleteFurniture(
+  doc: PlanDocument,
+  payload: DeleteFurniturePayload,
+): CommandResult {
+  const item = doc.furniture.find((candidate) => candidate.id === payload.furnitureId);
+  if (!item) {
+    return rejected(doc, 'Excluir móvel', {
+      code: 'FURNITURE_NOT_FOUND',
+      ids: [payload.furnitureId],
+    });
+  }
+
+  const [nextDoc, patches, inversePatches] = produceWithPatches(doc, (draft) => {
+    const index = draft.furniture.findIndex(
+      (candidate) => candidate.id === payload.furnitureId,
+    );
+    if (index !== -1) draft.furniture.splice(index, 1);
+  });
+
+  return applied(nextDoc, patches, inversePatches, `Excluir ${item.name}`);
+}
+
+function checkDimensions(
+  width: number,
+  depth: number,
+  clearance: number,
+): CommandError | null {
+  const positiveInteger = (value: number): boolean => Number.isInteger(value) && value > 0;
+  if (!positiveInteger(width) || !positiveInteger(depth)) {
+    return { code: 'INVALID_DIMENSION', ids: [] };
+  }
+  if (!Number.isInteger(clearance) || clearance < 0) {
+    return { code: 'INVALID_DIMENSION', ids: [] };
+  }
+  return null;
+}
+
+function checkRotation(rotation: number): CommandError | null {
+  if (!Number.isInteger(rotation) || rotation < 0 || rotation > 359) {
+    return { code: 'INVALID_ROTATION', ids: [] };
+  }
+  return null;
+}
+
+function checkCenter(center: { x: number; y: number }): CommandError | null {
+  if (!Number.isInteger(center.x) || !Number.isInteger(center.y)) {
+    return { code: 'NON_INTEGER_COORDINATE', ids: [] };
+  }
+  return null;
+}
+
+function checkColor(color: HexColor | null, id = ''): CommandError | null {
+  if (color !== null && !isDocumentColor(color)) {
+    return { code: 'UNKNOWN_COLOR', ids: id === '' ? [] : [id] };
+  }
+  return null;
 }
 
 // ============================================================
