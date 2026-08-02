@@ -19,9 +19,9 @@ export interface ToolbarButton {
 export const TOOLBAR_BUTTONS: readonly ToolbarButton[] = [
   { id: 'select', shortcut: 'V', enabled: true },
   { id: 'room', shortcut: 'R', enabled: true },
-  { id: 'wall', shortcut: 'W', enabled: false },
+  { id: 'wall', shortcut: 'W', enabled: true },
   { id: 'furniture', shortcut: 'F', enabled: true },
-  { id: 'measure', shortcut: 'M', enabled: false },
+  { id: 'measure', shortcut: 'M', enabled: true },
 ]
 
 /**

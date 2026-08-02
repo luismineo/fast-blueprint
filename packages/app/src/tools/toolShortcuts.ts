@@ -2,8 +2,7 @@ import type { RoomToolEvent } from './roomTool'
 import type { SelectToolEvent } from './selectTool'
 import { NUDGE_COARSE_MM, NUDGE_MM } from './furnitureActions'
 
-/** Ferramentas que existem. Parede e Medir seguem em aberto desde o M1. */
-export type ToolId = 'select' | 'room' | 'furniture'
+export type ToolId = 'select' | 'room' | 'wall' | 'furniture' | 'measure'
 
 export type FocusKind =
   | 'canvas'
@@ -35,6 +34,7 @@ export type KeyAction =
   | { readonly kind: 'none' }
   | { readonly kind: 'passToField' }
   | { readonly kind: 'toolEvent'; readonly event: RoomToolEvent }
+  | { readonly kind: 'wallEvent'; readonly event: { type: 'enter' } | { type: 'backspace' } }
   | { readonly kind: 'selectEvent'; readonly event: SelectToolEvent }
   | { readonly kind: 'furnitureEvent'; readonly action: FurnitureAction }
   | { readonly kind: 'activateTool'; readonly tool: ToolId }
@@ -43,6 +43,7 @@ export type KeyAction =
   | { readonly kind: 'redo' }
   | { readonly kind: 'togglePanel' }
   | { readonly kind: 'focusHudField'; readonly field: 'length' | 'angle' }
+  | { readonly kind: 'focusWallHudField'; readonly field: 'length' | 'angle' }
 
 const IN_FIELD: ReadonlySet<FocusKind> = new Set<FocusKind>(['hudLength', 'hudAngle', 'roomName'])
 
@@ -139,13 +140,21 @@ export function classifyKey(ctx: KeyContext): KeyAction {
     if (ctx.key === 'Tab') return { kind: 'focusHudField', field: 'length' }
   }
 
+  if (ctx.tool === 'wall' && ctx.drawing) {
+    if (ctx.key === 'Enter') return { kind: 'wallEvent', event: { type: 'enter' } }
+    if (ctx.key === 'Backspace') return { kind: 'wallEvent', event: { type: 'backspace' } }
+    if (ctx.key === 'Tab') return { kind: 'focusWallHudField', field: 'length' }
+  }
+
   if (ctx.key === 'Delete' || ctx.key === 'Backspace') {
     return { kind: 'selectEvent', event: { type: 'deleteSelection' } }
   }
 
   if (ctx.key === 'r' || ctx.key === 'R') return { kind: 'activateTool', tool: 'room' }
   if (ctx.key === 'v' || ctx.key === 'V') return { kind: 'activateTool', tool: 'select' }
+  if (ctx.key === 'w' || ctx.key === 'W') return { kind: 'activateTool', tool: 'wall' }
   if (ctx.key === 'f' || ctx.key === 'F') return { kind: 'activateTool', tool: 'furniture' }
+  if (ctx.key === 'm' || ctx.key === 'M') return { kind: 'activateTool', tool: 'measure' }
 
   return { kind: 'none' }
 }
