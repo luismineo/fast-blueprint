@@ -2,6 +2,7 @@ import js from '@eslint/js'
 import tseslint from 'typescript-eslint'
 import svelte from 'eslint-plugin-svelte'
 import svelteParser from 'svelte-eslint-parser'
+import planta from './eslint-rules/no-literal-text.js'
 
 export default tseslint.config(
   {
@@ -37,6 +38,10 @@ export default tseslint.config(
       parserOptions: {
         parser: tseslint.parser,
       },
+    },
+    plugins: { planta },
+    rules: {
+      'planta/no-literal-text': 'error',
     },
   },
   {
