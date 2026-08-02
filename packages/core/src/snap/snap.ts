@@ -29,7 +29,8 @@ export type SnapTarget =
   | { kind: 'axis'; from: Point; to: Point }
   | { kind: 'alignment'; from: Point; to: Point; nodeId: NodeId }
   | { kind: 'edge'; a: Point; b: Point }
-  | { kind: 'extension'; a: Point; b: Point };
+  | { kind: 'extension'; a: Point; b: Point }
+  | { kind: 'furnitureCorner'; at: Point };
 
 export interface SnapResult {
   point: Point;
@@ -61,6 +62,7 @@ export interface SnapContext {
   scale: number; // px/mm
   shift: boolean;
   alt: boolean;
+  furnitureCorners?: readonly Point[];
 }
 
 /**
@@ -229,11 +231,21 @@ function resolveAnchor(
     const d = distance(point, middle);
     if (d < tolerance && d < bestDistance) {
       bestDistance = d;
-      // Ponto médio preenche `targets` mas deixa `merged = null`: não há nó
-      // existente para reusar ali (ADR-0003 § Classe 1).
       best = {
         point: { ...middle },
         targets: [{ kind: 'midpoint', at: { ...middle } }],
+        merged: null,
+      };
+    }
+  }
+
+  for (const corner of ctx.furnitureCorners ?? []) {
+    const d = distance(point, corner);
+    if (d < tolerance && d < bestDistance) {
+      bestDistance = d;
+      best = {
+        point: { x: corner.x, y: corner.y },
+        targets: [{ kind: 'furnitureCorner', at: { x: corner.x, y: corner.y } }],
         merged: null,
       };
     }

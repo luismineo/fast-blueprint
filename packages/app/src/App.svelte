@@ -19,6 +19,7 @@
     generateWallId,
     hitTest,
     pruneSelection,
+    obbCorners,
     resolveFurnitureSnap,
     tryParseAngle,
     tryParseLength,
@@ -299,6 +300,11 @@
   function measureContext() {
     const world = worldAt(cursorPx)
     const current = store.current
+    const corners: Point[] = []
+    for (const item of current.furniture) {
+      const c = obbCorners(item.center, item.width, item.depth, item.rotation)
+      for (let i = 0; i < 4; i += 1) corners.push(c[i]!)
+    }
     return {
       snap: resolveToolSnap(world, {
         doc: current,
@@ -306,6 +312,7 @@
         scale: camera.scale,
         shift: false,
         alt: false,
+        furnitureCorners: corners,
       }),
     }
   }
