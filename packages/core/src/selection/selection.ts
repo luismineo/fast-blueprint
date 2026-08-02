@@ -2,13 +2,14 @@
 // Seleção — spec 03 § Modelo de seleção
 // ============================================================
 
-import type { EdgeRef, NodeId, PlanDocument, RoomId } from '../model';
-import { pointInPolygon, type Point } from '../geometry';
+import type { EdgeRef, FurnitureId, NodeId, PlanDocument, RoomId } from '../model';
+import { obbCorners, pointInPolygon, type Point } from '../geometry';
 
 export type SelectionRef =
   | { kind: 'room'; roomId: RoomId }
   | { kind: 'node'; nodeId: NodeId }
-  | { kind: 'edge'; edge: EdgeRef };
+  | { kind: 'edge'; edge: EdgeRef }
+  | { kind: 'furniture'; furnitureId: FurnitureId };
 
 export type Selection = readonly SelectionRef[];
 
@@ -37,6 +38,8 @@ export function selectionKey(ref: SelectionRef): string {
       return ref.edge.kind === 'room'
         ? `edge:room:${ref.edge.roomId}:${ref.edge.index}`
         : `edge:wall:${ref.edge.wallId}`;
+    case 'furniture':
+      return `furniture:${ref.furnitureId}`;
   }
 }
 
@@ -64,6 +67,14 @@ export function selectedRooms(selection: Selection): RoomId[] {
   return rooms;
 }
 
+export function selectedFurniture(selection: Selection): FurnitureId[] {
+  const furniture: FurnitureId[] = [];
+  for (const ref of selection) {
+    if (ref.kind === 'furniture') furniture.push(ref.furnitureId);
+  }
+  return furniture;
+}
+
 /**
  * Referências cujos ids ainda existem no documento.
  *
@@ -88,6 +99,8 @@ function exists(doc: PlanDocument, ref: SelectionRef): boolean {
       const room = doc.rooms.find((candidate) => candidate.id === edge.roomId);
       return room !== undefined && edge.index >= 0 && edge.index < room.loop.length;
     }
+    case 'furniture':
+      return doc.furniture.some((item) => item.id === ref.furnitureId);
   }
 }
 
@@ -149,6 +162,13 @@ export function selectWithin(doc: PlanDocument, rect: Rect): Selection {
     selection.push({ kind: 'node', nodeId: node.id });
   }
 
+  for (const item of doc.furniture) {
+    const corners = obbCorners(item.center, item.width, item.depth, item.rotation);
+    if (corners.every((corner) => contains(rect, corner))) {
+      selection.push({ kind: 'furniture', furnitureId: item.id });
+    }
+  }
+
   return selection;
 }
 
@@ -193,11 +213,18 @@ export function edgePoints(doc: PlanDocument, edge: EdgeRef): [Point, Point] | n
   return from && to ? [from, to] : null;
 }
 
-/** Nós que a seleção move: os dela, mais os das arestas e cômodos incluídos. */
+/**
+ * Nós que a seleção move: os dela, mais os das arestas e cômodos incluídos.
+ *
+ * Móvel não contribui com nó nenhum — ele não é geometria de nó, e quem o move
+ * é `MoveFurniture`.
+ */
 export function affectedNodes(doc: PlanDocument, selection: Selection): NodeId[] {
   const ids = new Set<NodeId>();
 
   for (const ref of selection) {
+    if (ref.kind === 'furniture') continue;
+
     if (ref.kind === 'node') {
       ids.add(ref.nodeId);
       continue;

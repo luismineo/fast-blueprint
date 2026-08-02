@@ -147,6 +147,19 @@
       <dt>{messages.panelConnectedRooms}</dt>
       <dd>{model.connectedRooms}</dd>
     </dl>
+  {:else if model.kind === 'furniture'}
+    <dl class="rows">
+      <dt>{messages.panelFurnitureName}</dt>
+      <dd data-testid="furniture-name">{model.name}</dd>
+      <dt>{messages.panelWidth}</dt>
+      <dd>{model.widthText}</dd>
+      <dt>{messages.panelDepth}</dt>
+      <dd>{model.depthText}</dd>
+      <dt>{messages.panelRotation}</dt>
+      <dd>{model.rotationText}</dd>
+      <dt>{messages.panelClearance}</dt>
+      <dd>{model.clearanceText}</dd>
+    </dl>
   {:else}
     <dl class="rows">
       <dt>{messages.panelRoomCount}</dt>
@@ -155,6 +168,8 @@
       <dd>{model.nodes}</dd>
       <dt>{messages.panelEdgeCount}</dt>
       <dd>{model.edges}</dd>
+      <dt>{messages.panelFurnitureCount}</dt>
+      <dd>{model.furniture}</dd>
     </dl>
     {#if model.rooms > 0}
       <button type="button" class="danger" onclick={onDelete}>{messages.panelDelete}</button>

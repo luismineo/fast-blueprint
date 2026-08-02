@@ -133,7 +133,7 @@ describe('describeSelection', () => {
       { kind: 'edge', edge: { kind: 'room', roomId: LEFT, index: 0 } },
     ])
 
-    expect(model).toEqual({ kind: 'multi', rooms: 2, nodes: 1, edges: 1 })
+    expect(model).toEqual({ kind: 'multi', rooms: 2, nodes: 1, edges: 1, furniture: 0 })
   })
 
   it('referência que não resolve cai para o resumo, sem quebrar', () => {

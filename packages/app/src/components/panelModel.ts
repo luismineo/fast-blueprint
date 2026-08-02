@@ -8,6 +8,7 @@ import {
   formatLength,
   roomPoints,
   type EdgeRef,
+  type FurnitureId,
   type NodeId,
   type PlanDocument,
   type Selection,
@@ -43,10 +44,22 @@ export type PanelModel =
       readonly connectedRooms: string
     }
   | {
+      readonly kind: 'furniture'
+      readonly name: string
+      readonly widthText: string
+      readonly depthText: string
+      readonly rotationText: string
+      readonly clearanceText: string
+      readonly locked: boolean
+      readonly colorIndex: number | null
+      readonly palette: readonly string[]
+    }
+  | {
       readonly kind: 'multi'
       readonly rooms: number
       readonly nodes: number
       readonly edges: number
+      readonly furniture: number
     }
 
 /**
@@ -68,6 +81,8 @@ export function describeSelection(doc: PlanDocument, selection: Selection): Pane
       return edgeModel(doc, ref.edge)
     case 'node':
       return nodeModel(doc, ref.nodeId)
+    case 'furniture':
+      return furnitureModel(doc, ref.furnitureId)
   }
 }
 
@@ -139,18 +154,39 @@ function nodeModel(doc: PlanDocument, nodeId: NodeId): PanelModel {
   }
 }
 
+function furnitureModel(doc: PlanDocument, furnitureId: FurnitureId): PanelModel {
+  const item = doc.furniture.find((candidate) => candidate.id === furnitureId)
+  if (!item) return emptyModel(doc)
+
+  const colorIndex = item.color === null ? null : DOCUMENT_COLORS.indexOf(item.color)
+
+  return {
+    kind: 'furniture',
+    name: item.name,
+    widthText: String(Math.round(item.width / 10)),
+    depthText: String(Math.round(item.depth / 10)),
+    rotationText: String(item.rotation),
+    clearanceText: String(Math.round(item.clearance / 10)),
+    locked: item.locked,
+    colorIndex: colorIndex === -1 ? null : colorIndex,
+    palette: DOCUMENT_COLORS,
+  }
+}
+
 function multiModel(selection: Selection): PanelModel {
   let rooms = 0
   let nodes = 0
   let edges = 0
+  let furniture = 0
 
   for (const ref of selection) {
     if (ref.kind === 'room') rooms += 1
     else if (ref.kind === 'node') nodes += 1
+    else if (ref.kind === 'furniture') furniture += 1
     else edges += 1
   }
 
-  return { kind: 'multi', rooms, nodes, edges }
+  return { kind: 'multi', rooms, nodes, edges, furniture }
 }
 
 /** Cômodos que contêm os dois extremos da aresta — os que ela separa. */

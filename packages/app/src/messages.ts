@@ -38,6 +38,13 @@ export const messages = {
   panelRoomCount: 'Cômodos',
   panelNodeCount: 'Nós',
   panelEdgeCount: 'Arestas',
+  panelFurnitureCount: 'Móveis',
+
+  panelFurnitureName: 'Nome',
+  panelWidth: 'Largura',
+  panelDepth: 'Profundidade',
+  panelRotation: 'Rotação',
+  panelClearance: 'Circulação',
 
   edgeLengthLabel: 'Comprimento da aresta em centímetros',
   sharedNodeMoveTogether: 'Mover junto',

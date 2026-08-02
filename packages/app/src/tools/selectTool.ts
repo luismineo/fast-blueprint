@@ -458,6 +458,10 @@ function marqueeOverlay(state: SelectToolState): OverlayPrimitive[] {
 // Auxiliares
 // ============================================================
 
+/**
+ * Handle de móvel resolve para o próprio móvel: agarrar um canto do que já
+ * está selecionado não muda a seleção, muda o que o arraste vai fazer.
+ */
 export function refFor(hit: HitResult): SelectionRef | null {
   if (!hit) return null
   switch (hit.kind) {
@@ -467,6 +471,10 @@ export function refFor(hit: HitResult): SelectionRef | null {
       return { kind: 'edge', edge: hit.edge }
     case 'roomInterior':
       return { kind: 'room', roomId: hit.roomId }
+    case 'furniture':
+    case 'furnitureCorner':
+    case 'furnitureRotation':
+      return { kind: 'furniture', furnitureId: hit.furnitureId }
   }
 }
 
