@@ -60,11 +60,13 @@ Este é o momento de testar com gente de verdade. Se o fluxo de desenho não con
 
 **Pronto quando:** dá para responder "cabe uma cama queen com 60 cm de circulação dos dois lados no Quarto L?" em menos de um minuto.
 
-**Fora do M3, e para onde foi.** O plano aprovado (`plans/m3-mobiliar.md`) registra a lista completa. Os desvios que mudam outro milestone:
+**Fora do M3, e para onde foi.** O plano aprovado (`plans/m3-mobiliar.md`) e a cobertura (`plans/m3-mobiliar-cobertura.md`) registram a lista completa. Os desvios que mudam outro milestone:
 
 - **Ferramenta Medir (`M`)** nunca foi alocada a milestone nenhum por este roadmap, e continua assim. A barra de ferramentas a mostra desabilitada, junto com Parede.
 - **Ferramenta Parede (`W`)** e `CreateWall`/`DeleteWall` seguem em aberto desde o M1, agora visíveis como botão desabilitado.
 - **Export CSV com tabela de móveis** (`05` § Export) vai com o resto do export, no M4.
+- **Exportar e importar o catálogo do usuário como JSON** (`06` § Catálogo do usuário) vai para o M4: depende de diálogo de arquivo, que é de lá, e não tem critério de aceitação próprio.
+- **`04-6` (profiler < 8 ms com 40 móveis)** fecha só na parte do renderer, medida por bench local. A medição com canvas real depende de carregar a fixture no aplicativo, e abrir arquivo é do M4.
 
 ## M4 — Persistir
 
