@@ -118,6 +118,18 @@ export function formatLength(mm: number, unit: 'm' | 'cm'): string {
 }
 
 /**
+ * Formata o par de dimensões de um móvel em centímetros inteiros, sem unidade:
+ * `158 × 198`.
+ *
+ * É o rótulo desenhado dentro do retângulo (`04-renderizacao.md` § Mobília).
+ * Quem precisa da unidade — o cartão do catálogo — compõe com `unitCm`, em vez
+ * de repetir "cm" nos dois números.
+ */
+export function formatDimensions(widthMm: number, depthMm: number): string {
+  return `${Math.round(widthMm / 10)} × ${Math.round(depthMm / 10)}`;
+}
+
+/**
  * Formata área em mm² para exibição.
  * Ex: 8_000_000 → "8,00 m²"
  */

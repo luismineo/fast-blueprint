@@ -31,6 +31,29 @@ class ThrowingLineTarget implements DrawTarget {
 }
 
 describe('render', () => {
+  /**
+   * A lista de passes de `04-renderizacao.md` § Passes de desenho, na ordem.
+   * Ordem de desenho e decisao de spec: mobilia sob parede, abertura sobre
+   * parede, efemero por cima de tudo.
+   */
+  it('a lista de passes bate com a da spec 04, na ordem', () => {
+    expect(Object.keys(passSpaces())).toEqual([
+      'clear',
+      'grid',
+      'roomFills',
+      'furnitureClearance',
+      'furniture',
+      'walls',
+      'openings',
+      'dimensions',
+      'roomLabels',
+      'snapGuides',
+      'toolOverlay',
+      'selection',
+      'hud',
+    ])
+  })
+
   it('desenha geometria em espaco de mundo e texto/overlay em espaco de tela', () => {
     const spaces = passSpaces()
 
@@ -38,6 +61,12 @@ describe('render', () => {
     expect(spaces.grid).toBe('world')
     expect(spaces.roomFills).toBe('world')
     expect(spaces.walls).toBe('world')
+    expect(spaces.furnitureClearance).toBe('world')
+    expect(spaces.openings).toBe('world')
+
+    // O pass de mobilia carrega texto e espessura constante em pixels, entao
+    // desenha em espaco de tela como os demais que tem rotulo.
+    expect(spaces.furniture).toBe('screen')
 
     // Texto e overlay: nunca escalados pela matriz (specs/04 secao Espessura
     // constante). Foi por rodarem em espaco de mundo que cota e rotulo saiam

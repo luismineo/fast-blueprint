@@ -75,7 +75,7 @@ export function centroid(points: Point[]): Point {
  * Ponto-em-polígono via ray casting.
  * Raio horizontal para +X, com tratamento de vértice conforme spec 02.
  */
-export function pointInPolygon(point: Point, polygon: Point[]): boolean {
+export function pointInPolygon(point: Point, polygon: readonly Point[]): boolean {
   let inside = false;
   const n = polygon.length;
   for (let i = 0, j = n - 1; i < n; j = i++) {
@@ -230,23 +230,51 @@ export function obbCorners(
   depth: number,
   rotationDeg: number,
 ): Point[] {
+  const out: Point[] = [
+    { x: 0, y: 0 },
+    { x: 0, y: 0 },
+    { x: 0, y: 0 },
+    { x: 0, y: 0 },
+  ];
+  writeObbCorners(out, center, width, depth, rotationDeg);
+  return out;
+}
+
+/**
+ * Como `obbCorners`, escrevendo num buffer de quatro pontos já alocado.
+ *
+ * É o que o pass de mobília usa: nenhuma alocação dentro de um pass de desenho
+ * (`04-renderizacao.md` § Orçamento de performance, regra 2).
+ */
+export function writeObbCorners(
+  out: Point[],
+  center: Point,
+  width: number,
+  depth: number,
+  rotationDeg: number,
+): void {
   const radians = (rotationDeg * Math.PI) / 180;
   const cos = Math.cos(radians);
   const sin = Math.sin(radians);
   const hw = width / 2;
   const hd = depth / 2;
 
-  const local: Point[] = [
-    { x: -hw, y: -hd },
-    { x: hw, y: -hd },
-    { x: hw, y: hd },
-    { x: -hw, y: hd },
-  ];
+  writeCorner(out[0]!, center, -hw, -hd, cos, sin);
+  writeCorner(out[1]!, center, hw, -hd, cos, sin);
+  writeCorner(out[2]!, center, hw, hd, cos, sin);
+  writeCorner(out[3]!, center, -hw, hd, cos, sin);
+}
 
-  return local.map((point) => ({
-    x: roundMm(center.x + point.x * cos - point.y * sin),
-    y: roundMm(center.y + point.x * sin + point.y * cos),
-  }));
+function writeCorner(
+  target: Point,
+  center: Point,
+  x: number,
+  y: number,
+  cos: number,
+  sin: number,
+): void {
+  target.x = roundMm(center.x + x * cos - y * sin);
+  target.y = roundMm(center.y + x * sin + y * cos);
 }
 
 /**
@@ -262,29 +290,38 @@ export function satOverlap(a: readonly Point[], b: readonly Point[]): boolean {
   return !hasSeparatingAxis(a, b) && !hasSeparatingAxis(b, a);
 }
 
+/**
+ * Projeções calculadas em variáveis locais, sem tupla de retorno: este caminho
+ * roda por par de móveis a cada mudança de documento, e uma tupla por eixo
+ * seriam oito alocações por par.
+ */
 function hasSeparatingAxis(from: readonly Point[], other: readonly Point[]): boolean {
   for (let i = 0; i < from.length; i += 1) {
     const start = from[i]!;
     const end = from[(i + 1) % from.length]!;
-    const axis: Point = { x: -(end.y - start.y), y: end.x - start.x };
-    if (axis.x === 0 && axis.y === 0) continue;
+    const axisX = -(end.y - start.y);
+    const axisY = end.x - start.x;
+    if (axisX === 0 && axisY === 0) continue;
 
-    const [minA, maxA] = projectOnAxis(from, axis);
-    const [minB, maxB] = projectOnAxis(other, axis);
+    let minA = Infinity;
+    let maxA = -Infinity;
+    for (const point of from) {
+      const value = point.x * axisX + point.y * axisY;
+      if (value < minA) minA = value;
+      if (value > maxA) maxA = value;
+    }
+
+    let minB = Infinity;
+    let maxB = -Infinity;
+    for (const point of other) {
+      const value = point.x * axisX + point.y * axisY;
+      if (value < minB) minB = value;
+      if (value > maxB) maxB = value;
+    }
+
     if (maxA <= minB || maxB <= minA) return true;
   }
   return false;
-}
-
-function projectOnAxis(points: readonly Point[], axis: Point): [number, number] {
-  let min = Infinity;
-  let max = -Infinity;
-  for (const point of points) {
-    const value = point.x * axis.x + point.y * axis.y;
-    if (value < min) min = value;
-    if (value > max) max = value;
-  }
-  return [min, max];
 }
 
 export type Containment = 'inside' | 'partial' | 'outside';
@@ -319,7 +356,7 @@ export function pointInPolygonInclusive(point: Point, polygon: readonly Point[])
     if (distance(point, foot) <= BOUNDARY_TOLERANCE_MM) return true;
   }
 
-  return pointInPolygon(point, [...polygon]);
+  return pointInPolygon(point, polygon);
 }
 
 /**

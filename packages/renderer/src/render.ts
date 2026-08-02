@@ -1,6 +1,9 @@
 import { clearPass } from './passes/clear'
 import { gridPass } from './passes/grid'
 import { roomFillsPass } from './passes/roomFills'
+import { furnitureClearancePass } from './passes/furnitureClearance'
+import { furniturePass } from './passes/furniture'
+import { openingsPass } from './passes/openings'
 import { wallsPass } from './passes/walls'
 import { dimensionsPass } from './passes/dimensions'
 import { roomLabelsPass } from './passes/roomLabels'
@@ -22,7 +25,10 @@ const PASSES: readonly PassEntry[] = [
   { name: 'clear', space: 'screen', run: clearPass },
   { name: 'grid', space: 'world', run: gridPass },
   { name: 'roomFills', space: 'world', run: roomFillsPass },
+  { name: 'furnitureClearance', space: 'world', run: furnitureClearancePass },
+  { name: 'furniture', space: 'screen', run: furniturePass },
   { name: 'walls', space: 'world', run: wallsPass },
+  { name: 'openings', space: 'world', run: openingsPass },
   { name: 'dimensions', space: 'screen', run: dimensionsPass },
   { name: 'roomLabels', space: 'screen', run: roomLabelsPass },
   { name: 'snapGuides', space: 'screen', run: snapGuidesPass },
