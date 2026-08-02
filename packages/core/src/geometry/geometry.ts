@@ -191,3 +191,185 @@ export function pointToLineDistance(point: Point, lineStart: Point, lineEnd: Poi
 export function snapToGrid(value: number, gridSize: number): number {
   return Math.round(value / gridSize) * gridSize;
 }
+
+// ============================================================
+// Geometria de mobília — spec 02 § Geometria de mobília
+// ============================================================
+
+/**
+ * Tolerância da fronteira, em mm.
+ *
+ * O arredondamento para milímetro inteiro pode tirar um canto da reta da
+ * parede em até √2/2 mm; 1 mm é o menor limiar inteiro que cobre isso.
+ */
+const BOUNDARY_TOLERANCE_MM = 1;
+
+/**
+ * Cantos de um retângulo orientado, em milímetros inteiros.
+ *
+ * Ordem: os dois primeiros são a face **traseira** (borda em `−depth`, a que
+ * encosta na parede), os dois últimos a face frontal
+ * (`06-catalogo-de-mobilia.md` § Convenção de orientação).
+ */
+export function obbCorners(
+  center: Point,
+  width: number,
+  depth: number,
+  rotationDeg: number,
+): Point[] {
+  const radians = (rotationDeg * Math.PI) / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const hw = width / 2;
+  const hd = depth / 2;
+
+  const local: Point[] = [
+    { x: -hw, y: -hd },
+    { x: hw, y: -hd },
+    { x: hw, y: hd },
+    { x: -hw, y: hd },
+  ];
+
+  return local.map((point) => ({
+    x: Math.round(center.x + point.x * cos - point.y * sin),
+    y: Math.round(center.y + point.x * sin + point.y * cos),
+  }));
+}
+
+/**
+ * Sobreposição entre dois polígonos convexos pelo teorema dos eixos
+ * separadores.
+ *
+ * Para dois retângulos são os 4 eixos candidatos da spec 02 — as normais das
+ * arestas de cada um, duas a duas paralelas. Contato exato **não** é
+ * sobreposição: dois móveis encostados lado a lado são o arranjo normal de um
+ * quarto pequeno, e acusá-los seria aviso falso em posição correta.
+ */
+export function satOverlap(a: readonly Point[], b: readonly Point[]): boolean {
+  return !hasSeparatingAxis(a, b) && !hasSeparatingAxis(b, a);
+}
+
+function hasSeparatingAxis(from: readonly Point[], other: readonly Point[]): boolean {
+  for (let i = 0; i < from.length; i += 1) {
+    const start = from[i]!;
+    const end = from[(i + 1) % from.length]!;
+    const axis: Point = { x: -(end.y - start.y), y: end.x - start.x };
+    if (axis.x === 0 && axis.y === 0) continue;
+
+    const [minA, maxA] = projectOnAxis(from, axis);
+    const [minB, maxB] = projectOnAxis(other, axis);
+    if (maxA <= minB || maxB <= minA) return true;
+  }
+  return false;
+}
+
+function projectOnAxis(points: readonly Point[], axis: Point): [number, number] {
+  let min = Infinity;
+  let max = -Infinity;
+  for (const point of points) {
+    const value = point.x * axis.x + point.y * axis.y;
+    if (value < min) min = value;
+    if (value > max) max = value;
+  }
+  return [min, max];
+}
+
+export type Containment = 'inside' | 'partial' | 'outside';
+
+/**
+ * Contenção de um retângulo num polígono, pelos quatro cantos.
+ *
+ * A fronteira conta como dentro (`01-modelo-de-dominio.md` § Invariantes): o
+ * snap a parede põe dois cantos exatamente sobre a aresta, e o ray casting é
+ * assimétrico ali — num retângulo com Y para baixo, o canto sobre a parede de
+ * cima cai dentro e o canto sobre a de baixo cai fora.
+ */
+export function containment(
+  corners: readonly Point[],
+  polygon: readonly Point[],
+): Containment {
+  let inside = 0;
+  for (const corner of corners) {
+    if (pointInPolygonInclusive(corner, polygon)) inside += 1;
+  }
+
+  if (inside === 0) return 'outside';
+  return inside === corners.length ? 'inside' : 'partial';
+}
+
+/** Ponto-em-polígono com a fronteira contando como dentro. */
+export function pointInPolygonInclusive(point: Point, polygon: readonly Point[]): boolean {
+  for (let i = 0; i < polygon.length; i += 1) {
+    const from = polygon[i]!;
+    const to = polygon[(i + 1) % polygon.length]!;
+    const foot = closestPointOnSegment(point, from, to).point;
+    if (distance(point, foot) <= BOUNDARY_TOLERANCE_MM) return true;
+  }
+
+  return pointInPolygon(point, [...polygon]);
+}
+
+/**
+ * Região comum a dois polígonos convexos, por recorte de Sutherland–Hodgman.
+ *
+ * É o que a hachura de colisão desenha (`04-renderizacao.md` § Mobília).
+ * Devolve lista vazia quando não há região comum.
+ */
+export function convexIntersection(
+  subject: readonly Point[],
+  clip: readonly Point[],
+): Point[] {
+  if (subject.length < 3 || clip.length < 3) return [];
+
+  const window = orientLoop([...clip]);
+  let output = orientLoop([...subject]);
+
+  for (let i = 0; i < window.length && output.length > 0; i += 1) {
+    output = clipAgainstEdge(output, window[i]!, window[(i + 1) % window.length]!);
+  }
+
+  return output;
+}
+
+/**
+ * Recorte contra o semiplano interno de uma aresta.
+ *
+ * O ciclo está normalizado para horário, e com Y para baixo a normal interna é
+ * `(-dy, dx)` — a mesma que a cota usa para desenhar por fora
+ * (`04-renderizacao.md` § Cotas).
+ */
+function clipAgainstEdge(points: readonly Point[], from: Point, to: Point): Point[] {
+  const normal: Point = { x: -(to.y - from.y), y: to.x - from.x };
+  const side = (point: Point): number =>
+    (point.x - from.x) * normal.x + (point.y - from.y) * normal.y;
+
+  const output: Point[] = [];
+
+  for (let i = 0; i < points.length; i += 1) {
+    const current = points[i]!;
+    const previous = points[(i + points.length - 1) % points.length]!;
+    const currentInside = side(current) >= 0;
+    const previousInside = side(previous) >= 0;
+
+    if (currentInside !== previousInside) {
+      const crossing = lineCrossing(previous, current, from, to);
+      if (crossing) output.push(crossing);
+    }
+    if (currentInside) output.push(current);
+  }
+
+  return output;
+}
+
+function lineCrossing(a: Point, b: Point, c: Point, d: Point): Point | null {
+  const abx = b.x - a.x;
+  const aby = b.y - a.y;
+  const cdx = d.x - c.x;
+  const cdy = d.y - c.y;
+
+  const denominator = abx * cdy - aby * cdx;
+  if (denominator === 0) return null;
+
+  const t = ((c.x - a.x) * cdy - (c.y - a.y) * cdx) / denominator;
+  return { x: a.x + abx * t, y: a.y + aby * t };
+}
