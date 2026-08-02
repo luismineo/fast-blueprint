@@ -161,6 +161,58 @@ test('a barra de ferramentas troca de ferramenta e Home nao enquadra com foco ne
   await expect(page.getByTestId('tool-select')).toBeFocused()
 })
 
+test('movel salvo no catalogo do usuario sobrevive a recarga', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.locator('canvas')).toBeVisible()
+
+  const origin = await canvasOrigin(page)
+  await drawRoom(page, origin, 0)
+
+  await page.getByTestId('catalog-search').fill('criado')
+  await page.getByTestId('catalog-item-nightstand').click()
+  await page.mouse.click(origin.x + 100, origin.y + 100)
+
+  const nome = page.getByTestId('furniture-name')
+  await nome.fill('Criado do vô')
+  await nome.press('Enter')
+
+  await page.getByTestId('save-to-catalog').click()
+  await page.getByTestId('confirm-save-item').click()
+
+  // A gravação é assíncrona e disparada sem espera: recarregar antes de a
+  // transação fechar perderia o item. Espera o registro existir em vez de
+  // dormir um tempo arbitrário.
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          new Promise<string>((resolve) => {
+            const open = indexedDB.open('planta', 1)
+            open.onsuccess = () => {
+              const db = open.result
+              if (!db.objectStoreNames.contains('catalog')) return resolve('')
+              const get = db
+                .transaction('catalog', 'readonly')
+                .objectStore('catalog')
+                .get('planta:catalog:user')
+              get.onsuccess = () => resolve(JSON.stringify(get.result ?? ''))
+              get.onerror = () => resolve('')
+            }
+            open.onerror = () => resolve('')
+          }),
+      ),
+    )
+    .toContain('Criado do vô')
+
+  // Recarrega: o item precisa vir do IndexedDB, não da memória da sessão.
+  await page.reload()
+  await expect(page.locator('canvas')).toBeVisible()
+
+  // Busca sem acento acha o item com acento (spec 06 § Busca).
+  await page.getByTestId('catalog-search').fill('criado do vo')
+  await expect(page.locator('aside.side-panel')).toContainText('Criado do vô')
+})
+
 test('Ctrl+B recolhe e devolve o painel direito', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('canvas')).toBeVisible()
