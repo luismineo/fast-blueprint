@@ -472,3 +472,44 @@ function lineCrossing(a: Point, b: Point, c: Point, d: Point): Point | null {
   const t = ((c.x - a.x) * cdy - (c.y - a.y) * cdx) / denominator;
   return { x: a.x + abx * t, y: a.y + aby * t };
 }
+
+// ============================================================
+// Achatamento de arco — adr/0006-glifos-de-mobilia.md § 3
+// ============================================================
+
+const FULL_CIRCLE_SEGMENTS = 24;
+
+/**
+ * Escreve os pontos de um arco elíptico achatado num buffer pré-alocado.
+ *
+ * O arco é definido no sistema de coordenadas local do móvel (já escalado por
+ * width × depth). Os pontos são escritos em `out` a partir de `outOffset` e o
+ * último ponto coincide com o primeiro quando o arco é um círculo completo —
+ * não fecha o anel sozinho; o chamador decide se fecha.
+ *
+ * Ângulos em radianos, 0 = +X, crescendo no sentido horário (Y para baixo).
+ *
+ * Retorna o número de pontos escritos.
+ */
+export function writeArcPoints(
+  out: Point[],
+  outOffset: number,
+  cx: number,
+  cy: number,
+  rx: number,
+  ry: number,
+  startAngle: number,
+  endAngle: number,
+  segments: number = FULL_CIRCLE_SEGMENTS,
+): number {
+  const sweep = endAngle - startAngle;
+  const step = sweep / segments;
+
+  for (let i = 0; i < segments; i += 1) {
+    const angle = startAngle + step * i;
+    out[outOffset + i]!.x = cx + rx * Math.cos(angle);
+    out[outOffset + i]!.y = cy + ry * Math.sin(angle);
+  }
+
+  return segments;
+}
