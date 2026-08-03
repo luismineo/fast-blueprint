@@ -8,3 +8,4 @@ export * from './selection';
 export * from './commands';
 export * from './history';
 export * from './overlay';
+export * from './io';

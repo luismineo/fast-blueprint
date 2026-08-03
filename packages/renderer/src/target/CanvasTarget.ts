@@ -4,10 +4,10 @@ import type { DrawTarget, LineStyle, TextStyle, FillStyle } from './DrawTarget'
 const EMPTY_DASH: number[] = []
 
 export class CanvasTarget implements DrawTarget {
-  private readonly ctx: CanvasRenderingContext2D
+  private readonly ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D
   private dpr: number
 
-  constructor(ctx: CanvasRenderingContext2D, dpr = 1) {
+  constructor(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, dpr = 1) {
     this.ctx = ctx
     this.dpr = dpr
   }

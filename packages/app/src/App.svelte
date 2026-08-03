@@ -23,6 +23,8 @@
     resolveFurnitureSnap,
     tryParseAngle,
     tryParseLength,
+    readDocument,
+    serializeDocument,
     type FurnitureId,
     type OverlayPrimitive,
     type PlanDocument,
@@ -97,6 +99,7 @@
   import PropertiesPanel from './components/PropertiesPanel.svelte'
   import CatalogPanel from './components/CatalogPanel.svelte'
   import Toolbar from './components/Toolbar.svelte'
+  import TopBar from './components/TopBar.svelte'
   import { pushRecent, type CatalogEntry } from './components/catalogModel'
   import {
     loadDefaultCatalog,
@@ -109,6 +112,12 @@
     type CatalogItem,
   } from '@planta/catalog'
   import { loadUserCatalog, saveUserCatalog } from './persistence/userCatalog'
+  import { saveFileHandle, loadFileHandle } from './persistence/fileHandleStore'
+  import { AutosaveScheduler, saveAutosave, loadAutosave } from './persistence/autosave'
+  import { openFile, saveFile } from './persistence/fileAccess'
+  import { exportPng } from './export/exportPng'
+  import { exportSvg } from './export/exportSvg'
+  import { exportCsv } from './export/exportCsv'
 
   const HUD_OFFSET_PX = 16
 
@@ -147,6 +156,9 @@
   let dragged: CatalogEntry | null = $state.raw(null)
   let userItems: readonly CatalogItem[] = $state.raw([])
 
+  let fileHandle: FileSystemFileHandle | null = $state.raw(null)
+  const autosave = new AutosaveScheduler(saveAutosave)
+
   const defaultCatalog = loadDefaultCatalog()
   const catalogItems = $derived(mergeCatalogs(defaultCatalog, userItems))
 
@@ -161,15 +173,17 @@
     typeof window !== 'undefined' &&
     new URLSearchParams(window.location.search).get('debug') === 'perf'
 
-  const hudLeft = $derived(cursorPx.x + HUD_OFFSET_PX)
-  const hudTop = $derived(cursorPx.y + HUD_OFFSET_PX)
+  const hudLeft = $derived(cursorPx.x + HUD_OFFSET_PX + 48)
+  const hudTop = $derived(cursorPx.y + HUD_OFFSET_PX + 48)
   const namingPos: Point = $derived.by(() => {
     const request = naming
-    return request ? worldToScreen(camera, request.centroid) : { x: 0, y: 0 }
+    const pos = request ? worldToScreen(camera, request.centroid) : { x: 0, y: 0 }
+    return { x: pos.x + 48, y: pos.y + 48 }
   })
   const edgeEditPos: Point = $derived.by(() => {
     const request = edgeEdit
-    return request ? worldToScreen(camera, request.at) : { x: 0, y: 0 }
+    const pos = request ? worldToScreen(camera, request.at) : { x: 0, y: 0 }
+    return { x: pos.x + 48, y: pos.y + 48 }
   })
 
   function focusKind(): FocusKind {
@@ -739,6 +753,7 @@
 
     const unsubscribe = store.subscribe((next) => {
       doc = next
+      autosave.schedule(serializeDocument(next, '1.0.0'))
       scheduler.markDirty()
     })
 
@@ -900,6 +915,12 @@
     }
 
     function onKeyDown(event: KeyboardEvent): void {
+      if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+        event.preventDefault()
+        void saveDocument()
+        return
+      }
+
       if (event.code === 'Space' && focusKind() === 'canvas') {
         spacePressed = true
         event.preventDefault()
@@ -1079,6 +1100,72 @@
     }
   }
 
+  async function saveDocument() {
+    try {
+      const content = serializeDocument(doc, '1.0.0')
+      const handle = await saveFile(content, fileHandle ?? undefined, doc.meta.name || 'documento')
+      if (handle) {
+        fileHandle = handle
+        await saveFileHandle(handle)
+      }
+      store.markSaved()
+    } catch (e) {
+      // ignorar
+    }
+  }
+
+  async function openDocument() {
+    try {
+      const result = await openFile()
+      if (!result) return
+
+      if (result.handle) {
+        fileHandle = result.handle
+        await saveFileHandle(result.handle)
+      }
+
+      const readResult = readDocument(result.content)
+      if (readResult.ok) {
+        store.replaceDocument(readResult.doc)
+      }
+    } catch (e) {
+      // ignorar
+    }
+  }
+
+  function renameDocument() {
+    const newName = prompt(messages.renameDocumentPrompt, doc.meta.name)
+    if (newName != null) {
+      store.dispatch({ type: 'SetDocumentMeta', payload: { name: newName } })
+    }
+  }
+
+  function downloadBlob(blob: Blob, filename: string) {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  async function onExportPng() {
+    const blob = await exportPng(doc, glyphs, 2)
+    downloadBlob(blob, `${doc.meta.name || 'documento'}.png`)
+  }
+
+  function onExportSvg() {
+    const svg = exportSvg(doc, glyphs)
+    downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), `${doc.meta.name || 'documento'}.svg`)
+  }
+
+  function onExportCsv() {
+    const csv = exportCsv(doc)
+    downloadBlob(new Blob([csv], { type: 'text/csv' }), `${doc.meta.name || 'documento'}.csv`)
+  }
+
   onMount(() => {
     if (!canvasEl) return
 
@@ -1086,7 +1173,35 @@
       userItems = items
     })
 
-    return setupCanvas(canvasEl, debugPerf ? new Profiler() : undefined)
+    void loadAutosave().then((json) => {
+      if (json) {
+        if (window.confirm(messages.restoreAutosave)) {
+          const result = readDocument(json)
+          if (result.ok) {
+            store.replaceDocument(result.doc)
+          }
+        }
+      }
+
+      void loadFileHandle().then(handle => {
+        fileHandle = handle
+      })
+    })
+
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (store.dirty) {
+        event.preventDefault()
+        event.returnValue = messages.unsavedChanges
+      }
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+
+    const cleanupCanvas = setupCanvas(canvasEl, debugPerf ? new Profiler() : undefined)
+
+    return () => {
+      window.removeEventListener('beforeunload', onBeforeUnload)
+      cleanupCanvas()
+    }
   })
 </script>
 
@@ -1097,6 +1212,17 @@
   class:panel-open={!panelCollapsed}
   tabindex="-1"
 ></canvas>
+
+<TopBar
+  title={doc.meta.name}
+  dirty={store.dirty}
+  onOpen={openDocument}
+  onSave={saveDocument}
+  onExportPng={onExportPng}
+  onExportSvg={onExportSvg}
+  onExportCsv={onExportCsv}
+  onRename={renameDocument}
+/>
 
 <Toolbar {tool} onSelect={activateTool} />
 
@@ -1232,11 +1358,11 @@
   */
   .canvas-fullscreen {
     position: fixed;
-    top: 0;
+    top: 48px;
     left: 48px;
     display: block;
     width: calc(100vw - 48px);
-    height: 100vh;
+    height: calc(100vh - 48px);
     touch-action: none;
     outline: none;
   }
@@ -1251,10 +1377,10 @@
 
   .side-panel {
     position: fixed;
-    top: 0;
+    top: 48px;
     right: 0;
     width: 264px;
-    height: 100vh;
+    height: calc(100vh - 48px);
     padding: 12px 16px;
     box-sizing: border-box;
     background: var(--surface);
@@ -1274,6 +1400,7 @@
     border-radius: var(--radius-field);
     box-shadow: var(--shadow-floating);
     font-size: 12px;
+    pointer-events: none;
   }
 
   .hud:focus-within {
@@ -1295,6 +1422,7 @@
     font-size: 12px;
     color: var(--text);
     outline: none;
+    pointer-events: auto;
   }
 
   .hud-field--angle {

@@ -84,15 +84,15 @@ export const documentMetaSchema = z.object({
   modifiedAt: z.string(),
   displayUnit: z.enum(['m', 'cm']),
   gridSize: z.number().int().min(1),
-});
+}).passthrough();
 
 export const planDocumentSchema = z.object({
   schemaVersion: z.number().int().positive(),
   meta: documentMetaSchema,
   nodes: z.array(nodeSchema),
   rooms: z.array(roomSchema),
-  walls: z.array(wallSchema),
-  openings: z.array(openingSchema),
+  walls: z.array(wallSchema).default([]),
+  openings: z.array(openingSchema).default([]),
   furniture: z.array(furnitureItemSchema),
   underlay: underlaySchema.nullable(),
-});
+}).passthrough();

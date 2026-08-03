@@ -652,3 +652,85 @@ describe('applyCreateRoom — rejeição de payload malformado', () => {
     expect(store.lastError?.code).toBe('DUPLICATE_LOOP_NODE');
   });
 });
+
+describe('SetDocumentMeta', () => {
+  it('SetDocumentMeta changes name', () => {
+    const doc = createEmptyDocument();
+    const result = applyCommand(doc, {
+      type: 'SetDocumentMeta',
+      payload: { name: 'New Plan' },
+    });
+    expect(result.document.meta.name).toBe('New Plan');
+    expect(result.patchGroups).not.toEqual([]);
+  });
+
+  it('SetDocumentMeta changes displayUnit', () => {
+    const doc = createEmptyDocument();
+    const result = applyCommand(doc, {
+      type: 'SetDocumentMeta',
+      payload: { displayUnit: 'cm' },
+    });
+    expect(result.document.meta.displayUnit).toBe('cm');
+    expect(result.patchGroups).not.toEqual([]);
+  });
+
+  it('SetDocumentMeta changes gridSize', () => {
+    const doc = createEmptyDocument();
+    const result = applyCommand(doc, {
+      type: 'SetDocumentMeta',
+      payload: { gridSize: 200 },
+    });
+    expect(result.document.meta.gridSize).toBe(200);
+    expect(result.patchGroups).not.toEqual([]);
+  });
+
+  it('SetDocumentMeta with gridSize <= 0 is rejected', () => {
+    const doc = createEmptyDocument();
+    const result = applyCommand(doc, {
+      type: 'SetDocumentMeta',
+      payload: { gridSize: 0 },
+    });
+    expect(result.error?.code).toBe('INVALID_GRID_SIZE');
+    expect(result.document).toBe(doc);
+    expect(result.patchGroups).toEqual([]);
+  });
+
+  it('SetDocumentMeta with non-integer gridSize is rejected', () => {
+    const doc = createEmptyDocument();
+    const result = applyCommand(doc, {
+      type: 'SetDocumentMeta',
+      payload: { gridSize: 10.5 },
+    });
+    expect(result.error?.code).toBe('INVALID_GRID_SIZE');
+    expect(result.document).toBe(doc);
+    expect(result.patchGroups).toEqual([]);
+  });
+
+  it('SetDocumentMeta with no fields is a no-op (doesnt change document)', () => {
+    const doc = createEmptyDocument();
+    const result = applyCommand(doc, {
+      type: 'SetDocumentMeta',
+      payload: {},
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.document).toBe(doc);
+    expect(result.patchGroups).toEqual([[]]);
+  });
+
+  it('SetDocumentMeta is invertible (undo restores original)', () => {
+    const store = new DocumentStore();
+    store.dispatch({
+      type: 'SetDocumentMeta',
+      payload: { name: 'My Plan', displayUnit: 'cm', gridSize: 200 },
+    });
+    expect(store.current.meta.name).toBe('My Plan');
+    expect(store.current.meta.displayUnit).toBe('cm');
+    expect(store.current.meta.gridSize).toBe(200);
+
+    store.undo();
+    const emptyDoc = createEmptyDocument();
+    expect(store.current.meta.name).toBe(emptyDoc.meta.name);
+    expect(store.current.meta.displayUnit).toBe(emptyDoc.meta.displayUnit);
+    expect(store.current.meta.gridSize).toBe(emptyDoc.meta.gridSize);
+  });
+});

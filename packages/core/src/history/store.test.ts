@@ -192,4 +192,69 @@ describe('DocumentStore', () => {
     const store = new DocumentStore(doc)
     expect(store.current.nodes).toHaveLength(0)
   })
+
+  it('dirty is false on new store', () => {
+    const store = new DocumentStore()
+    expect(store.dirty).toBe(false)
+  })
+
+  it('dirty becomes true after dispatch', () => {
+    const store = new DocumentStore()
+    store.dispatch(makeRoomPayload())
+    expect(store.dirty).toBe(true)
+  })
+
+  it('markSaved sets dirty to false', () => {
+    const store = new DocumentStore()
+    store.dispatch(makeRoomPayload())
+    store.markSaved()
+    expect(store.dirty).toBe(false)
+  })
+
+  it('dirty becomes true again after dispatch after markSaved', () => {
+    const store = new DocumentStore()
+    store.dispatch(makeRoomPayload())
+    store.markSaved()
+    store.dispatch({
+      type: 'SetDocumentMeta',
+      payload: { name: 'foo' },
+    })
+    expect(store.dirty).toBe(true)
+  })
+
+  it('undo sets dirty to true', () => {
+    const store = new DocumentStore()
+    store.dispatch(makeRoomPayload())
+    store.markSaved()
+    store.undo()
+    expect(store.dirty).toBe(true)
+  })
+
+  it('redo sets dirty to true', () => {
+    const store = new DocumentStore()
+    store.dispatch(makeRoomPayload())
+    store.undo()
+    store.markSaved()
+    store.redo()
+    expect(store.dirty).toBe(true)
+  })
+
+  it('replaceDocument clears history, sets dirty false, notifies subscribers', () => {
+    const store = new DocumentStore()
+    store.dispatch(makeRoomPayload())
+    let notified = false
+    store.subscribe(() => {
+      notified = true
+    })
+    
+    const newDoc = createEmptyDocument()
+    newDoc.meta.name = 'Replacement'
+    store.replaceDocument(newDoc)
+
+    expect(store.current.meta.name).toBe('Replacement')
+    expect(store.dirty).toBe(false)
+    expect(store.canUndo).toBe(false)
+    expect(store.canRedo).toBe(false)
+    expect(notified).toBe(true)
+  })
 })

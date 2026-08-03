@@ -14,6 +14,7 @@ import type {
   FurnitureId,
   FurnitureItem,
   HexColor,
+  DocumentMeta,
 } from '../model';
 import {
   generateNodeId,
@@ -55,7 +56,8 @@ export type Command =
   | DeleteFurnitureCommand
   | CreateWallCommand
   | DeleteWallCommand
-  | BatchCommand;
+  | BatchCommand
+  | SetDocumentMetaCommand;
 
 export interface CreateRoomCommand {
   type: 'CreateRoom';
@@ -280,6 +282,18 @@ export interface BatchPayload {
   commands: Command[];
 }
 
+export interface SetDocumentMetaCommand {
+  type: 'SetDocumentMeta';
+  transient?: boolean;
+  payload: SetDocumentMetaPayload;
+}
+
+export interface SetDocumentMetaPayload {
+  name?: string;
+  displayUnit?: 'm' | 'cm';
+  gridSize?: number;
+}
+
 // ============================================================
 // Resultado
 // ============================================================
@@ -306,7 +320,8 @@ export type CommandErrorCode =
   | 'INVALID_DIMENSION'
   | 'INVALID_ROTATION'
   | 'EMPTY_WALL'
-  | 'WALL_NOT_FOUND';
+  | 'WALL_NOT_FOUND'
+  | 'INVALID_GRID_SIZE';
 
 export interface CommandError {
   code: CommandErrorCode;
@@ -395,6 +410,8 @@ export function applyCommand(
       return applyDeleteWall(doc, cmd.payload);
     case 'Batch':
       return applyBatch(doc, cmd.payload);
+    case 'SetDocumentMeta':
+      return applySetDocumentMeta(doc, cmd.payload);
   }
 }
 
@@ -638,6 +655,39 @@ function applyBatch(doc: PlanDocument, payload: BatchPayload): CommandResult {
   }
 
   return { document: current, patchGroups, inversePatchGroups, label: payload.label };
+}
+
+// ============================================================
+// Documento
+// ============================================================
+
+function applySetDocumentMeta(
+  doc: PlanDocument,
+  payload: SetDocumentMetaPayload,
+): CommandResult {
+  const label = 'Alterar propriedades do documento';
+
+  if (
+    payload.name === undefined &&
+    payload.displayUnit === undefined &&
+    payload.gridSize === undefined
+  ) {
+    return applied(doc, [], [], label);
+  }
+
+  if (payload.gridSize !== undefined) {
+    if (!Number.isInteger(payload.gridSize) || payload.gridSize <= 0) {
+      return rejected(doc, label, { code: 'INVALID_GRID_SIZE', ids: [] });
+    }
+  }
+
+  const [nextDoc, patches, inversePatches] = produceWithPatches(doc, (draft) => {
+    if (payload.name !== undefined) draft.meta.name = payload.name;
+    if (payload.displayUnit !== undefined) draft.meta.displayUnit = payload.displayUnit;
+    if (payload.gridSize !== undefined) draft.meta.gridSize = payload.gridSize as DocumentMeta['gridSize'];
+  });
+
+  return applied(nextDoc, patches, inversePatches, label);
 }
 
 // ============================================================

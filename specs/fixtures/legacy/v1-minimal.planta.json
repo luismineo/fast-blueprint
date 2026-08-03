@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "meta": {
+    "name": "v1 minimal",
+    "createdAt": "2026-08-01T12:00:00Z",
+    "modifiedAt": "2026-08-01T12:00:00Z",
+    "displayUnit": "m",
+    "gridSize": 100,
+    "appVersion": "1.0.0"
+  },
+  "nodes": [
+    { "id": "n_1", "x": 0, "y": 0 },
+    { "id": "n_2", "x": 2000, "y": 0 },
+    { "id": "n_3", "x": 2000, "y": 2000 },
+    { "id": "n_4", "x": 0, "y": 2000 },
+    { "id": "n_5", "x": 3000, "y": 0 },
+    { "id": "n_6", "x": 3000, "y": 2000 }
+  ],
+  "walls": [
+    { "id": "w_1", "a": "n_5", "b": "n_6" }
+  ],
+  "rooms": [
+    {
+      "id": "r_1",
+      "name": "Cômodo 1",
+      "loop": ["n_1", "n_2", "n_3", "n_4"],
+      "color": null,
+      "includeInUsableArea": true
+    }
+  ],
+  "openings": [],
+  "furniture": [
+    {
+      "id": "f_1",
+      "catalogId": "c_chair",
+      "name": "Cadeira",
+      "width": 500,
+      "depth": 500,
+      "center": { "x": 1000, "y": 1000 },
+      "rotation": 0,
+      "color": null,
+      "locked": false,
+      "clearance": 0
+    }
+  ],
+  "underlay": null
+}

@@ -15,6 +15,8 @@ export const messages = {
   hudSummary: (sides: number, area: string) => `${sides} lados · ${area}`,
 
   roomNameLabel: 'Nome do cômodo',
+  renameDocument: 'Renomear documento',
+  renameDocumentPrompt: 'Novo nome do documento:',
 
   toolbarLabel: 'Ferramentas',
   toolSelect: 'Selecionar',
@@ -88,4 +90,10 @@ export const messages = {
   },
 
   emptyCanvas: 'Pressione R e clique para começar a desenhar um cômodo',
+
+  restoreAutosave: 'Existe um salvamento automático mais recente. Deseja restaurá-lo?',
+  unsavedChanges: 'Existem alterações não salvas. Tem certeza que deseja sair?',
+  menuOpen: 'Abrir',
+  menuSave: 'Salvar',
+  menuExport: 'Exportar',
 } as const
