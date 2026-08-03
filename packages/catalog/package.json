@@ -7,6 +7,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@planta/core": "workspace:*",
     "zod": "^4.4.3"
   }
 }

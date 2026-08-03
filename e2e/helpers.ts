@@ -5,8 +5,17 @@ export interface Origin {
   readonly y: number
 }
 
+/**
+ * O canvas principal, distinto das miniaturas de glifo do painel de catálogo
+ * (`06-catalogo-de-mobilia.md` § Painel) — `locator('canvas')` sozinho passa
+ * a casar com múltiplos elementos assim que um item tem glifo.
+ */
+export function mainCanvas(page: Page) {
+  return page.locator('canvas.canvas-fullscreen')
+}
+
 export async function canvasOrigin(page: Page): Promise<Origin> {
-  const box = await page.locator('canvas').boundingBox()
+  const box = await mainCanvas(page).boundingBox()
   if (!box) throw new Error('canvas sem bounding box')
   return { x: box.x + box.width * 0.3, y: box.y + box.height * 0.35 }
 }

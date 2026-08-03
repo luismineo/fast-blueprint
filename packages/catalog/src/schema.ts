@@ -34,6 +34,8 @@ export const catalogItemSchema = z.object({
   /** mm de circulação sugerida. Ausente é 0. */
   clearance: z.number().int().min(0).optional(),
   tags: z.array(z.string()).optional(),
+  /** Id do glifo em glyphs.json. Ausente = sem glifo (retângulo). */
+  glyph: z.string().min(1).optional(),
   /** Presente só em item criado pelo usuário (spec 06 § Catálogo do usuário). */
   source: z.literal('user').optional(),
 })

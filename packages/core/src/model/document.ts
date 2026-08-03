@@ -2,7 +2,7 @@
 // Fábrica de documento e helpers — spec 01 § Visão geral
 // ============================================================
 
-import type { PlanDocument, DocumentMeta, FurnitureId, NodeId, RoomId } from './types';
+import type { PlanDocument, DocumentMeta, FurnitureId, NodeId, RoomId, WallId } from './types';
 import { validateDocument } from './validation';
 
 /**
@@ -61,6 +61,10 @@ export function generateRoomId(): RoomId {
  */
 export function generateFurnitureId(): FurnitureId {
   return `f_${crypto.randomUUID()}` as FurnitureId;
+}
+
+export function generateWallId(): WallId {
+  return `w_${crypto.randomUUID()}` as WallId;
 }
 
 /**

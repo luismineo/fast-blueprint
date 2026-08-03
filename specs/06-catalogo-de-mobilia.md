@@ -168,17 +168,28 @@ A justificativa completa, com as alternativas rejeitadas, está em `adr/0006-gli
 ### Forma
 
 ```ts
-type UnitPoint = { x: number; y: number }   // ambos em [0, 1]
-
 type GlyphPrimitive =
-  | { kind: 'polyline'; points: readonly UnitPoint[]; closed: boolean }
-  | { kind: 'arc'; center: UnitPoint; radius: number; from: number; to: number }
+  | { kind: 'line'; x1: number; y1: number; x2: number; y2: number }
+  | { kind: 'rect'; x: number; y: number; w: number; h: number }
+  | { kind: 'circle'; cx: number; cy: number; r: number }
+  | {
+      kind: 'arc'
+      cx: number; cy: number; r: number
+      startAngle: number; endAngle: number
+      closed: boolean
+    }
 
 interface FurnitureGlyph {
   id: string
   primitives: readonly GlyphPrimitive[]
 }
 ```
+
+Todas as coordenadas (`x1`, `cx`, `w`, `r`, ...) são frações em `[0,1]` da caixa unitária do móvel, exceto `startAngle`/`endAngle`, que são radianos.
+
+`rect` e `circle` são açúcar sintático: o pass de mobília expande `rect` em quatro `line` e `circle` num `arc` fechado de `0` a `2π`. Nenhum dos quatro chega a `DrawTarget` como primitiva — `line`, `rect` e `circle` viram segmento reto, e `arc` é achatado por `writeArcPoints` (`core/geometry`) em polilinha, dentro do próprio pass (`adr/0006-glifos-de-mobilia.md` § 3). Esta é uma revisão desta seção: a primeira versão descrevia `polyline`/`arc` com `center`/`radius`/`from`/`to` em graus; a implementação do M3.5 optou por `line`/`rect`/`circle`/`arc`, mais perto de como se desenha um glifo à mão, primitiva por primitiva — a decisão está registrada aqui, e não só no código, porque esta seção é quem a possui.
+
+`closed` do `arc` decide se o achatamento fecha o anel repetindo o primeiro ponto como último. `true` para forma pensada como fechada — bacia, roda, botão de eletrodoméstico, e é o que `circle` sempre usa internamente. `false` para arco de verdade, como o `door-swing`: a curva que uma folha de porta varre não tem segmento reto ligando a ponta de volta ao eixo.
 
 O tipo vive em `core`, junto de `OverlayPrimitive`, pelo mesmo motivo dele: `renderer` e `catalog` precisam do tipo e a direção de dependência de `08-arquitetura.md` só admite `core` como lugar comum. Os **valores** vivem em `packages/catalog/data/glyphs.json`.
 
@@ -188,13 +199,13 @@ Como `OverlayPrimitive`, um glifo nunca carrega cor, espessura ou fonte — não
 
 `(0,0)` é o canto traseiro esquerdo do móvel, `(1,1)` o frontal direito. `y` cresce da parede para dentro do cômodo, acompanhando `depth` (§ Convenção de orientação). O renderer escala por `width × depth` **do item no documento**, não do item de catálogo: a medida que o usuário digitou é a que vale.
 
-`radius` é fração da caixa, e `from`/`to` são graus com 0 no eixo `+x`, crescendo para `+y`. Como a escala é aplicada por eixo, um arco de raio constante numa caixa não quadrada sai elíptico — é assim que a bacia de um vaso (380 × 700) fica com a proporção certa sem nenhum caso especial.
+`r` é fração da caixa, e `startAngle`/`endAngle` têm `0` no eixo `+x`, crescendo para `+y`. Como a escala é aplicada por eixo, um arco de raio constante numa caixa não quadrada sai elíptico — é assim que a bacia de um vaso (380 × 700) fica com a proporção certa sem nenhum caso especial.
 
 Coordenada de glifo é fracionária. Isso **não** contradiz "float em coordenada de nó é bug": glifo não tem coordenada de domínio, tem proporção.
 
 ### Limites de schema
 
-Um glifo tem no máximo 48 primitivas; uma polilinha, no máximo 64 pontos; um arco é achatado em no máximo 64. É o que permite ao pass de mobília trabalhar com um único buffer pré-alocado de 64 pontos, reusado primitiva a primitiva (`04-renderizacao.md` § Orçamento de performance, regra 2).
+Um glifo tem no máximo 48 primitivas. Um círculo ou arco completo achata em até 24 pontos, um a cada 15° de varredura, no mínimo quatro (`02-unidades-e-geometria.md` § Achatamento de arco) — é o que permite ao pass de mobília trabalhar com um buffer pré-alocado de 25 posições (24 pontos mais o fecho do anel), reusado primitiva a primitiva (`04-renderizacao.md` § Orçamento de performance, regra 2).
 
 ### Glifos do catálogo default
 

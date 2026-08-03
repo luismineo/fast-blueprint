@@ -12,6 +12,8 @@ export const MARKER_HALF_PX: Readonly<Record<OverlayRole, number>> = {
   edgeHighlight: 4,
   closeTarget: 5,
   marquee: 4,
+  measure: 3,
+  measureLabel: 4,
 }
 
 /** Papéis desenhados como losango em vez de quadrado (spec 02 § Guias visuais). */
@@ -22,6 +24,8 @@ export const TOOL_OVERLAY_ROLES: ReadonlySet<OverlayRole> = new Set<OverlayRole>
   'ghost',
   'closeTarget',
   'marquee',
+  'measure',
+  'measureLabel',
 ])
 
 export const SNAP_GUIDE_ROLES: ReadonlySet<OverlayRole> = new Set<OverlayRole>([
@@ -55,6 +59,8 @@ export function overlayStyles(theme: Theme): Readonly<Record<OverlayRole, LineSt
     alignmentGuide: { color: theme.snapGuide, width: 1, dash: [2, 5] },
     edgeHighlight: { color: theme.snapGuide, width: 2, opacity: 0.6 },
     marquee: { color: theme.selection, width: 1, dash: [4, 3] },
+    measure: { color: theme.dimension, width: 1, dash: [6, 4] },
+    measureLabel: { color: theme.dimension, width: 1 },
   }
 
   cache.set(theme, styles)

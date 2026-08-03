@@ -73,8 +73,8 @@ export class RecordingTarget implements DrawTarget {
     this.lines.push({ x1, y1, x2, y2, style })
   }
 
-  polyline(points: { x: number; y: number }[], style: LineStyle): void {
-    this.polylines.push({ points: copyPoints(points), style })
+  polyline(points: { x: number; y: number }[], style: LineStyle, count = points.length): void {
+    this.polylines.push({ points: copyPoints(points.slice(0, count)), style })
   }
 
   filledPolygon(points: { x: number; y: number }[], fill: FillStyle): void {

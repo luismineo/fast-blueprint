@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { canvasOrigin, drawRoom } from './helpers'
+import { canvasOrigin, drawRoom, mainCanvas } from './helpers'
 
 /**
  * Fluxo de edição do M2 (`specs/09-roadmap.md`), contra o build de produção.
@@ -16,7 +16,7 @@ test('arrastar uma parede compartilhada atualiza os dois comodos', async ({ page
   page.on('pageerror', (err) => errors.push(String(err)))
 
   await page.goto('/')
-  await expect(page.locator('canvas')).toBeVisible()
+  await expect(mainCanvas(page)).toBeVisible()
 
   const origin = await canvasOrigin(page)
   await drawRoom(page, origin, 0)
@@ -46,7 +46,7 @@ test('arrastar uma parede compartilhada atualiza os dois comodos', async ({ page
 
 test('corrigir a medida de uma aresta sem redesenhar o comodo', async ({ page }) => {
   await page.goto('/')
-  await expect(page.locator('canvas')).toBeVisible()
+  await expect(mainCanvas(page)).toBeVisible()
 
   const origin = await canvasOrigin(page)
   await drawRoom(page, origin, 0)
@@ -71,7 +71,7 @@ test('corrigir a medida de uma aresta sem redesenhar o comodo', async ({ page })
 
 test('duplo clique numa aresta abre o campo de comprimento', async ({ page }) => {
   await page.goto('/')
-  await expect(page.locator('canvas')).toBeVisible()
+  await expect(mainCanvas(page)).toBeVisible()
 
   const origin = await canvasOrigin(page)
   await drawRoom(page, origin, 0)
@@ -88,7 +88,7 @@ test('duplo clique numa aresta abre o campo de comprimento', async ({ page }) =>
 
 test('duplo clique no interior de um comodo abre a edicao de nome', async ({ page }) => {
   await page.goto('/')
-  await expect(page.locator('canvas')).toBeVisible()
+  await expect(mainCanvas(page)).toBeVisible()
 
   const origin = await canvasOrigin(page)
   await drawRoom(page, origin, 0)
@@ -101,7 +101,7 @@ test('duplo clique no interior de um comodo abre a edicao de nome', async ({ pag
 
 test('selecionar um comodo e excluir com Delete', async ({ page }) => {
   await page.goto('/')
-  await expect(page.locator('canvas')).toBeVisible()
+  await expect(mainCanvas(page)).toBeVisible()
 
   const origin = await canvasOrigin(page)
   await drawRoom(page, origin, 0)

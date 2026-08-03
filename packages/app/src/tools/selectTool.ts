@@ -616,6 +616,12 @@ function onDelete(ctx: SelectToolContext): SelectToolResult {
   // `Delete` com o móvel selecionado é ação explícita (spec 03 § Selecionar).
   commands.push(...deleteFurnitureCommands(ctx.selection))
 
+  for (const ref of ctx.selection) {
+    if (ref.kind === 'edge' && ref.edge.kind === 'wall') {
+      commands.push({ type: 'DeleteWall', payload: { wallId: ref.edge.wallId } })
+    }
+  }
+
   if (commands.length === 0) return present({ kind: 'idle' }, ctx, ctx.selection)
 
   return {

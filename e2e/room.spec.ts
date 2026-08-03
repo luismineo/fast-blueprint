@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { mainCanvas } from './helpers'
 
 /**
  * Sequência de aceitação do M1 (`specs/09-roadmap.md`), contra o build de
@@ -6,7 +7,7 @@ import { expect, test, type Page } from '@playwright/test'
  * a suíte de unidade do M1 passava inteira com o desenho quebrado na tela.
  */
 async function drawReferenceRoom(page: Page): Promise<void> {
-  const canvas = await page.locator('canvas').boundingBox()
+  const canvas = await mainCanvas(page).boundingBox()
   if (!canvas) throw new Error('canvas sem bounding box')
 
   const ox = canvas.x + canvas.width * 0.35
@@ -37,7 +38,7 @@ test('desenhar um comodo por teclado produz a area correta no painel', async ({ 
   page.on('pageerror', (err) => errors.push(String(err)))
 
   await page.goto('/')
-  await expect(page.locator('canvas')).toBeVisible()
+  await expect(mainCanvas(page)).toBeVisible()
 
   await drawReferenceRoom(page)
 
@@ -51,13 +52,13 @@ test('desenhar um comodo por teclado produz a area correta no painel', async ({ 
 
 test('undo depois de criar o comodo restaura o documento vazio', async ({ page }) => {
   await page.goto('/')
-  await expect(page.locator('canvas')).toBeVisible()
+  await expect(mainCanvas(page)).toBeVisible()
 
   await drawReferenceRoom(page)
   await page.keyboard.press('Escape')
   await expect(page.getByTestId('room-count')).toHaveText('1')
 
-  await page.locator('canvas').click({ position: { x: 5, y: 5 } })
+  await mainCanvas(page).click({ position: { x: 5, y: 5 } })
   await page.keyboard.press('Control+z')
 
   await expect(page.getByTestId('room-count')).toHaveText('0')

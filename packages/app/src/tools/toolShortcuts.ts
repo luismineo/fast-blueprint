@@ -1,9 +1,9 @@
 import type { RoomToolEvent } from './roomTool'
+import type { WallToolEvent } from './wallTool'
 import type { SelectToolEvent } from './selectTool'
 import { NUDGE_COARSE_MM, NUDGE_MM } from './furnitureActions'
 
-/** Ferramentas que existem. Parede e Medir seguem em aberto desde o M1. */
-export type ToolId = 'select' | 'room' | 'furniture'
+export type ToolId = 'select' | 'room' | 'wall' | 'furniture' | 'measure'
 
 export type FocusKind =
   | 'canvas'
@@ -35,6 +35,7 @@ export type KeyAction =
   | { readonly kind: 'none' }
   | { readonly kind: 'passToField' }
   | { readonly kind: 'toolEvent'; readonly event: RoomToolEvent }
+  | { readonly kind: 'wallEvent'; readonly event: WallToolEvent }
   | { readonly kind: 'selectEvent'; readonly event: SelectToolEvent }
   | { readonly kind: 'furnitureEvent'; readonly action: FurnitureAction }
   | { readonly kind: 'activateTool'; readonly tool: ToolId }
@@ -43,6 +44,7 @@ export type KeyAction =
   | { readonly kind: 'redo' }
   | { readonly kind: 'togglePanel' }
   | { readonly kind: 'focusHudField'; readonly field: 'length' | 'angle' }
+  | { readonly kind: 'focusWallHudField'; readonly field: 'length' | 'angle' }
 
 const IN_FIELD: ReadonlySet<FocusKind> = new Set<FocusKind>(['hudLength', 'hudAngle', 'roomName'])
 
@@ -81,6 +83,9 @@ export function classifyKey(ctx: KeyContext): KeyAction {
     if (ctx.tool === 'room' && ctx.drawing) {
       return { kind: 'toolEvent', event: { type: 'escape' } }
     }
+    if (ctx.tool === 'wall' && ctx.drawing) {
+      return { kind: 'wallEvent', event: { type: 'escape' } }
+    }
     return { kind: 'selectEvent', event: { type: 'escape' } }
   }
 
@@ -89,6 +94,15 @@ export function classifyKey(ctx: KeyContext): KeyAction {
   // global dispara. É a mesma regra D0 que vale para campo de texto — o
   // elemento com foco consome a tecla.
   if (ctx.focus === 'toolbar') return { kind: 'none' }
+
+  // Campo de texto genérico (busca do catálogo, campos do painel de
+  // propriedades) — D0 lista os dois entre os campos que bloqueiam atalho
+  // global. Sem este retorno antecipado, `Backspace`/`Delete` caíam na regra
+  // de "excluir seleção" mais abaixo, `q`/`e`/setas na de girar/mover móvel, e
+  // letra de atalho (`r`, `w`, `f`, `m`, `v`) trocava de ferramenta enquanto o
+  // usuário só queria digitar — cada um deles interrompendo o campo e, no
+  // caso de `Backspace`/`Delete`, apagando a seleção em vez do caractere.
+  if (ctx.focus === 'other') return { kind: 'passToField' }
 
   // Dígitos são permanentemente reservados para a entrada numérica
   // (`03-ferramentas-e-interacao.md`). Roteá-los sempre pela ferramenta, mesmo
@@ -99,25 +113,39 @@ export function classifyKey(ctx: KeyContext): KeyAction {
   // O dígito vai para o campo que **tem foco**. Mandar todo dígito para
   // comprimento tornaria a entrada de ângulo inalcançável, já que o único
   // caminho até aquele campo é `Tab`.
-  if (ctx.tool === 'room' && ctx.drawing && ctx.focus !== 'roomName' && /^[0-9]$/.test(ctx.key)) {
-    return { kind: 'focusHudField', field: ctx.focus === 'hudAngle' ? 'angle' : 'length' }
+  if (
+    (ctx.tool === 'room' || ctx.tool === 'wall') &&
+    ctx.drawing &&
+    ctx.focus !== 'roomName' &&
+    /^[0-9]$/.test(ctx.key)
+  ) {
+    const field = ctx.focus === 'hudAngle' ? 'angle' : 'length'
+    return ctx.tool === 'wall' ? { kind: 'focusWallHudField', field } : { kind: 'focusHudField', field }
   }
 
   if (inField) {
     if (ctx.focus === 'roomName') return { kind: 'passToField' }
 
-    if (ctx.key === 'Enter') return { kind: 'toolEvent', event: { type: 'enter' } }
+    if (ctx.key === 'Enter') {
+      return ctx.tool === 'wall'
+        ? { kind: 'wallEvent', event: { type: 'enter' } }
+        : { kind: 'toolEvent', event: { type: 'enter' } }
+    }
     if (ctx.key === 'Tab') {
-      return { kind: 'focusHudField', field: ctx.focus === 'hudLength' ? 'angle' : 'length' }
+      const field = ctx.focus === 'hudLength' ? 'angle' : 'length'
+      return ctx.tool === 'wall' ? { kind: 'focusWallHudField', field } : { kind: 'focusHudField', field }
     }
     if (ctx.key === 'Backspace' && focusedFieldEmpty(ctx)) {
-      return { kind: 'toolEvent', event: { type: 'backspace' } }
+      return ctx.tool === 'wall'
+        ? { kind: 'wallEvent', event: { type: 'backspace' } }
+        : { kind: 'toolEvent', event: { type: 'backspace' } }
     }
     // `c` fecha o polígono com o campo vazio, e é caractere de sufixo de
     // unidade ("320cm") com o campo preenchido. Sem essa distinção, a
     // sequência documentada `320 Enter … C` não fecharia: depois do Enter o
-    // foco está no campo, e todo `c` viraria texto.
-    if ((ctx.key === 'c' || ctx.key === 'C') && ctx.lengthFieldEmpty) {
+    // foco está no campo, e todo `c` viraria texto. Só a Ferramenta Cômodo
+    // fecha polígono — a Parede não tem `C` (`03 § Parede`).
+    if ((ctx.key === 'c' || ctx.key === 'C') && ctx.lengthFieldEmpty && ctx.tool === 'room') {
       return { kind: 'toolEvent', event: { type: 'close' } }
     }
     return { kind: 'passToField' }
@@ -139,13 +167,21 @@ export function classifyKey(ctx: KeyContext): KeyAction {
     if (ctx.key === 'Tab') return { kind: 'focusHudField', field: 'length' }
   }
 
+  if (ctx.tool === 'wall' && ctx.drawing) {
+    if (ctx.key === 'Enter') return { kind: 'wallEvent', event: { type: 'enter' } }
+    if (ctx.key === 'Backspace') return { kind: 'wallEvent', event: { type: 'backspace' } }
+    if (ctx.key === 'Tab') return { kind: 'focusWallHudField', field: 'length' }
+  }
+
   if (ctx.key === 'Delete' || ctx.key === 'Backspace') {
     return { kind: 'selectEvent', event: { type: 'deleteSelection' } }
   }
 
   if (ctx.key === 'r' || ctx.key === 'R') return { kind: 'activateTool', tool: 'room' }
   if (ctx.key === 'v' || ctx.key === 'V') return { kind: 'activateTool', tool: 'select' }
+  if (ctx.key === 'w' || ctx.key === 'W') return { kind: 'activateTool', tool: 'wall' }
   if (ctx.key === 'f' || ctx.key === 'F') return { kind: 'activateTool', tool: 'furniture' }
+  if (ctx.key === 'm' || ctx.key === 'M') return { kind: 'activateTool', tool: 'measure' }
 
   return { kind: 'none' }
 }

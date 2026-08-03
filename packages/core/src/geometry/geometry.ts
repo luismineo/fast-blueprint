@@ -472,3 +472,58 @@ function lineCrossing(a: Point, b: Point, c: Point, d: Point): Point | null {
   const t = ((c.x - a.x) * cdy - (c.y - a.y) * cdx) / denominator;
   return { x: a.x + abx * t, y: a.y + aby * t };
 }
+
+// ============================================================
+// Achatamento de arco — adr/0006-glifos-de-mobilia.md § 3
+// ============================================================
+
+const DEGREES_PER_SEGMENT = 15;
+const MIN_ARC_SEGMENTS = 4;
+
+/**
+ * Segmentos para uma varredura de `sweepRad` radianos: um a cada 15°, no
+ * mínimo quatro (`02-unidades-e-geometria.md` § Achatamento de arco). Um
+ * círculo completo (2π) sai com 24.
+ */
+function defaultArcSegments(sweepRad: number): number {
+  const sweepDeg = Math.abs(sweepRad) * (180 / Math.PI);
+  return Math.max(MIN_ARC_SEGMENTS, Math.round(sweepDeg / DEGREES_PER_SEGMENT));
+}
+
+/**
+ * Escreve os pontos de um arco elíptico achatado num buffer pré-alocado.
+ *
+ * O arco é definido no sistema de coordenadas local do móvel (já escalado por
+ * width × depth). Os pontos são escritos em `out` a partir de `outOffset`,
+ * cobrindo `[startAngle, endAngle)` — o ponto em `endAngle` não é escrito, e o
+ * arco não fecha o anel sozinho; o chamador decide se fecha (repetindo o
+ * primeiro ponto ao final, quando fizer sentido).
+ *
+ * Ângulos em radianos, 0 = +X, crescendo no sentido horário (Y para baixo).
+ * `segments`, se omitido, segue a regra de 15°/segmento com mínimo de quatro.
+ *
+ * Retorna o número de pontos escritos.
+ */
+export function writeArcPoints(
+  out: Point[],
+  outOffset: number,
+  cx: number,
+  cy: number,
+  rx: number,
+  ry: number,
+  startAngle: number,
+  endAngle: number,
+  segments?: number,
+): number {
+  const sweep = endAngle - startAngle;
+  const count = segments ?? defaultArcSegments(sweep);
+  const step = sweep / count;
+
+  for (let i = 0; i < count; i += 1) {
+    const angle = startAngle + step * i;
+    out[outOffset + i]!.x = cx + rx * Math.cos(angle);
+    out[outOffset + i]!.y = cy + ry * Math.sin(angle);
+  }
+
+  return count;
+}

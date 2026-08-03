@@ -16,8 +16,10 @@
     generateFurnitureId,
     generateNodeId,
     generateRoomId,
+    generateWallId,
     hitTest,
     pruneSelection,
+    obbCorners,
     resolveFurnitureSnap,
     tryParseAngle,
     tryParseLength,
@@ -72,6 +74,19 @@
     nudgeCommands,
     rotateCommands,
   } from './tools/furnitureActions'
+  import {
+    initialWallState,
+    wallToolTransition,
+    type WallToolContext,
+    type WallToolEvent,
+    type WallToolState,
+    type WallHudModel,
+  } from './tools/wallTool'
+  import {
+    initialMeasureState,
+    measureToolTransition,
+    type MeasureToolState,
+  } from './tools/measureTool'
   import { exactNodeAt, resolveToolSnap, wallEdges } from './tools/snapContext'
   import {
     classifyKey,
@@ -85,7 +100,9 @@
   import { pushRecent, type CatalogEntry } from './components/catalogModel'
   import {
     loadDefaultCatalog,
+    loadGlyphs,
     mergeCatalogs,
+    resolveGlyphMap,
     upsertUserItem,
     userItemFrom,
     type CatalogCategory,
@@ -107,10 +124,12 @@
   let roomState: RoomToolState = $state.raw(initialRoomState())
   let selectState: SelectToolState = $state.raw(initialSelectState())
   let furnitureState: FurnitureToolState = $state.raw(initialFurnitureState())
+  let wallState: WallToolState = $state.raw(initialWallState())
+  let measureState: MeasureToolState = $state.raw(initialMeasureState())
   let selection: Selection = $state.raw([])
   let hover: SelectionRef | null = $state.raw(null)
   let overlays: readonly OverlayPrimitive[] = $state.raw([])
-  let hud: RoomHudModel | null = $state.raw(null)
+  let hud: RoomHudModel | WallHudModel | null = $state.raw(null)
   let naming: NamingRequest | null = $state.raw(null)
   let namingValue = $state('')
   let edgeEdit: (EditRequest & { kind: 'edgeLength' }) | null = $state.raw(null)
@@ -130,6 +149,9 @@
 
   const defaultCatalog = loadDefaultCatalog()
   const catalogItems = $derived(mergeCatalogs(defaultCatalog, userItems))
+
+  const allGlyphs = loadGlyphs()
+  const glyphs = $derived.by(() => resolveGlyphMap(catalogItems, defaultCatalog, allGlyphs))
 
   const store = new DocumentStore()
   let doc: PlanDocument = $state.raw(store.current)
@@ -233,6 +255,26 @@
     }
   }
 
+  function wallContext(shift: boolean): WallToolContext {
+    const world = worldAt(cursorPx)
+    const draft = wallState.kind === 'idle' ? [] : wallState.nodes
+    const current = store.current
+    return {
+      cursor: world,
+      snap: resolveToolSnap(world, {
+        doc: current,
+        draft,
+        scale: camera.scale,
+        shift,
+        alt: false,
+      }),
+      shift,
+      nodeAt: (point) => exactNodeAt(point, { doc: current, draft }),
+      newNodeId: generateNodeId,
+      newWallId: generateWallId,
+    }
+  }
+
   function dispatchFurniture(event: FurnitureToolEvent, alt = false): void {
     const result = furnitureToolTransition(furnitureState, event, furnitureContext(alt))
     furnitureState = result.state
@@ -249,15 +291,52 @@
     }
   }
 
+  function dispatchWall(event: WallToolEvent, shift = false): void {
+    const result = wallToolTransition(wallState, event, wallContext(shift))
+    wallState = result.state
+    overlays = result.overlays
+    hud = result.hud
+
+    for (const command of result.commands) store.dispatch(command)
+  }
+
+  function measureContext() {
+    const world = worldAt(cursorPx)
+    const current = store.current
+    const corners: Point[] = []
+    for (const item of current.furniture) {
+      const c = obbCorners(item.center, item.width, item.depth, item.rotation)
+      for (let i = 0; i < 4; i += 1) corners.push(c[i]!)
+    }
+    return {
+      snap: resolveToolSnap(world, {
+        doc: current,
+        draft: [],
+        scale: camera.scale,
+        shift: false,
+        alt: false,
+        furnitureCorners: corners,
+      }),
+    }
+  }
+
+  function dispatchMeasure(event: { type: 'pointerDown' } | { type: 'pointerUp' } | { type: 'pointerMove' } | { type: 'escape' }): void {
+    const result = measureToolTransition(measureState, event, measureContext())
+    measureState = result.state
+    overlays = result.overlays
+  }
+
   /**
-   * Trocar de ferramenta zera o estado das outras duas.
+   * Trocar de ferramenta zera o estado das outras.
    *
    * Um traço pela metade ou um item armado que sobrevivesse à troca voltaria a
-   * aparecer sem que o usuário pedisse.
+   * aparecer sem que o usuário pedisse — inclusive a Parede, que fica com um
+   * traço em andamento tão facilmente quanto o Cômodo.
    */
   function activateTool(next: ToolId): void {
     tool = next
     roomState = initialRoomState()
+    wallState = initialWallState()
     selectState = initialSelectState()
     furnitureState = initialFurnitureState()
     overlays = []
@@ -267,6 +346,10 @@
       selection = []
       hover = null
       dispatchTool({ type: 'activate' })
+    }
+
+    if (next === 'wall') {
+      dispatchWall({ type: 'activate' })
     }
   }
 
@@ -616,12 +699,14 @@
 
   function onLengthInput(event: Event): void {
     const value = (event.currentTarget as HTMLInputElement).value
-    dispatchTool({ type: 'inputChange', value, field: 'length' })
+    if (tool === 'wall') dispatchWall({ type: 'inputChange', value, field: 'length' })
+    else dispatchTool({ type: 'inputChange', value, field: 'length' })
   }
 
   function onAngleInput(event: Event): void {
     const value = (event.currentTarget as HTMLInputElement).value
-    dispatchTool({ type: 'inputChange', value, field: 'angle' })
+    if (tool === 'wall') dispatchWall({ type: 'inputChange', value, field: 'angle' })
+    else dispatchTool({ type: 'inputChange', value, field: 'angle' })
   }
 
   function setupCanvas(canvas: HTMLCanvasElement, profiler: Profiler | undefined): () => void {
@@ -644,6 +729,7 @@
         overlays,
         selection,
         hover,
+        glyphs,
       })
     })
 
@@ -719,6 +805,10 @@
 
       if (tool === 'room') {
         dispatchTool({ type: 'pointerDown', clickCount: 1 }, event.shiftKey)
+      } else if (tool === 'wall') {
+        dispatchWall({ type: 'pointerDown', clickCount: 1 }, event.shiftKey)
+      } else if (tool === 'measure') {
+        dispatchMeasure({ type: 'pointerDown' })
       } else if (tool === 'furniture') {
         dispatchFurniture({ type: 'pointerDown' }, event.altKey)
       } else {
@@ -749,6 +839,8 @@
 
       if (tool === 'room') {
         dispatchTool({ type: 'pointerDown', clickCount: 2 }, event.shiftKey)
+      } else if (tool === 'wall') {
+        dispatchWall({ type: 'pointerDown', clickCount: 2 }, event.shiftKey)
       } else if (tool === 'select') {
         dispatchSelect({ type: 'pointerDown', clickCount: 2, additive: false }, event.altKey)
       }
@@ -777,6 +869,10 @@
 
       if (tool === 'room') {
         dispatchTool({ type: 'pointerMove' }, event.shiftKey)
+      } else if (tool === 'wall') {
+        dispatchWall({ type: 'pointerMove' }, event.shiftKey)
+      } else if (tool === 'measure') {
+        dispatchMeasure({ type: 'pointerMove' })
       } else if (tool === 'furniture') {
         dispatchFurniture({ type: 'pointerMove' }, event.altKey)
       } else {
@@ -816,7 +912,7 @@
         shift: event.shiftKey,
         focus: focusKind(),
         tool,
-        drawing: roomState.kind !== 'idle',
+        drawing: tool === 'wall' ? wallState.kind !== 'idle' : roomState.kind !== 'idle',
         lengthFieldEmpty: (hud?.lengthText ?? '') === '',
         angleFieldEmpty: (hud?.angleText ?? '') === '',
         selectionHasFurniture: selection.some((ref) => ref.kind === 'furniture'),
@@ -868,6 +964,12 @@
           scheduler.markDirty()
           return
 
+        case 'wallEvent':
+          event.preventDefault()
+          dispatchWall(action.event, event.shiftKey)
+          scheduler.markDirty()
+          return
+
         case 'selectEvent': {
           event.preventDefault()
           // `Esc` sem seleção volta para a Ferramenta Selecionar; com seleção,
@@ -876,6 +978,11 @@
           if (tool === 'furniture' && action.event.type === 'escape') {
             if (furnitureState.kind === 'armed') dispatchFurniture({ type: 'escape' })
             else activateSelect()
+            scheduler.markDirty()
+            return
+          }
+          if (tool === 'wall') {
+            if (action.event.type === 'escape' && wasEmpty) activateSelect()
             scheduler.markDirty()
             return
           }
@@ -895,6 +1002,17 @@
           element?.focus()
           if (/^[0-9]$/.test(event.key)) {
             dispatchTool({ type: 'digit', digit: event.key, field: action.field })
+            scheduler.markDirty()
+          }
+          return
+        }
+
+        case 'focusWallHudField': {
+          event.preventDefault()
+          const element = action.field === 'length' ? lengthEl : angleEl
+          element?.focus()
+          if (/^[0-9]$/.test(event.key)) {
+            dispatchWall({ type: 'digit', digit: event.key, field: action.field })
             scheduler.markDirty()
           }
         }
@@ -1003,6 +1121,7 @@
   <CatalogPanel
     items={catalogItems}
     {recentIds}
+    {glyphs}
     onChoose={chooseCatalogItem}
     onDragStart={beginCatalogDrag}
   />

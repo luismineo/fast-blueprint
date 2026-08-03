@@ -33,37 +33,58 @@ export function dimensionsPass(ctx: RenderContext): void {
     for (let i = 0; i < points.length; i += 1) {
       const a = points[i]!
       const b = points[(i + 1) % points.length]!
-
-      const lengthMm = Math.hypot(b.x - a.x, b.y - a.y)
-      if (lengthMm === 0) continue
-
-      const ax = worldToScreenX(camera, a.x)
-      const ay = worldToScreenY(camera, a.y)
-      const bx = worldToScreenX(camera, b.x)
-      const by = worldToScreenY(camera, b.y)
-
-      const dx = bx - ax
-      const dy = by - ay
-      const screenLength = Math.hypot(dx, dy)
-
-      const text = formatLength(lengthMm, doc.meta.displayUnit)
-      if (screenLength < text.length * CHAR_WIDTH_PX + PADDING_PX) continue
-
-      // Normal externa de um ciclo horário com Y para baixo é (dy, -dx).
-      const nx = dy / screenLength
-      const ny = -dx / screenLength
-
-      let angle = Math.atan2(dy, dx)
-      if (angle > Math.PI / 2) angle -= Math.PI
-      if (angle < -Math.PI / 2) angle += Math.PI
-
-      target.textRotated(
-        (ax + bx) / 2 + nx * OFFSET_PX,
-        (ay + by) / 2 + ny * OFFSET_PX,
-        text,
-        angle,
-        style,
-      )
+      drawDimension(a, b, doc.meta.displayUnit, camera, target, style)
     }
   }
+
+  for (const wall of doc.walls) {
+    const a = resolveNode(doc, wall.a)
+    const b = resolveNode(doc, wall.b)
+    if (!a || !b) continue
+    drawDimension(a, b, doc.meta.displayUnit, camera, target, style)
+  }
+}
+
+function resolveNode(doc: RenderContext['doc'] & {}, nodeId: string) {
+  const node = doc.nodes.find((n) => n.id === nodeId)
+  return node ? { x: node.x, y: node.y } : null
+}
+
+function drawDimension(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  unit: 'm' | 'cm',
+  camera: RenderContext['camera'],
+  target: RenderContext['target'],
+  style: TextStyle,
+): void {
+  const lengthMm = Math.hypot(b.x - a.x, b.y - a.y)
+  if (lengthMm === 0) return
+
+  const ax = worldToScreenX(camera, a.x)
+  const ay = worldToScreenY(camera, a.y)
+  const bx = worldToScreenX(camera, b.x)
+  const by = worldToScreenY(camera, b.y)
+
+  const dx = bx - ax
+  const dy = by - ay
+  const screenLength = Math.hypot(dx, dy)
+
+  const text = formatLength(lengthMm, unit)
+  if (screenLength < text.length * CHAR_WIDTH_PX + PADDING_PX) return
+
+  const nx = dy / screenLength
+  const ny = -dx / screenLength
+
+  let angle = Math.atan2(dy, dx)
+  if (angle > Math.PI / 2) angle -= Math.PI
+  if (angle < -Math.PI / 2) angle += Math.PI
+
+  target.textRotated(
+    (ax + bx) / 2 + nx * OFFSET_PX,
+    (ay + by) / 2 + ny * OFFSET_PX,
+    text,
+    angle,
+    style,
+  )
 }

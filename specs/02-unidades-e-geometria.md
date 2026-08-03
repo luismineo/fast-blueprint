@@ -239,11 +239,13 @@ A face traseira é a que encosta porque é a convenção de catálogo — cama, 
 
 ### Achatamento de arco
 
-`writeArcPoints(out, center, radius, from, to, ...)` escreve num buffer pré-alocado os pontos que aproximam um arco por polilinha, com um segmento a cada 15° de varredura e no mínimo quatro. Um círculo completo sai com 24 lados.
+`writeArcPoints(out, outOffset, cx, cy, rx, ry, startAngle, endAngle, segments?)` escreve num buffer pré-alocado, a partir de `outOffset`, os pontos que aproximam um arco elíptico por polilinha. `segments`, quando omitido, é calculado a partir da varredura: um segmento a cada 15°, no mínimo quatro. Um círculo completo (varredura de 2π) sai com 24 pontos.
+
+A função escreve `[startAngle, endAngle)` — o ponto em `endAngle` não é escrito, e o arco não fecha o anel sozinho; quem chama decide se fecha, repetindo o primeiro ponto como último. Isso é seguro porque o ponto de uma volta completa (`startAngle + 2π`) coincide com o de `startAngle` dentro de 1 mm — os dois avaliam o mesmo cosseno e seno, só que em ângulos que diferem por um múltiplo exato de 2π.
 
 É geometria pura e mora em `core/geometry` ao lado de `writeObbCorners`, mas o único consumidor é o renderer: os glifos de mobília declaram arco e o pass os achata na hora de desenhar, para que `DrawTarget` não precise de primitiva de curva (`adr/0006-glifos-de-mobilia.md`). Nada no domínio produz arco — não existe geometria curva em documento nenhum.
 
-O arco é escrito em coordenadas da caixa unitária do glifo e escalado depois, por eixo. É essa ordem que faz um arco circular virar elipse num móvel não quadrado, sem nenhum tratamento de elipse.
+`rx` e `ry` já são os semieixos em milímetros locais do móvel (`raio fracionário × width` e `raio fracionário × depth`) — é o chamador, no pass de mobília, quem escala por eixo antes de chamar `writeArcPoints`. É essa escala não uniforme, aplicada antes do achatamento, que faz um arco circular virar elipse num móvel não quadrado, sem nenhum tratamento de elipse dentro da função.
 
 ## Precisão de fechamento
 
@@ -266,6 +268,6 @@ A mensagem é informativa, sem limiar de recusa, sem algoritmo de ajuste, sem n�
 - [ ] SAT detecta sobreposição entre dois retângulos rotacionados 30° e 60° com centros a 400 mm
 - [ ] Canto de móvel dispara âncora de Classe 1 com o flag ligado, e não dispara sem ele
 - [ ] Móvel a 100 mm de uma parede avulsa encosta nela; a 200 mm, não
-- [ ] `writeArcPoints` de um círculo completo escreve 24 pontos, e o primeiro coincide com o último dentro de 1 mm
+- [ ] `writeArcPoints` de um círculo completo escreve 24 pontos únicos (adjacentes a 15° um do outro, não coincidentes); o ponto em `startAngle + 2π`, avaliado à parte, coincide com o de `startAngle` dentro de 1 mm — a base matemática para o chamador fechar o anel repetindo o primeiro ponto
 - [ ] Property test: para qualquer polígono simples gerado, área calculada por shoelace é igual à soma das áreas dos triângulos da sua triangulação por fan
 - [ ] Property test: para qualquer sequência de comprimentos digitados, o polígono resultante fecha (primeiro nó igual ao último)

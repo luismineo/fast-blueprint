@@ -40,8 +40,7 @@
   }
 
   function activate(id: ToolbarId): void {
-    if (id === 'wall' || id === 'measure') return
-    onSelect(id)
+    onSelect(id as ToolId)
   }
 </script>
 

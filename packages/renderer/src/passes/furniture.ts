@@ -2,9 +2,13 @@ import {
   convexIntersection,
   formatDimensions,
   furnitureFlags,
+  roundMm,
   satOverlap,
+  writeArcPoints,
   writeObbCorners,
+  type FurnitureGlyph,
   type FurnitureItem,
+  type GlyphPrimitive,
   type PlanDocument,
   type Point,
 } from '@planta/core'
@@ -19,6 +23,7 @@ const HATCH_SPACING_PX = 6
 const LABEL_GAP_PX = 2
 const MIN_LABEL_WIDTH_PX = 56
 const MIN_LABEL_HEIGHT_PX = 26
+const GLYPH_MIN_SCREEN_PX = 24
 
 interface FurnitureStyles {
   readonly fill: FillStyle
@@ -26,6 +31,7 @@ interface FurnitureStyles {
   readonly dashed: LineStyle
   readonly orientation: LineStyle
   readonly hatch: LineStyle
+  readonly glyph: LineStyle
   readonly name: TextStyle
   readonly size: TextStyle
 }
@@ -42,6 +48,7 @@ function furnitureStyles(theme: Theme): FurnitureStyles {
     dashed: { color: theme.outsideRoom, width: 1, dash: OUTLINE_DASH },
     orientation: { color: theme.furnitureStroke, width: ORIENTATION_WIDTH_PX },
     hatch: { color: theme.collision, width: 1 },
+    glyph: { color: theme.glyph, width: 1 },
     name: {
       color: theme.furnitureLabel,
       font: '11px Inter, sans-serif',
@@ -80,6 +87,10 @@ const other: Point[] = [
   { x: 0, y: 0 },
   { x: 0, y: 0 },
 ]
+/** Buffer para achatamento de arco de glifo — 24 segmentos para círculo cheio. */
+const arcBuffer: Point[] = Array.from({ length: 24 }, () => ({ x: 0, y: 0 }))
+/** Buffer para polilinha do glifo em espaço de tela. */
+const glyphPoints: Point[] = Array.from({ length: 25 }, () => ({ x: 0, y: 0 }))
 
 /**
  * Pass 5: retângulos de móveis, rótulos, marca de orientação e hachura de
@@ -108,15 +119,21 @@ export function furniturePass(ctx: RenderContext): void {
 
     ctx.target.polyline(screen, dashed ? styles.dashed : styles.stroke)
 
-    // Marca de orientação na face frontal — a borda em +depth, oposta ao fundo
-    // que encosta na parede.
-    ctx.target.line(
-      screen[2]!.x,
-      screen[2]!.y,
-      screen[3]!.x,
-      screen[3]!.y,
-      styles.orientation,
-    )
+    const glyph = ctx.glyphs?.get(item.catalogId ?? '')
+    const widthPx = item.width * ctx.camera.scale
+    const depthPx = item.depth * ctx.camera.scale
+
+    if (glyph && widthPx > GLYPH_MIN_SCREEN_PX && depthPx > GLYPH_MIN_SCREEN_PX) {
+      drawGlyph(ctx, item, glyph, styles.glyph)
+    } else {
+      ctx.target.line(
+        screen[2]!.x,
+        screen[2]!.y,
+        screen[3]!.x,
+        screen[3]!.y,
+        styles.orientation,
+      )
+    }
 
     drawLabel(ctx, item, styles)
   }
@@ -251,4 +268,142 @@ function clipHatchLine(
   if (found === 2) {
     ctx.target.line(entry.x, entry.y, exit.x, exit.y, styles.hatch)
   }
+}
+
+/**
+ * Expande as primitivas do glifo em coordenadas de mundo e desenha sobre
+ * o retângulo do móvel.
+ *
+ * Cada primitiva é convertida do espaço [0,1]² para o sistema local do móvel
+ * (centralizado), depois rotacionada e transladada para mundo, e finalmente
+ * para tela.
+ */
+function drawGlyph(
+  ctx: RenderContext,
+  item: FurnitureItem,
+  glyph: FurnitureGlyph,
+  style: LineStyle,
+): void {
+  const hw = item.width / 2
+  const hd = item.depth / 2
+  const rad = (item.rotation * Math.PI) / 180
+  const cos = Math.cos(rad)
+  const sin = Math.sin(rad)
+  const cx = item.center.x
+  const cy = item.center.y
+
+  for (const prim of glyph.primitives) {
+    switch (prim.kind) {
+      case 'line':
+        drawGlyphLine(ctx, prim.x1, prim.y1, prim.x2, prim.y2, hw, hd, cx, cy, cos, sin, style)
+        break
+      case 'rect':
+        drawGlyphRect(ctx, prim, hw, hd, cx, cy, cos, sin, style)
+        break
+      case 'circle':
+        drawGlyphArc(
+          ctx, prim.cx, prim.cy, prim.r, 0, 2 * Math.PI, true,
+          hw, hd, cx, cy, cos, sin, style,
+        )
+        break
+      case 'arc':
+        drawGlyphArc(
+          ctx, prim.cx, prim.cy, prim.r, prim.startAngle, prim.endAngle, prim.closed,
+          hw, hd, cx, cy, cos, sin, style,
+        )
+        break
+    }
+  }
+}
+
+/**
+ * Ponto local (pré-rotação) reaproveitado por `drawGlyphLine` — nenhuma
+ * alocação por segmento de glifo (`04-renderizacao.md` § Orçamento de
+ * performance, regra 2).
+ */
+const glyphLocalA: Point = { x: 0, y: 0 }
+const glyphLocalB: Point = { x: 0, y: 0 }
+
+function writeGlyphWorld(
+  out: Point,
+  gx: number, gy: number,
+  hw: number, hd: number, cx: number, cy: number,
+  cos: number, sin: number,
+): void {
+  const lx = (gx - 0.5) * hw * 2
+  const ly = (gy - 0.5) * hd * 2
+  out.x = roundMm(cx + lx * cos - ly * sin)
+  out.y = roundMm(cy + lx * sin + ly * cos)
+}
+
+function drawGlyphLine(
+  ctx: RenderContext,
+  x1: number, y1: number, x2: number, y2: number,
+  hw: number, hd: number, cx: number, cy: number,
+  cos: number, sin: number,
+  style: LineStyle,
+): void {
+  writeGlyphWorld(glyphLocalA, x1, y1, hw, hd, cx, cy, cos, sin)
+  writeGlyphWorld(glyphLocalB, x2, y2, hw, hd, cx, cy, cos, sin)
+  ctx.target.line(
+    worldToScreenX(ctx.camera, glyphLocalA.x),
+    worldToScreenY(ctx.camera, glyphLocalA.y),
+    worldToScreenX(ctx.camera, glyphLocalB.x),
+    worldToScreenY(ctx.camera, glyphLocalB.y),
+    style,
+  )
+}
+
+function drawGlyphRect(
+  ctx: RenderContext,
+  prim: { x: number; y: number; w: number; h: number },
+  hw: number, hd: number, cx: number, cy: number,
+  cos: number, sin: number,
+  style: LineStyle,
+): void {
+  const r = prim.x + prim.w
+  const b = prim.y + prim.h
+
+  drawGlyphLine(ctx, prim.x, prim.y, r, prim.y, hw, hd, cx, cy, cos, sin, style)
+  drawGlyphLine(ctx, r, prim.y, r, b, hw, hd, cx, cy, cos, sin, style)
+  drawGlyphLine(ctx, r, b, prim.x, b, hw, hd, cx, cy, cos, sin, style)
+  drawGlyphLine(ctx, prim.x, b, prim.x, prim.y, hw, hd, cx, cy, cos, sin, style)
+}
+
+/**
+ * Arco do glifo: achatado por `writeArcPoints` já em mm locais, rotacionado e
+ * projetado para tela em `glyphPoints` — buffer fixo de 25 posições,
+ * reaproveitado a cada chamada. `DrawTarget.polyline` recebe o `count` real,
+ * então fechar o anel não precisa de `slice`.
+ */
+function drawGlyphArc(
+  ctx: RenderContext,
+  gcx: number, gcy: number, gr: number,
+  startAngle: number, endAngle: number, closed: boolean,
+  hw: number, hd: number, cx: number, cy: number,
+  cos: number, sin: number,
+  style: LineStyle,
+): void {
+  const width = hw * 2
+  const depth = hd * 2
+  const localCx = (gcx - 0.5) * width
+  const localCy = (gcy - 0.5) * depth
+  const count = writeArcPoints(arcBuffer, 0, localCx, localCy, gr * width, gr * depth, startAngle, endAngle)
+  if (count < 2) return
+
+  for (let i = 0; i < count; i += 1) {
+    const lx = arcBuffer[i]!.x
+    const ly = arcBuffer[i]!.y
+    glyphPoints[i]!.x = worldToScreenX(ctx.camera, roundMm(cx + lx * cos - ly * sin))
+    glyphPoints[i]!.y = worldToScreenY(ctx.camera, roundMm(cy + lx * sin + ly * cos))
+  }
+
+  if (!closed) {
+    ctx.target.polyline(glyphPoints, style, count)
+    return
+  }
+
+  glyphPoints[count]!.x = glyphPoints[0]!.x
+  glyphPoints[count]!.y = glyphPoints[0]!.y
+  ctx.target.polyline(glyphPoints, style, count + 1)
 }
