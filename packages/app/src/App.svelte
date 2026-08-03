@@ -1099,6 +1099,7 @@
   <CatalogPanel
     items={catalogItems}
     {recentIds}
+    {glyphs}
     onChoose={chooseCatalogItem}
     onDragStart={beginCatalogDrag}
   />

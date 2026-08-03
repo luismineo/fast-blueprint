@@ -6,7 +6,7 @@ import {
   type CatalogCategory,
   type CatalogItem,
 } from '@planta/catalog'
-import { formatDimensions } from '@planta/core'
+import { formatDimensions, type FurnitureGlyph } from '@planta/core'
 import type { FurnitureDraft } from '../tools/furnitureTool'
 
 /**
@@ -28,6 +28,7 @@ export interface CatalogEntry {
   readonly dimensions: string
   readonly thumbnail: { readonly width: number; readonly height: number }
   readonly draft: FurnitureDraft
+  readonly glyph?: FurnitureGlyph
 }
 
 export interface CatalogGroup {
@@ -46,6 +47,7 @@ export function describeCatalog(
   items: readonly CatalogItem[],
   query: string,
   recentIds: readonly string[],
+  glyphs: ReadonlyMap<string, FurnitureGlyph>,
 ): CatalogPanelModel {
   const matches = searchCatalog(items, query)
   const searching = query.trim() !== ''
@@ -54,14 +56,12 @@ export function describeCatalog(
   for (const category of CATALOG_CATEGORIES) {
     const inCategory = matches.filter((item) => item.category === category)
     if (inCategory.length > 0) {
-      groups.push({ category, items: inCategory.map(toEntry) })
+      groups.push({ category, items: inCategory.map((i) => toEntry(i, glyphs)) })
     }
   }
 
   return {
-    // Recentes só aparecem sem busca: quem digitou quer o resultado, não o
-    // histórico.
-    recent: searching ? [] : recentEntries(items, recentIds),
+    recent: searching ? [] : recentEntries(items, recentIds, glyphs),
     groups,
     searching,
     empty: matches.length === 0,
@@ -87,22 +87,25 @@ export function toDraft(item: CatalogItem): FurnitureDraft {
 function recentEntries(
   items: readonly CatalogItem[],
   recentIds: readonly string[],
+  glyphs: ReadonlyMap<string, FurnitureGlyph>,
 ): CatalogEntry[] {
   const entries: CatalogEntry[] = []
   for (const id of recentIds) {
     const item = items.find((candidate) => candidate.id === id)
-    if (item) entries.push(toEntry(item))
+    if (item) entries.push(toEntry(item, glyphs))
   }
   return entries
 }
 
-function toEntry(item: CatalogItem): CatalogEntry {
+function toEntry(item: CatalogItem, glyphs: ReadonlyMap<string, FurnitureGlyph>): CatalogEntry {
+  const glyph = glyphs.get(item.id)
   return {
     id: item.id,
     name: item.name,
     dimensions: formatDimensions(item.width, item.depth),
     thumbnail: thumbnailBox(item.width, item.depth),
     draft: toDraft(item),
+    glyph,
   }
 }
 

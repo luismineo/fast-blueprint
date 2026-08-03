@@ -5,14 +5,14 @@ import { describeCatalog, pushRecent, toDraft } from './catalogModel'
 const catalog = loadDefaultCatalog()
 
 function itemsOf(query: string, recent: string[] = []): string[] {
-  return describeCatalog(catalog, query, recent).groups.flatMap((group) =>
+  return describeCatalog(catalog, query, recent, new Map()).groups.flatMap((group) =>
     group.items.map((entry) => entry.id),
   )
 }
 
 describe('modelo do painel de catálogo', () => {
   it('sem busca, agrupa o catálogo inteiro por categoria', () => {
-    const model = describeCatalog(catalog, '', [])
+    const model = describeCatalog(catalog, '', [], new Map())
 
     expect(model.groups.map((group) => group.category)).toEqual([
       'quarto',
@@ -28,7 +28,7 @@ describe('modelo do painel de catálogo', () => {
   })
 
   it('busca filtra e mantém o agrupamento', () => {
-    const model = describeCatalog(catalog, 'geladeira', [])
+    const model = describeCatalog(catalog, 'geladeira', [], new Map())
 
     expect(model.groups).toHaveLength(1)
     expect(model.groups[0]!.category).toBe('cozinha')
@@ -40,7 +40,7 @@ describe('modelo do painel de catálogo', () => {
   })
 
   it('busca sem casamento marca vazio', () => {
-    const model = describeCatalog(catalog, 'helicoptero', [])
+    const model = describeCatalog(catalog, 'helicoptero', [], new Map())
 
     expect(model.empty).toBe(true)
     expect(model.groups).toEqual([])
@@ -51,25 +51,25 @@ describe('modelo do painel de catálogo', () => {
   })
 
   it('recentes aparecem sem busca, na ordem de uso', () => {
-    const model = describeCatalog(catalog, '', ['sofa-3', 'bed-queen'])
+    const model = describeCatalog(catalog, '', ['sofa-3', 'bed-queen'], new Map())
 
     expect(model.recent.map((entry) => entry.id)).toEqual(['sofa-3', 'bed-queen'])
   })
 
   it('recentes somem durante a busca', () => {
-    const model = describeCatalog(catalog, 'cama', ['sofa-3'])
+    const model = describeCatalog(catalog, 'cama', ['sofa-3'], new Map())
 
     expect(model.recent).toEqual([])
   })
 
   it('recente de id que não existe mais é ignorado', () => {
-    const model = describeCatalog(catalog, '', ['fantasma', 'bed-queen'])
+    const model = describeCatalog(catalog, '', ['fantasma', 'bed-queen'], new Map())
 
     expect(model.recent.map((entry) => entry.id)).toEqual(['bed-queen'])
   })
 
   it('o cartão traz nome e dimensão em centímetros, sem unidade repetida', () => {
-    const model = describeCatalog(catalog, 'cama queen', [])
+    const model = describeCatalog(catalog, 'cama queen', [], new Map())
     const entry = model.groups[0]!.items[0]!
 
     expect(entry.name).toBe('Cama queen')
@@ -77,7 +77,7 @@ describe('modelo do painel de catálogo', () => {
   })
 
   it('a miniatura respeita a proporção do móvel', () => {
-    const model = describeCatalog(catalog, 'cama queen', [])
+    const model = describeCatalog(catalog, 'cama queen', [], new Map())
     const { thumbnail } = model.groups[0]!.items[0]!
 
     expect(thumbnail.height).toBe(28)
@@ -85,7 +85,7 @@ describe('modelo do painel de catálogo', () => {
   })
 
   it('miniatura de item muito estreito ainda é visível', () => {
-    const model = describeCatalog(catalog, 'rack 1,80', [])
+    const model = describeCatalog(catalog, 'rack 1,80', [], new Map())
     const { thumbnail } = model.groups[0]!.items[0]!
 
     expect(thumbnail.width).toBe(28)
