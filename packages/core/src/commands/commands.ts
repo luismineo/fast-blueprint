@@ -10,7 +10,6 @@ import type {
   WallId,
   Node,
   Room,
-  Wall,
   EdgeRef,
   FurnitureId,
   FurnitureItem,

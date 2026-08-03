@@ -8,7 +8,6 @@ import {
   writeObbCorners,
   type FurnitureGlyph,
   type FurnitureItem,
-  type GlyphPrimitive,
   type PlanDocument,
   type Point,
 } from '@planta/core'
