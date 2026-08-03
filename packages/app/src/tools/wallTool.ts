@@ -186,7 +186,7 @@ function fromActive(
     case 'pointerDown': {
       const candidate = candidateOf(nodes, input, ctx)
       if (event.clickCount >= 2 && nodes.length >= 1) {
-        return finishWall(nodes, ctx)
+        return finishWall(nodes)
       }
       if (coincidesWithLast(nodes, candidate)) return present(state, ctx)
       return present(confirm(nodes, candidate, ctx), ctx)
@@ -198,7 +198,7 @@ function fromActive(
         if (candidate.length < MIN_SEGMENT_MM) return present(state, ctx)
         return present(confirm(nodes, candidate, ctx), ctx)
       }
-      return finishWall(nodes, ctx)
+      return finishWall(nodes)
     }
 
     case 'escape':
@@ -269,7 +269,7 @@ function withInput(
   return { kind: state.kind, nodes: state.nodes, input }
 }
 
-function finishWall(nodes: readonly DraftNode[], ctx: WallToolContext): WallToolResult {
+function finishWall(nodes: readonly DraftNode[]): WallToolResult {
   if (nodes.length < 2) {
     return { state: { kind: 'idle' }, commands: [], overlays: [], hud: null }
   }

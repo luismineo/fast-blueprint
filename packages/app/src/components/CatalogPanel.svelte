@@ -3,7 +3,7 @@
   import { messages } from '../messages'
   import { describeCatalog, type CatalogEntry } from './catalogModel'
   import type { FurnitureGlyph } from '@planta/core'
-  import { CanvasTarget } from '@planta/renderer'
+  import { CanvasTarget, lightTheme } from '@planta/renderer'
 
   interface Props {
     items: readonly CatalogItem[]
@@ -34,7 +34,7 @@
           target.line(
             prim.x1 * w, prim.y1 * h,
             prim.x2 * w, prim.y2 * h,
-            { color: '#5B6775', width: 1 },
+            { color: lightTheme.glyph, width: 1 },
           )
           break
         }
@@ -45,7 +45,7 @@
             { x: (prim.x + prim.w) * w, y: (prim.y + prim.h) * h },
             { x: prim.x * w, y: (prim.y + prim.h) * h },
             { x: prim.x * w, y: prim.y * h },
-          ], { color: '#5B6775', width: 1 })
+          ], { color: lightTheme.glyph, width: 1 })
           break
         }
         case 'circle': {
@@ -58,7 +58,7 @@
             const a = (i * 2 * Math.PI) / segs
             pts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) })
           }
-          target.polyline(pts, { color: '#5B6775', width: 1 })
+          target.polyline(pts, { color: lightTheme.glyph, width: 1 })
           break
         }
         case 'arc': {
@@ -72,7 +72,7 @@
             const a = prim.startAngle + (i * sweep) / segs
             pts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) })
           }
-          target.polyline(pts, { color: '#5B6775', width: 1 })
+          target.polyline(pts, { color: lightTheme.glyph, width: 1 })
           break
         }
       }
