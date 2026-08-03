@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { canvasOrigin, drawRoom } from './helpers'
+import { canvasOrigin, drawRoom, mainCanvas } from './helpers'
 
 /**
  * Fluxo de mobiliar do M3 (`specs/09-roadmap.md`), contra o build de produção.
@@ -16,7 +16,7 @@ test('inserir um movel do catalogo aparece no canvas', async ({ page }) => {
   page.on('pageerror', (err) => errors.push(String(err)))
 
   await page.goto('/')
-  await expect(page.locator('canvas')).toBeVisible()
+  await expect(mainCanvas(page)).toBeVisible()
 
   const origin = await canvasOrigin(page)
   await drawRoom(page, origin, 0)
@@ -37,7 +37,7 @@ test('inserir um movel do catalogo aparece no canvas', async ({ page }) => {
 
 test('a taxa de ocupacao responde se a cama cabe no quarto', async ({ page }) => {
   await page.goto('/')
-  await expect(page.locator('canvas')).toBeVisible()
+  await expect(mainCanvas(page)).toBeVisible()
 
   const origin = await canvasOrigin(page)
   await drawRoom(page, origin, 0)
@@ -74,7 +74,7 @@ const WALLS: [string, number, number, string][] = [
 for (const [label, dx, dy, rotation] of WALLS) {
   test(`a cama encostada na parede ${label} fica contida, sem aviso`, async ({ page }) => {
     await page.goto('/')
-    await expect(page.locator('canvas')).toBeVisible()
+    await expect(mainCanvas(page)).toBeVisible()
 
     const origin = await canvasOrigin(page)
     await drawRoom(page, origin, 0)
@@ -94,7 +94,7 @@ for (const [label, dx, dy, rotation] of WALLS) {
 
 test('Q e E giram o movel selecionado, e Ctrl+Z desfaz', async ({ page }) => {
   await page.goto('/')
-  await expect(page.locator('canvas')).toBeVisible()
+  await expect(mainCanvas(page)).toBeVisible()
 
   const origin = await canvasOrigin(page)
   await drawRoom(page, origin, 0)
@@ -118,7 +118,7 @@ test('Q e E giram o movel selecionado, e Ctrl+Z desfaz', async ({ page }) => {
 
 test('excluir o movel com Delete e desfazer', async ({ page }) => {
   await page.goto('/')
-  await expect(page.locator('canvas')).toBeVisible()
+  await expect(mainCanvas(page)).toBeVisible()
 
   const origin = await canvasOrigin(page)
   await drawRoom(page, origin, 0)
@@ -139,7 +139,7 @@ test('a barra de ferramentas troca de ferramenta e Home nao enquadra com foco ne
   page,
 }) => {
   await page.goto('/')
-  await expect(page.locator('canvas')).toBeVisible()
+  await expect(mainCanvas(page)).toBeVisible()
 
   await page.getByTestId('tool-furniture').click()
   await expect(page.getByTestId('tool-furniture')).toHaveAttribute('aria-pressed', 'true')
@@ -162,7 +162,7 @@ test('a barra de ferramentas troca de ferramenta e Home nao enquadra com foco ne
 
 test('movel salvo no catalogo do usuario sobrevive a recarga', async ({ page }) => {
   await page.goto('/')
-  await expect(page.locator('canvas')).toBeVisible()
+  await expect(mainCanvas(page)).toBeVisible()
 
   const origin = await canvasOrigin(page)
   await drawRoom(page, origin, 0)
@@ -205,7 +205,7 @@ test('movel salvo no catalogo do usuario sobrevive a recarga', async ({ page }) 
 
   // Recarrega: o item precisa vir do IndexedDB, não da memória da sessão.
   await page.reload()
-  await expect(page.locator('canvas')).toBeVisible()
+  await expect(mainCanvas(page)).toBeVisible()
 
   // Busca sem acento acha o item com acento (spec 06 § Busca).
   await page.getByTestId('catalog-search').fill('criado do vo')
@@ -220,7 +220,7 @@ test('M3.5 — desenhar bancada com W insere geladeira que encosta', async ({ pa
   page.on('pageerror', (err) => errors.push(String(err)))
 
   await page.goto('/')
-  await expect(page.locator('canvas')).toBeVisible()
+  await expect(mainCanvas(page)).toBeVisible()
 
   const origin = await canvasOrigin(page)
   await drawRoom(page, origin, 0)
@@ -241,8 +241,8 @@ test('M3.5 — desenhar bancada com W insere geladeira que encosta', async ({ pa
 
   // Insere geladeira perto da bancada.
   await page.getByTestId('tool-furniture').click()
-  await page.getByTestId('catalog-search').fill('fridge')
-  await page.getByTestId('catalog-item-fridge').click()
+  await page.getByTestId('catalog-search').fill('geladeira frost')
+  await page.getByTestId('catalog-item-fridge-frost-free').click()
   await page.mouse.click(origin.x + 80, origin.y + 55)
 
   // Rotação deve ser 0 (alinhada com a bancada horizontal).
@@ -259,7 +259,7 @@ test('M3.5 — Ferramenta Medir mostra distancia e Esc limpa sem gastar undo', a
   page.on('pageerror', (err) => errors.push(String(err)))
 
   await page.goto('/')
-  await expect(page.locator('canvas')).toBeVisible()
+  await expect(mainCanvas(page)).toBeVisible()
 
   const origin = await canvasOrigin(page)
   await drawRoom(page, origin, 0)
@@ -283,18 +283,20 @@ test('M3.5 — Ferramenta Medir mostra distancia e Esc limpa sem gastar undo', a
   // Esc limpa a medição.
   await page.keyboard.press('Escape')
 
-  // Ctrl+Z não desfaz nada (a medição não gastou undo).
-  // O documento continua com 1 cômodo e 1 móvel.
+  // A medição não emite comando nenhum, então não abre entrada de histórico
+  // própria: um Ctrl+Z aqui desfaz o comando anterior a ela (AddFurniture da
+  // cama), não algum passo fantasma da medição
+  // (`03-ferramentas-e-interacao.md` § Medir).
   await page.keyboard.press('Control+z')
-  // Nenhum erro — o undo não afetou a medição.
-  await expect(page.getByTestId('furniture-count')).toHaveText('1')
+  await expect(page.getByTestId('furniture-count')).toHaveText('0')
+  await expect(page.getByTestId('room-count')).toHaveText('1')
 
   expect(errors).toEqual([])
 })
 
 test('Ctrl+B recolhe e devolve o painel direito', async ({ page }) => {
   await page.goto('/')
-  await expect(page.locator('canvas')).toBeVisible()
+  await expect(mainCanvas(page)).toBeVisible()
 
   await expect(page.getByTestId('catalog-search')).toBeVisible()
 

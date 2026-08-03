@@ -5,7 +5,11 @@ import type {
 } from '@planta/core'
 import {
   distance,
+  formatLength,
 } from '@planta/core'
+
+/** Deslocamento em mm, abaixo do rótulo de distância, para a linha de ΔX/ΔY. */
+const DELTA_LABEL_OFFSET_MM = 220
 
 export type MeasureToolState =
   | { readonly kind: 'idle' }
@@ -45,7 +49,12 @@ export function measureToolTransition(
       return present(state, null, ctx)
 
     case 'pointerDown':
-      if (state.kind === 'idle') return present({ kind: 'dragging', anchor: ctx.snap.point }, ctx.snap.point, ctx)
+      // `pointerdown` novo substitui a medição anterior por uma nova, tanto
+      // saindo de `idle` quanto de `done` (03-ferramentas-e-interacao.md §
+      // Medir).
+      if (state.kind === 'idle' || state.kind === 'done') {
+        return present({ kind: 'dragging', anchor: ctx.snap.point }, ctx.snap.point, ctx)
+      }
       return present(state, null, ctx)
 
     case 'pointerUp':
@@ -89,11 +98,24 @@ function present(
   overlays.push({ kind: 'marker', role: 'measure', position: end })
   overlays.push({ kind: 'segment', role: 'measure', a: anchor, b: end })
 
+  // Números formatados pela unidade de exibição corrente, como em qualquer
+  // cota (03-ferramentas-e-interacao.md § Medir).
   const d = distance(anchor, end)
-  const text = String(Math.round(d / 10))
   const mid: Point = { x: (anchor.x + end.x) / 2, y: (anchor.y + end.y) / 2 }
+  overlays.push({ kind: 'label', role: 'measureLabel', position: mid, text: formatLength(d, 'm') })
 
-  overlays.push({ kind: 'label', role: 'measureLabel', position: mid, text })
+  const dx = end.x - anchor.x
+  const dy = end.y - anchor.y
+  const axial = dx === 0 || dy === 0
+  if (!axial) {
+    const deltaText = `ΔX ${formatLength(Math.abs(dx), 'm')}  ΔY ${formatLength(Math.abs(dy), 'm')}`
+    overlays.push({
+      kind: 'label',
+      role: 'measureLabel',
+      position: { x: mid.x, y: mid.y + DELTA_LABEL_OFFSET_MM },
+      text: deltaText,
+    })
+  }
 
   return { state, commands: [], overlays }
 }

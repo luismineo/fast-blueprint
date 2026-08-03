@@ -23,7 +23,6 @@
     resolveFurnitureSnap,
     tryParseAngle,
     tryParseLength,
-    type FurnitureGlyph,
     type FurnitureId,
     type OverlayPrimitive,
     type PlanDocument,
@@ -103,6 +102,7 @@
     loadDefaultCatalog,
     loadGlyphs,
     mergeCatalogs,
+    resolveGlyphMap,
     upsertUserItem,
     userItemFrom,
     type CatalogCategory,
@@ -151,17 +151,7 @@
   const catalogItems = $derived(mergeCatalogs(defaultCatalog, userItems))
 
   const allGlyphs = loadGlyphs()
-  const glyphs = $derived.by(() => {
-    const glyphsById = new Map(allGlyphs.map((g) => [g.id, g]))
-    const map = new Map<string, FurnitureGlyph>()
-    for (const item of catalogItems) {
-      if (item.glyph) {
-        const g = glyphsById.get(item.glyph)
-        if (g) map.set(item.id, g)
-      }
-    }
-    return map
-  })
+  const glyphs = $derived.by(() => resolveGlyphMap(catalogItems, defaultCatalog, allGlyphs))
 
   const store = new DocumentStore()
   let doc: PlanDocument = $state.raw(store.current)
@@ -337,14 +327,16 @@
   }
 
   /**
-   * Trocar de ferramenta zera o estado das outras duas.
+   * Trocar de ferramenta zera o estado das outras.
    *
    * Um traço pela metade ou um item armado que sobrevivesse à troca voltaria a
-   * aparecer sem que o usuário pedisse.
+   * aparecer sem que o usuário pedisse — inclusive a Parede, que fica com um
+   * traço em andamento tão facilmente quanto o Cômodo.
    */
   function activateTool(next: ToolId): void {
     tool = next
     roomState = initialRoomState()
+    wallState = initialWallState()
     selectState = initialSelectState()
     furnitureState = initialFurnitureState()
     overlays = []
@@ -354,6 +346,10 @@
       selection = []
       hover = null
       dispatchTool({ type: 'activate' })
+    }
+
+    if (next === 'wall') {
+      dispatchWall({ type: 'activate' })
     }
   }
 
@@ -703,12 +699,14 @@
 
   function onLengthInput(event: Event): void {
     const value = (event.currentTarget as HTMLInputElement).value
-    dispatchTool({ type: 'inputChange', value, field: 'length' })
+    if (tool === 'wall') dispatchWall({ type: 'inputChange', value, field: 'length' })
+    else dispatchTool({ type: 'inputChange', value, field: 'length' })
   }
 
   function onAngleInput(event: Event): void {
     const value = (event.currentTarget as HTMLInputElement).value
-    dispatchTool({ type: 'inputChange', value, field: 'angle' })
+    if (tool === 'wall') dispatchWall({ type: 'inputChange', value, field: 'angle' })
+    else dispatchTool({ type: 'inputChange', value, field: 'angle' })
   }
 
   function setupCanvas(canvas: HTMLCanvasElement, profiler: Profiler | undefined): () => void {
@@ -841,6 +839,8 @@
 
       if (tool === 'room') {
         dispatchTool({ type: 'pointerDown', clickCount: 2 }, event.shiftKey)
+      } else if (tool === 'wall') {
+        dispatchWall({ type: 'pointerDown', clickCount: 2 }, event.shiftKey)
       } else if (tool === 'select') {
         dispatchSelect({ type: 'pointerDown', clickCount: 2, additive: false }, event.altKey)
       }
@@ -912,7 +912,7 @@
         shift: event.shiftKey,
         focus: focusKind(),
         tool,
-        drawing: roomState.kind !== 'idle',
+        drawing: tool === 'wall' ? wallState.kind !== 'idle' : roomState.kind !== 'idle',
         lengthFieldEmpty: (hud?.lengthText ?? '') === '',
         angleFieldEmpty: (hud?.angleText ?? '') === '',
         selectionHasFurniture: selection.some((ref) => ref.kind === 'furniture'),
@@ -964,6 +964,12 @@
           scheduler.markDirty()
           return
 
+        case 'wallEvent':
+          event.preventDefault()
+          dispatchWall(action.event, event.shiftKey)
+          scheduler.markDirty()
+          return
+
         case 'selectEvent': {
           event.preventDefault()
           // `Esc` sem seleção volta para a Ferramenta Selecionar; com seleção,
@@ -972,6 +978,11 @@
           if (tool === 'furniture' && action.event.type === 'escape') {
             if (furnitureState.kind === 'armed') dispatchFurniture({ type: 'escape' })
             else activateSelect()
+            scheduler.markDirty()
+            return
+          }
+          if (tool === 'wall') {
+            if (action.event.type === 'escape' && wasEmpty) activateSelect()
             scheduler.markDirty()
             return
           }
@@ -991,6 +1002,17 @@
           element?.focus()
           if (/^[0-9]$/.test(event.key)) {
             dispatchTool({ type: 'digit', digit: event.key, field: action.field })
+            scheduler.markDirty()
+          }
+          return
+        }
+
+        case 'focusWallHudField': {
+          event.preventDefault()
+          const element = action.field === 'length' ? lengthEl : angleEl
+          element?.focus()
+          if (/^[0-9]$/.test(event.key)) {
+            dispatchWall({ type: 'digit', digit: event.key, field: action.field })
             scheduler.markDirty()
           }
         }

@@ -295,20 +295,20 @@ function drawGlyph(
   for (const prim of glyph.primitives) {
     switch (prim.kind) {
       case 'line':
-        drawGlyphLine(ctx, prim, hw, hd, cx, cy, cos, sin, style)
+        drawGlyphLine(ctx, prim.x1, prim.y1, prim.x2, prim.y2, hw, hd, cx, cy, cos, sin, style)
         break
       case 'rect':
         drawGlyphRect(ctx, prim, hw, hd, cx, cy, cos, sin, style)
         break
       case 'circle':
         drawGlyphArc(
-          ctx, prim.cx, prim.cy, prim.r, 0, 2 * Math.PI,
+          ctx, prim.cx, prim.cy, prim.r, 0, 2 * Math.PI, true,
           hw, hd, cx, cy, cos, sin, style,
         )
         break
       case 'arc':
         drawGlyphArc(
-          ctx, prim.cx, prim.cy, prim.r, prim.startAngle, prim.endAngle,
+          ctx, prim.cx, prim.cy, prim.r, prim.startAngle, prim.endAngle, prim.closed,
           hw, hd, cx, cy, cos, sin, style,
         )
         break
@@ -316,29 +316,40 @@ function drawGlyph(
   }
 }
 
-function toWorld(gx: number, gy: number, hw: number, hd: number, cx: number, cy: number, cos: number, sin: number): { x: number; y: number } {
+/**
+ * Ponto local (pré-rotação) reaproveitado por `drawGlyphLine` — nenhuma
+ * alocação por segmento de glifo (`04-renderizacao.md` § Orçamento de
+ * performance, regra 2).
+ */
+const glyphLocalA: Point = { x: 0, y: 0 }
+const glyphLocalB: Point = { x: 0, y: 0 }
+
+function writeGlyphWorld(
+  out: Point,
+  gx: number, gy: number,
+  hw: number, hd: number, cx: number, cy: number,
+  cos: number, sin: number,
+): void {
   const lx = (gx - 0.5) * hw * 2
   const ly = (gy - 0.5) * hd * 2
-  return {
-    x: roundMm(cx + lx * cos - ly * sin),
-    y: roundMm(cy + lx * sin + ly * cos),
-  }
+  out.x = roundMm(cx + lx * cos - ly * sin)
+  out.y = roundMm(cy + lx * sin + ly * cos)
 }
 
 function drawGlyphLine(
   ctx: RenderContext,
-  prim: { x1: number; y1: number; x2: number; y2: number },
+  x1: number, y1: number, x2: number, y2: number,
   hw: number, hd: number, cx: number, cy: number,
   cos: number, sin: number,
   style: LineStyle,
 ): void {
-  const a = toWorld(prim.x1, prim.y1, hw, hd, cx, cy, cos, sin)
-  const b = toWorld(prim.x2, prim.y2, hw, hd, cx, cy, cos, sin)
+  writeGlyphWorld(glyphLocalA, x1, y1, hw, hd, cx, cy, cos, sin)
+  writeGlyphWorld(glyphLocalB, x2, y2, hw, hd, cx, cy, cos, sin)
   ctx.target.line(
-    worldToScreenX(ctx.camera, a.x),
-    worldToScreenY(ctx.camera, a.y),
-    worldToScreenX(ctx.camera, b.x),
-    worldToScreenY(ctx.camera, b.y),
+    worldToScreenX(ctx.camera, glyphLocalA.x),
+    worldToScreenY(ctx.camera, glyphLocalA.y),
+    worldToScreenX(ctx.camera, glyphLocalB.x),
+    worldToScreenY(ctx.camera, glyphLocalB.y),
     style,
   )
 }
@@ -353,37 +364,46 @@ function drawGlyphRect(
   const r = prim.x + prim.w
   const b = prim.y + prim.h
 
-  const tl = toWorld(prim.x, prim.y, hw, hd, cx, cy, cos, sin)
-  const tr = toWorld(r, prim.y, hw, hd, cx, cy, cos, sin)
-  const br = toWorld(r, b, hw, hd, cx, cy, cos, sin)
-  const bl = toWorld(prim.x, b, hw, hd, cx, cy, cos, sin)
-
-  drawGlyphLine(ctx, { x1: prim.x, y1: prim.y, x2: r, y2: prim.y }, hw, hd, cx, cy, cos, sin, style)
-  drawGlyphLine(ctx, { x1: r, y1: prim.y, x2: r, y2: b }, hw, hd, cx, cy, cos, sin, style)
-  drawGlyphLine(ctx, { x1: r, y1: b, x2: prim.x, y2: b }, hw, hd, cx, cy, cos, sin, style)
-  drawGlyphLine(ctx, { x1: prim.x, y1: b, x2: prim.x, y2: prim.y }, hw, hd, cx, cy, cos, sin, style)
+  drawGlyphLine(ctx, prim.x, prim.y, r, prim.y, hw, hd, cx, cy, cos, sin, style)
+  drawGlyphLine(ctx, r, prim.y, r, b, hw, hd, cx, cy, cos, sin, style)
+  drawGlyphLine(ctx, r, b, prim.x, b, hw, hd, cx, cy, cos, sin, style)
+  drawGlyphLine(ctx, prim.x, b, prim.x, prim.y, hw, hd, cx, cy, cos, sin, style)
 }
 
+/**
+ * Arco do glifo: achatado por `writeArcPoints` já em mm locais, rotacionado e
+ * projetado para tela em `glyphPoints` — buffer fixo de 25 posições,
+ * reaproveitado a cada chamada. `DrawTarget.polyline` recebe o `count` real,
+ * então fechar o anel não precisa de `slice`.
+ */
 function drawGlyphArc(
   ctx: RenderContext,
   gcx: number, gcy: number, gr: number,
-  startAngle: number, endAngle: number,
+  startAngle: number, endAngle: number, closed: boolean,
   hw: number, hd: number, cx: number, cy: number,
   cos: number, sin: number,
   style: LineStyle,
 ): void {
-  const count = writeArcPoints(arcBuffer, 0, 0, 0, gr * hw * 2, gr * hd * 2, startAngle, endAngle)
+  const width = hw * 2
+  const depth = hd * 2
+  const localCx = (gcx - 0.5) * width
+  const localCy = (gcy - 0.5) * depth
+  const count = writeArcPoints(arcBuffer, 0, localCx, localCy, gr * width, gr * depth, startAngle, endAngle)
   if (count < 2) return
 
   for (let i = 0; i < count; i += 1) {
-    const gx = gcx + (arcBuffer[i]!.x / (hw * 2))
-    const gy = gcy + (arcBuffer[i]!.y / (hd * 2))
-    const w = toWorld(gx, gy, hw, hd, cx, cy, cos, sin)
-    glyphPoints[i]!.x = worldToScreenX(ctx.camera, w.x)
-    glyphPoints[i]!.y = worldToScreenY(ctx.camera, w.y)
+    const lx = arcBuffer[i]!.x
+    const ly = arcBuffer[i]!.y
+    glyphPoints[i]!.x = worldToScreenX(ctx.camera, roundMm(cx + lx * cos - ly * sin))
+    glyphPoints[i]!.y = worldToScreenY(ctx.camera, roundMm(cy + lx * sin + ly * cos))
   }
+
+  if (!closed) {
+    ctx.target.polyline(glyphPoints, style, count)
+    return
+  }
+
   glyphPoints[count]!.x = glyphPoints[0]!.x
   glyphPoints[count]!.y = glyphPoints[0]!.y
-
-  ctx.target.polyline(glyphPoints.slice(0, count + 1), style)
+  ctx.target.polyline(glyphPoints, style, count + 1)
 }

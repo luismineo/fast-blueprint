@@ -10,34 +10,22 @@
       ]
     },
     {
-      "id": "toilet",
+      "id": "wardrobe",
       "primitives": [
-        { "kind": "rect", "x": 0.2, "y": 0.0, "w": 0.6, "h": 0.28 },
-        { "kind": "circle", "cx": 0.5, "cy": 0.64, "r": 0.26 },
-        { "kind": "circle", "cx": 0.5, "cy": 0.64, "r": 0.14 }
+        { "kind": "line", "x1": 0.5, "y1": 0.05, "x2": 0.5, "y2": 0.95 },
+        { "kind": "line", "x1": 0.15, "y1": 0.8, "x2": 0.85, "y2": 0.8 },
+        { "kind": "line", "x1": 0.35, "y1": 0.22, "x2": 0.45, "y2": 0.22 }
       ]
     },
     {
-      "id": "sink-bath",
+      "id": "drawers",
       "primitives": [
-        { "kind": "rect", "x": 0.15, "y": 0.05, "w": 0.7, "h": 0.5 },
-        { "kind": "circle", "cx": 0.5, "cy": 0.35, "r": 0.18 },
-        { "kind": "line", "x1": 0.85, "y1": 0.15, "x2": 0.95, "y2": 0.25 }
-      ]
-    },
-    {
-      "id": "bathtub",
-      "primitives": [
-        { "kind": "rect", "x": 0.05, "y": 0.05, "w": 0.9, "h": 0.9 },
-        { "kind": "circle", "cx": 0.8, "cy": 0.5, "r": 0.06 }
-      ]
-    },
-    {
-      "id": "shower",
-      "primitives": [
-        { "kind": "line", "x1": 0.1, "y1": 0.1, "x2": 0.3, "y2": 0.1 },
-        { "kind": "line", "x1": 0.1, "y1": 0.1, "x2": 0.1, "y2": 0.3 },
-        { "kind": "circle", "cx": 0.5, "cy": 0.55, "r": 0.2 }
+        { "kind": "line", "x1": 0.1, "y1": 0.25, "x2": 0.9, "y2": 0.25 },
+        { "kind": "line", "x1": 0.1, "y1": 0.5, "x2": 0.9, "y2": 0.5 },
+        { "kind": "line", "x1": 0.1, "y1": 0.75, "x2": 0.9, "y2": 0.75 },
+        { "kind": "line", "x1": 0.45, "y1": 0.18, "x2": 0.55, "y2": 0.18 },
+        { "kind": "line", "x1": 0.45, "y1": 0.43, "x2": 0.55, "y2": 0.43 },
+        { "kind": "line", "x1": 0.45, "y1": 0.68, "x2": 0.55, "y2": 0.68 }
       ]
     },
     {
@@ -49,10 +37,28 @@
       ]
     },
     {
-      "id": "dining-table",
+      "id": "sofa-l",
+      "primitives": [
+        { "kind": "line", "x1": 0.28, "y1": 0.05, "x2": 0.28, "y2": 0.62 },
+        { "kind": "rect", "x": 0.05, "y": 0.05, "w": 0.62, "h": 0.28 },
+        { "kind": "rect", "x": 0.68, "y": 0.05, "w": 0.27, "h": 0.9 }
+      ]
+    },
+    {
+      "id": "table-chairs",
       "primitives": [
         { "kind": "rect", "x": 0.1, "y": 0.2, "w": 0.8, "h": 0.6 },
         { "kind": "rect", "x": 0.18, "y": 0.35, "w": 0.1, "h": 0.1 }
+      ]
+    },
+    {
+      "id": "table-round",
+      "primitives": [
+        { "kind": "circle", "cx": 0.5, "cy": 0.5, "r": 0.32 },
+        { "kind": "rect", "x": 0.4, "y": 0.02, "w": 0.2, "h": 0.12 },
+        { "kind": "rect", "x": 0.4, "y": 0.86, "w": 0.2, "h": 0.12 },
+        { "kind": "rect", "x": 0.02, "y": 0.4, "w": 0.12, "h": 0.2 },
+        { "kind": "rect", "x": 0.86, "y": 0.4, "w": 0.12, "h": 0.2 }
       ]
     },
     {
@@ -61,6 +67,45 @@
         { "kind": "rect", "x": 0.3, "y": 0.1, "w": 0.4, "h": 0.45 },
         { "kind": "line", "x1": 0.2, "y1": 0.55, "x2": 0.8, "y2": 0.55 },
         { "kind": "rect", "x": 0.35, "y": 0.55, "w": 0.3, "h": 0.35 }
+      ]
+    },
+    {
+      "id": "shelves",
+      "primitives": [
+        { "kind": "line", "x1": 0.1, "y1": 0.25, "x2": 0.9, "y2": 0.25 },
+        { "kind": "line", "x1": 0.1, "y1": 0.5, "x2": 0.9, "y2": 0.5 },
+        { "kind": "line", "x1": 0.1, "y1": 0.75, "x2": 0.9, "y2": 0.75 }
+      ]
+    },
+    {
+      "id": "toilet",
+      "primitives": [
+        { "kind": "rect", "x": 0.2, "y": 0.0, "w": 0.6, "h": 0.28 },
+        { "kind": "circle", "cx": 0.5, "cy": 0.64, "r": 0.26 },
+        { "kind": "circle", "cx": 0.5, "cy": 0.64, "r": 0.14 }
+      ]
+    },
+    {
+      "id": "basin",
+      "primitives": [
+        { "kind": "rect", "x": 0.15, "y": 0.05, "w": 0.7, "h": 0.5 },
+        { "kind": "circle", "cx": 0.5, "cy": 0.35, "r": 0.18 },
+        { "kind": "line", "x1": 0.85, "y1": 0.15, "x2": 0.95, "y2": 0.25 }
+      ]
+    },
+    {
+      "id": "shower",
+      "primitives": [
+        { "kind": "line", "x1": 0.1, "y1": 0.1, "x2": 0.3, "y2": 0.1 },
+        { "kind": "line", "x1": 0.1, "y1": 0.1, "x2": 0.1, "y2": 0.3 },
+        { "kind": "circle", "cx": 0.5, "cy": 0.55, "r": 0.2 }
+      ]
+    },
+    {
+      "id": "bathtub",
+      "primitives": [
+        { "kind": "rect", "x": 0.05, "y": 0.05, "w": 0.9, "h": 0.9 },
+        { "kind": "circle", "cx": 0.8, "cy": 0.5, "r": 0.06 }
       ]
     },
     {
@@ -73,6 +118,16 @@
       ]
     },
     {
+      "id": "stove-5",
+      "primitives": [
+        { "kind": "circle", "cx": 0.25, "cy": 0.25, "r": 0.1 },
+        { "kind": "circle", "cx": 0.75, "cy": 0.25, "r": 0.1 },
+        { "kind": "circle", "cx": 0.25, "cy": 0.7, "r": 0.1 },
+        { "kind": "circle", "cx": 0.75, "cy": 0.7, "r": 0.1 },
+        { "kind": "circle", "cx": 0.5, "cy": 0.48, "r": 0.08 }
+      ]
+    },
+    {
       "id": "fridge",
       "primitives": [
         { "kind": "line", "x1": 0.1, "y1": 0.35, "x2": 0.9, "y2": 0.35 },
@@ -80,7 +135,22 @@
       ]
     },
     {
-      "id": "sink-kitchen",
+      "id": "fridge-duplex",
+      "primitives": [
+        { "kind": "line", "x1": 0.1, "y1": 0.5, "x2": 0.9, "y2": 0.5 },
+        { "kind": "line", "x1": 0.15, "y1": 0.2, "x2": 0.85, "y2": 0.2 },
+        { "kind": "line", "x1": 0.15, "y1": 0.8, "x2": 0.85, "y2": 0.8 }
+      ]
+    },
+    {
+      "id": "washer",
+      "primitives": [
+        { "kind": "circle", "cx": 0.5, "cy": 0.45, "r": 0.25 },
+        { "kind": "circle", "cx": 0.5, "cy": 0.45, "r": 0.14 }
+      ]
+    },
+    {
+      "id": "sink-counter",
       "primitives": [
         { "kind": "rect", "x": 0.08, "y": 0.1, "w": 0.38, "h": 0.45 },
         { "kind": "rect", "x": 0.54, "y": 0.1, "w": 0.38, "h": 0.45 },
@@ -88,76 +158,16 @@
       ]
     },
     {
-      "id": "cabinet",
+      "id": "turn-circle",
       "primitives": [
-        { "kind": "line", "x1": 0.5, "y1": 0.0, "x2": 0.5, "y2": 1.0 },
-        { "kind": "line", "x1": 0.1, "y1": 0.5, "x2": 0.9, "y2": 0.5 }
+        { "kind": "circle", "cx": 0.5, "cy": 0.5, "r": 0.48 }
       ]
     },
     {
-      "id": "washing-machine",
+      "id": "door-swing",
       "primitives": [
-        { "kind": "circle", "cx": 0.5, "cy": 0.45, "r": 0.25 },
-        { "kind": "circle", "cx": 0.5, "cy": 0.45, "r": 0.14 }
-      ]
-    },
-    {
-      "id": "desk",
-      "primitives": [
-        { "kind": "rect", "x": 0.05, "y": 0.05, "w": 0.9, "h": 0.55 },
-        { "kind": "rect", "x": 0.07, "y": 0.65, "w": 0.12, "h": 0.3 }
-      ]
-    },
-    {
-      "id": "office-chair",
-      "primitives": [
-        { "kind": "circle", "cx": 0.5, "cy": 0.4, "r": 0.2 },
-        { "kind": "rect", "x": 0.38, "y": 0.55, "w": 0.24, "h": 0.35 },
-        { "kind": "circle", "cx": 0.5, "cy": 0.7, "r": 0.08 }
-      ]
-    },
-    {
-      "id": "bookshelf",
-      "primitives": [
-        { "kind": "line", "x1": 0.1, "y1": 0.25, "x2": 0.9, "y2": 0.25 },
-        { "kind": "line", "x1": 0.1, "y1": 0.5, "x2": 0.9, "y2": 0.5 },
-        { "kind": "line", "x1": 0.1, "y1": 0.75, "x2": 0.9, "y2": 0.75 }
-      ]
-    },
-    {
-      "id": "wardrobe",
-      "primitives": [
-        { "kind": "line", "x1": 0.5, "y1": 0.05, "x2": 0.5, "y2": 0.95 },
-        { "kind": "line", "x1": 0.15, "y1": 0.8, "x2": 0.85, "y2": 0.8 },
-        { "kind": "line", "x1": 0.35, "y1": 0.22, "x2": 0.45, "y2": 0.22 }
-      ]
-    },
-    {
-      "id": "tv",
-      "primitives": [
-        { "kind": "rect", "x": 0.05, "y": 0.15, "w": 0.9, "h": 0.7 },
-        { "kind": "line", "x1": 0.5, "y1": 0.85, "x2": 0.5, "y2": 0.98 }
-      ]
-    },
-    {
-      "id": "rack",
-      "primitives": [
-        { "kind": "line", "x1": 0.1, "y1": 0.33, "x2": 0.9, "y2": 0.33 },
-        { "kind": "line", "x1": 0.1, "y1": 0.66, "x2": 0.9, "y2": 0.66 }
-      ]
-    },
-    {
-      "id": "nightstand",
-      "primitives": [
-        { "kind": "rect", "x": 0.15, "y": 0.15, "w": 0.7, "h": 0.7 },
-        { "kind": "line", "x1": 0.15, "y1": 0.5, "x2": 0.85, "y2": 0.5 }
-      ]
-    },
-    {
-      "id": "coffee-table",
-      "primitives": [
-        { "kind": "rect", "x": 0.1, "y": 0.1, "w": 0.8, "h": 0.8 },
-        { "kind": "line", "x1": 0.1, "y1": 0.5, "x2": 0.9, "y2": 0.5 }
+        { "kind": "line", "x1": 0.0, "y1": 0.0, "x2": 0.0, "y2": 1.0 },
+        { "kind": "arc", "cx": 0.0, "cy": 0.0, "r": 1.0, "startAngle": 0, "endAngle": 1.5707963267948966, "closed": false }
       ]
     }
   ]

@@ -5,11 +5,31 @@ import {
   findCatalogItem,
   isOutlineItem,
   loadDefaultCatalog,
+  loadGlyphs,
   mergeCatalogs,
+  resolveGlyphMap,
   type CatalogItem,
 } from './index'
 
 const catalog = loadDefaultCatalog()
+
+const userQueen: CatalogItem = {
+  id: 'bed-queen',
+  name: 'Cama queen (a minha)',
+  category: 'quarto',
+  width: 1600,
+  depth: 2000,
+  source: 'user',
+}
+
+const userOwn: CatalogItem = {
+  id: 'user-1',
+  name: 'Bancada da varanda',
+  category: 'sala',
+  width: 2200,
+  depth: 400,
+  source: 'user',
+}
 
 describe('catálogo default', () => {
   it('carrega e valida contra o schema Zod', () => {
@@ -75,24 +95,6 @@ describe('catálogo default', () => {
 })
 
 describe('merge com o catálogo do usuário', () => {
-  const userQueen: CatalogItem = {
-    id: 'bed-queen',
-    name: 'Cama queen (a minha)',
-    category: 'quarto',
-    width: 1600,
-    depth: 2000,
-    source: 'user',
-  }
-
-  const userOwn: CatalogItem = {
-    id: 'user-1',
-    name: 'Bancada da varanda',
-    category: 'sala',
-    width: 2200,
-    depth: 400,
-    source: 'user',
-  }
-
   it('item de usuário com id colidindo sobrescreve o default', () => {
     const merged = mergeCatalogs(catalog, [userQueen])
 
@@ -119,5 +121,48 @@ describe('merge com o catálogo do usuário', () => {
 
     expect(merged).not.toBe(catalog)
     expect(findCatalogItem(catalog, 'bed-queen')?.width).toBe(1580)
+  })
+})
+
+describe('resolveGlyphMap', () => {
+  const glyphs = loadGlyphs()
+
+  it('item de usuário sem glyph, com id colidindo com o default, herda o glifo do default', () => {
+    const merged = mergeCatalogs(catalog, [userQueen])
+    const map = resolveGlyphMap(merged, catalog, glyphs)
+
+    // `userQueen` corrige a medida da cama queen e não declara `glyph` — o
+    // desenho não deve virar retângulo por causa disso (06-catalogo-de-
+    // mobilia.md § Catálogo do usuário).
+    expect(map.get('bed-queen')?.id).toBe('bed')
+  })
+
+  it('item de usuário com glyph próprio usa o declarado, não o herdado', () => {
+    const userQueenWithGlyph: CatalogItem = { ...userQueen, glyph: 'sofa' }
+    const merged = mergeCatalogs(catalog, [userQueenWithGlyph])
+    const map = resolveGlyphMap(merged, catalog, glyphs)
+
+    expect(map.get('bed-queen')?.id).toBe('sofa')
+  })
+
+  it('item de usuário com id novo não herda nada, e não entra no mapa', () => {
+    const merged = mergeCatalogs(catalog, [userOwn])
+    const map = resolveGlyphMap(merged, catalog, glyphs)
+
+    expect(map.has('user-1')).toBe(false)
+  })
+
+  it('todo item do default com glyph aparece no mapa, e só esses', () => {
+    const map = resolveGlyphMap(catalog, catalog, glyphs)
+    const withGlyph = catalog.filter((item) => item.glyph)
+
+    expect(map.size).toBe(withGlyph.length)
+    for (const item of withGlyph) expect(map.has(item.id)).toBe(true)
+  })
+
+  it('item sem glyph (retângulo) não entra no mapa', () => {
+    const map = resolveGlyphMap(catalog, catalog, glyphs)
+
+    expect(map.has('microwave')).toBe(false)
   })
 })

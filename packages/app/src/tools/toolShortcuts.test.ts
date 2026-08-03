@@ -126,6 +126,49 @@ describe('classifyKey — Backspace e Escape', () => {
   })
 })
 
+describe('classifyKey — foco em campo de texto genérico (busca do catálogo, painel de propriedades)', () => {
+  it('Backspace/Delete com seleção não excluem — vão para o campo', () => {
+    for (const key of ['Backspace', 'Delete']) {
+      expect(
+        classifyKey(ctx({ key, focus: 'other', drawing: false, selectionHasFurniture: true })),
+      ).toEqual({ kind: 'passToField' })
+    }
+  })
+
+  it('letra de atalho de ferramenta não troca de ferramenta — vai para o campo', () => {
+    for (const key of ['r', 'v', 'w', 'f', 'm']) {
+      expect(classifyKey(ctx({ key, focus: 'other', drawing: false }))).toEqual({
+        kind: 'passToField',
+      })
+    }
+  })
+
+  it('q/e e setas não giram nem movem o móvel selecionado — vão para o campo', () => {
+    for (const key of ['q', 'e', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']) {
+      expect(
+        classifyKey(ctx({ key, focus: 'other', drawing: false, selectionHasFurniture: true })),
+      ).toEqual({ kind: 'passToField' })
+    }
+  })
+
+  it('dígito não é roteado para o HUD — vai para o campo', () => {
+    expect(classifyKey(ctx({ key: '3', focus: 'other' }))).toEqual({ kind: 'passToField' })
+  })
+
+  it('Home não enquadra tudo — vai para o campo', () => {
+    expect(classifyKey(ctx({ key: 'Home', focus: 'other', drawing: false }))).toEqual({
+      kind: 'passToField',
+    })
+  })
+
+  it('Escape e Ctrl/Cmd continuam funcionando (as duas exceções de D0)', () => {
+    expect(classifyKey(ctx({ key: 'Escape', focus: 'other', drawing: false })).kind).toBe(
+      'selectEvent',
+    )
+    expect(classifyKey(ctx({ key: 'z', focus: 'other', ctrlOrMeta: true })).kind).toBe('undo')
+  })
+})
+
 describe('classifyKey — atalhos da Ferramenta Selecionar', () => {
   it('V ativa a Ferramenta Selecionar', () => {
     expect(classifyKey(ctx({ key: 'v', drawing: false, tool: 'select' }))).toEqual({

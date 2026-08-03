@@ -1,3 +1,4 @@
+import type { FurnitureGlyph } from '@planta/core'
 import defaultData from '../data/default.json'
 import { catalogFileSchema, type CatalogItem } from './schema'
 
@@ -47,4 +48,30 @@ export function findCatalogItem(
   id: string,
 ): CatalogItem | null {
   return items.find((item) => item.id === id) ?? null
+}
+
+/**
+ * Mapa `catalogId → FurnitureGlyph` para `RenderContext.glyphs`
+ * (`04-renderizacao.md` § Passes, `adr/0006-glifos-de-mobilia.md`).
+ *
+ * Item sem `glyph` próprio, mas com `id` colidindo com um item do catálogo
+ * default, herda o glifo do default de mesmo id — corrigir a medida de um
+ * móvel não deve apagar o desenho dele (spec 06 § Catálogo do usuário).
+ */
+export function resolveGlyphMap(
+  items: readonly CatalogItem[],
+  defaultItems: readonly CatalogItem[],
+  glyphs: readonly FurnitureGlyph[],
+): Map<string, FurnitureGlyph> {
+  const glyphsById = new Map(glyphs.map((glyph) => [glyph.id, glyph]))
+  const defaultGlyphIdById = new Map(defaultItems.map((item) => [item.id, item.glyph]))
+
+  const map = new Map<string, FurnitureGlyph>()
+  for (const item of items) {
+    const glyphId = item.glyph ?? defaultGlyphIdById.get(item.id)
+    if (!glyphId) continue
+    const glyph = glyphsById.get(glyphId)
+    if (glyph) map.set(item.id, glyph)
+  }
+  return map
 }

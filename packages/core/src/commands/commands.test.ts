@@ -186,6 +186,216 @@ describe('commands', () => {
     });
   });
 
+  describe('CreateWall', () => {
+    it('polilinha de três trechos produz três paredes e uma entrada de histórico', () => {
+      const store = new DocumentStore();
+      const nodeIds: NodeId[] = ['n1', 'n2', 'n3', 'n4'].map((id) => id as NodeId);
+
+      store.dispatch({
+        type: 'CreateWall',
+        payload: {
+          nodes: [
+            { id: nodeIds[0]!, x: 0, y: 0 },
+            { id: nodeIds[1]!, x: 1000, y: 0 },
+            { id: nodeIds[2]!, x: 1000, y: 1000 },
+            { id: nodeIds[3]!, x: 2000, y: 1000 },
+          ],
+          segments: [
+            { a: nodeIds[0]!, b: nodeIds[1]! },
+            { a: nodeIds[1]!, b: nodeIds[2]! },
+            { a: nodeIds[2]!, b: nodeIds[3]! },
+          ],
+        },
+      });
+
+      expect(store.current.walls).toHaveLength(3);
+      expect(store.current.nodes).toHaveLength(4);
+
+      store.undo();
+
+      expect(store.current.walls).toHaveLength(0);
+      expect(store.current.nodes).toHaveLength(0);
+    });
+
+    it('reusa nó existente por coordenada idêntica (E6) — a bancada gruda na parede do cômodo', () => {
+      const doc = createEmptyDocument();
+      const roomNodes: NodeId[] = ['r1', 'r2', 'r3', 'r4'].map((id) => id as NodeId);
+      const withRoom = applyCommand(doc, {
+        type: 'CreateRoom',
+        payload: {
+          nodes: [
+            { id: roomNodes[0]!, x: 0, y: 0 },
+            { id: roomNodes[1]!, x: 3200, y: 0 },
+            { id: roomNodes[2]!, x: 3200, y: 2500 },
+            { id: roomNodes[3]!, x: 0, y: 2500 },
+          ],
+          loop: roomNodes,
+          name: 'Quarto',
+        },
+      }).document;
+
+      const result = applyCommand(withRoom, {
+        type: 'CreateWall',
+        payload: {
+          nodes: [
+            { id: 'w1' as NodeId, x: 0, y: 0 },
+            { id: 'w2' as NodeId, x: -1000, y: 0 },
+          ],
+          segments: [{ a: 'w1' as NodeId, b: 'w2' as NodeId }],
+        },
+      });
+
+      expect(result.document.nodes).toHaveLength(5);
+      expect(result.document.walls).toHaveLength(1);
+      expect(result.document.walls[0]!.a).toBe(roomNodes[0]);
+    });
+
+    it('segmento que reproduz parede já existente é omitido; o resto do comando é aplicado', () => {
+      const doc = createEmptyDocument();
+      const n1 = 'n1' as NodeId;
+      const n2 = 'n2' as NodeId;
+      const n3 = 'n3' as NodeId;
+
+      const withWall = applyCommand(doc, {
+        type: 'CreateWall',
+        payload: {
+          nodes: [
+            { id: n1, x: 0, y: 0 },
+            { id: n2, x: 1000, y: 0 },
+          ],
+          segments: [{ a: n1, b: n2 }],
+        },
+      }).document;
+
+      expect(withWall.walls).toHaveLength(1);
+
+      const result = applyCommand(withWall, {
+        type: 'CreateWall',
+        payload: {
+          nodes: [{ id: n3, x: 2000, y: 0 }],
+          // Primeiro segmento reproduz a parede n1-n2 já existente (mesmo par,
+          // em qualquer ordem); o segundo é novo.
+          segments: [
+            { a: n2, b: n1 },
+            { a: n2, b: n3 },
+          ],
+        },
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(result.document.walls).toHaveLength(2);
+      expect(result.document.walls.filter((w) => w.a === n1 || w.b === n1)).toHaveLength(1);
+    });
+
+    it('rejeita com EMPTY_WALL quando todos os segmentos são duplicatas — não empilha entrada vazia', () => {
+      const doc = createEmptyDocument();
+      const n1 = 'n1' as NodeId;
+      const n2 = 'n2' as NodeId;
+
+      const withWall = applyCommand(doc, {
+        type: 'CreateWall',
+        payload: {
+          nodes: [
+            { id: n1, x: 0, y: 0 },
+            { id: n2, x: 1000, y: 0 },
+          ],
+          segments: [{ a: n1, b: n2 }],
+        },
+      }).document;
+
+      const result = applyCommand(withWall, {
+        type: 'CreateWall',
+        payload: { nodes: [], segments: [{ a: n2, b: n1 }] },
+      });
+
+      expect(result.error?.code).toBe('EMPTY_WALL');
+      expect(result.document).toBe(withWall);
+      expect(result.patchGroups).toEqual([]);
+    });
+
+    it('rejeita segments vazio sem tocar no documento', () => {
+      const doc = createEmptyDocument();
+      const result = applyCommand(doc, {
+        type: 'CreateWall',
+        payload: { nodes: [], segments: [] },
+      });
+
+      expect(result.error?.code).toBe('EMPTY_WALL');
+      expect(result.document).toBe(doc);
+    });
+
+    it('rejeita segmento degenerado (a === b) sem tocar no documento', () => {
+      const doc = createEmptyDocument();
+      const n1 = 'n1' as NodeId;
+      const result = applyCommand(doc, {
+        type: 'CreateWall',
+        payload: {
+          nodes: [{ id: n1, x: 0, y: 0 }],
+          segments: [{ a: n1, b: n1 }],
+        },
+      });
+
+      expect(result.error?.code).toBe('DEGENERATE_WALL');
+      expect(result.document).toBe(doc);
+    });
+
+    it('rejeita nó desconhecido sem tocar no documento', () => {
+      const doc = createEmptyDocument();
+      const n1 = 'n1' as NodeId;
+      const result = applyCommand(doc, {
+        type: 'CreateWall',
+        payload: {
+          nodes: [{ id: n1, x: 0, y: 0 }],
+          segments: [{ a: n1, b: 'zzz' as NodeId }],
+        },
+      });
+
+      expect(result.error?.code).toBe('NODE_NOT_FOUND');
+      expect(result.document).toBe(doc);
+    });
+  });
+
+  describe('DeleteWall', () => {
+    it('remove a parede; undo devolve com o mesmo WallId', () => {
+      const doc = createEmptyDocument();
+      const n1 = 'n1' as NodeId;
+      const n2 = 'n2' as NodeId;
+
+      const withWall = applyCommand(doc, {
+        type: 'CreateWall',
+        payload: {
+          nodes: [
+            { id: n1, x: 0, y: 0 },
+            { id: n2, x: 1000, y: 0 },
+          ],
+          segments: [{ a: n1, b: n2 }],
+        },
+      }).document;
+      const wallId = withWall.walls[0]!.id;
+
+      const store = new DocumentStore(withWall);
+      store.dispatch({ type: 'DeleteWall', payload: { wallId } });
+
+      expect(store.current.walls).toHaveLength(0);
+
+      store.undo();
+
+      expect(store.current.walls).toHaveLength(1);
+      expect(store.current.walls[0]!.id).toBe(wallId);
+    });
+
+    it('rejeita id inexistente sem tocar no documento', () => {
+      const doc = createEmptyDocument();
+      const result = applyCommand(doc, {
+        type: 'DeleteWall',
+        payload: { wallId: 'zzz' as never },
+      });
+
+      expect(result.error?.code).toBe('WALL_NOT_FOUND');
+      expect(result.document).toBe(doc);
+    });
+  });
+
   describe('DocumentStore', () => {
     it('undo e redo restauram documento', () => {
       const store = new DocumentStore();

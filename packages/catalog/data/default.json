@@ -96,8 +96,7 @@
       "tags": [
         "mesa de cabeceira",
         "apoio"
-      ],
-      "glyph": "nightstand"
+      ]
     },
     {
       "id": "wardrobe-2d",
@@ -148,7 +147,8 @@
       "tags": [
         "gaveta",
         "roupa"
-      ]
+      ],
+      "glyph": "drawers"
     },
     {
       "id": "sofa-2",
@@ -202,7 +202,7 @@
         "estar",
         "chaise"
       ],
-      "glyph": "sofa"
+      "glyph": "sofa-l"
     },
     {
       "id": "armchair",
@@ -227,8 +227,7 @@
       "tags": [
         "mesa",
         "estar"
-      ],
-      "glyph": "coffee-table"
+      ]
     },
     {
       "id": "side-table",
@@ -240,8 +239,7 @@
       "tags": [
         "mesa",
         "apoio"
-      ],
-      "glyph": "coffee-table"
+      ]
     },
     {
       "id": "tv-rack-15",
@@ -253,8 +251,7 @@
       "tags": [
         "tv",
         "estar"
-      ],
-      "glyph": "rack"
+      ]
     },
     {
       "id": "tv-rack-18",
@@ -266,8 +263,7 @@
       "tags": [
         "tv",
         "estar"
-      ],
-      "glyph": "rack"
+      ]
     },
     {
       "id": "bookshelf",
@@ -280,7 +276,7 @@
         "livro",
         "prateleira"
       ],
-      "glyph": "bookshelf"
+      "glyph": "shelves"
     },
     {
       "id": "dining-4",
@@ -293,7 +289,7 @@
         "mesa",
         "jantar"
       ],
-      "glyph": "dining-table"
+      "glyph": "table-chairs"
     },
     {
       "id": "dining-6",
@@ -306,7 +302,7 @@
         "mesa",
         "jantar"
       ],
-      "glyph": "dining-table"
+      "glyph": "table-chairs"
     },
     {
       "id": "dining-round-4",
@@ -320,7 +316,7 @@
         "jantar",
         "redonda"
       ],
-      "glyph": "dining-table"
+      "glyph": "table-round"
     },
     {
       "id": "chair",
@@ -346,7 +342,7 @@
         "banco",
         "jantar"
       ],
-      "glyph": "dining-table"
+      "glyph": "sofa-l"
     },
     {
       "id": "counter-run",
@@ -358,8 +354,7 @@
       "tags": [
         "bancada",
         "armario"
-      ],
-      "glyph": "cabinet"
+      ]
     },
     {
       "id": "sink-cabinet",
@@ -372,7 +367,7 @@
         "pia",
         "bancada"
       ],
-      "glyph": "sink-kitchen"
+      "glyph": "sink-counter"
     },
     {
       "id": "stove-4",
@@ -398,7 +393,7 @@
         "fogao",
         "cozinhar"
       ],
-      "glyph": "stove"
+      "glyph": "stove-5"
     },
     {
       "id": "cooktop-4",
@@ -438,7 +433,7 @@
         "geladeira",
         "refrigerador"
       ],
-      "glyph": "fridge"
+      "glyph": "fridge-duplex"
     },
     {
       "id": "microwave",
@@ -462,7 +457,8 @@
       "tags": [
         "louca",
         "embutido"
-      ]
+      ],
+      "glyph": "washer"
     },
     {
       "id": "island-small",
@@ -500,7 +496,7 @@
         "pia",
         "lavatorio"
       ],
-      "glyph": "sink-bath"
+      "glyph": "basin"
     },
     {
       "id": "vanity-60",
@@ -513,7 +509,7 @@
         "pia",
         "armario"
       ],
-      "glyph": "sink-bath"
+      "glyph": "basin"
     },
     {
       "id": "vanity-80",
@@ -526,7 +522,7 @@
         "pia",
         "armario"
       ],
-      "glyph": "sink-bath"
+      "glyph": "basin"
     },
     {
       "id": "shower-90",
@@ -577,7 +573,7 @@
         "lavar",
         "roupa"
       ],
-      "glyph": "washing-machine"
+      "glyph": "washer"
     },
     {
       "id": "washer-dryer",
@@ -591,7 +587,7 @@
         "secar",
         "roupa"
       ],
-      "glyph": "washing-machine"
+      "glyph": "washer"
     },
     {
       "id": "laundry-sink",
@@ -603,7 +599,8 @@
       "tags": [
         "lavar",
         "pia"
-      ]
+      ],
+      "glyph": "basin"
     },
     {
       "id": "laundry-cabinet",
@@ -615,7 +612,8 @@
       "tags": [
         "armario",
         "guardar"
-      ]
+      ],
+      "glyph": "wardrobe"
     },
     {
       "id": "desk-120",
@@ -628,8 +626,7 @@
         "mesa",
         "trabalho",
         "estudo"
-      ],
-      "glyph": "desk"
+      ]
     },
     {
       "id": "desk-140",
@@ -642,8 +639,7 @@
         "mesa",
         "trabalho",
         "estudo"
-      ],
-      "glyph": "desk"
+      ]
     },
     {
       "id": "desk-l",
@@ -655,8 +651,7 @@
       "tags": [
         "mesa",
         "trabalho"
-      ],
-      "glyph": "desk"
+      ]
     },
     {
       "id": "office-chair",
@@ -669,7 +664,7 @@
         "assento",
         "trabalho"
       ],
-      "glyph": "office-chair"
+      "glyph": "chair"
     },
     {
       "id": "filing-cabinet",
@@ -682,7 +677,7 @@
         "arquivo",
         "gaveta"
       ],
-      "glyph": "wardrobe"
+      "glyph": "drawers"
     },
     {
       "id": "clearance-person",
@@ -705,7 +700,8 @@
         "gabarito",
         "acessibilidade",
         "nbr 9050"
-      ]
+      ],
+      "glyph": "turn-circle"
     },
     {
       "id": "clearance-door-swing",
@@ -716,7 +712,8 @@
       "tags": [
         "gabarito",
         "porta"
-      ]
+      ],
+      "glyph": "door-swing"
     }
   ]
 }

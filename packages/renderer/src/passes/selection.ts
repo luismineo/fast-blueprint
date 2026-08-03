@@ -3,6 +3,8 @@ import {
   formatLength,
   roomPoints,
   selectionKey,
+  writeObbCorners,
+  type FurnitureItem,
   type PlanDocument,
   type Point,
   type SelectionRef,
@@ -14,6 +16,8 @@ import type { Theme } from '../theme'
 
 const HANDLE_HALF_PX = 4
 const EDGE_LABEL_OFFSET_PX = 12
+/** Mesma distância de `core/hit`'s `DEFAULT_HIT_CONFIG.rotationHandlePx`. */
+const ROTATION_HANDLE_PX = 24
 
 const scratch: { x: number; y: number }[] = []
 
@@ -28,6 +32,7 @@ interface SelectionStyles {
   readonly edge: LineStyle
   readonly handle: LineStyle
   readonly hoverHandle: LineStyle
+  readonly furnitureOutline: LineStyle
   readonly label: TextStyle
 }
 
@@ -42,6 +47,7 @@ function selectionStyles(theme: Theme): SelectionStyles {
     edge: { color: theme.selection, width: theme.wallWidth * 2 },
     handle: { color: theme.selection, width: 2 },
     hoverHandle: { color: theme.selection, width: 1 },
+    furnitureOutline: { color: theme.selection, width: 2 },
     label: {
       color: theme.selection,
       font: '11px "IBM Plex Mono", monospace',
@@ -113,6 +119,13 @@ function drawSelected(
       const ends = edgePoints(doc, ref.edge)
       if (!ends) return
       drawEdge(ends[0], ends[1], ctx, styles)
+      return
+    }
+
+    case 'furniture': {
+      const item = doc.furniture.find((candidate) => candidate.id === ref.furnitureId)
+      if (!item) return
+      drawFurnitureSelection(item, ctx, styles)
     }
   }
 }
@@ -178,6 +191,76 @@ function drawEdge(
     formatLength(length, unit),
     styles.label,
   )
+}
+
+const furnitureCorners: Point[] = [
+  { x: 0, y: 0 },
+  { x: 0, y: 0 },
+  { x: 0, y: 0 },
+  { x: 0, y: 0 },
+]
+const rotationGrip: Point = { x: 0, y: 0 }
+const frontMid: Point = { x: 0, y: 0 }
+
+/**
+ * Mesma fórmula de `core/hit`'s `rotationHandleAt`, escrevendo num ponto de
+ * escopo de módulo em vez de alocar — nenhuma alocação dentro de um pass de
+ * render (`04-renderizacao.md` § Orçamento de performance, regra 2).
+ */
+function writeRotationGrip(item: FurnitureItem, offsetMm: number): void {
+  const radians = (item.rotation * Math.PI) / 180
+  const forwardX = -Math.sin(radians)
+  const forwardY = Math.cos(radians)
+  const reach = item.depth / 2 + offsetMm
+
+  rotationGrip.x = item.center.x + forwardX * reach
+  rotationGrip.y = item.center.y + forwardY * reach
+}
+
+/**
+ * Móvel selecionado: contorno na cor de seleção, handle de 8 px em cada
+ * canto, e handle de rotação a 24 px da face frontal ligado a ela por uma
+ * haste (`03-ferramentas-e-interacao.md` § Handles).
+ *
+ * Móvel `locked` não desenha handle nenhum — não há o que agarrar — mas
+ * mantém o contorno, para a seleção continuar visível.
+ */
+function drawFurnitureSelection(
+  item: FurnitureItem,
+  ctx: RenderContext,
+  styles: SelectionStyles,
+): void {
+  writeObbCorners(furnitureCorners, item.center, item.width, item.depth, item.rotation)
+
+  const outline = buffer(5)
+  for (let i = 0; i < 4; i += 1) {
+    outline[i]!.x = worldToScreenX(ctx.camera, furnitureCorners[i]!.x)
+    outline[i]!.y = worldToScreenY(ctx.camera, furnitureCorners[i]!.y)
+  }
+  outline[4]!.x = outline[0]!.x
+  outline[4]!.y = outline[0]!.y
+  ctx.target.polyline(outline, styles.furnitureOutline)
+
+  if (item.locked) return
+
+  for (const corner of furnitureCorners) {
+    drawHandle(corner, ctx, styles.handle)
+  }
+
+  // Face frontal é a borda entre os cantos 2 e 3 — os dois últimos de
+  // `obbCorners` (`06-catalogo-de-mobilia.md` § Convenção de orientação).
+  frontMid.x = (furnitureCorners[2]!.x + furnitureCorners[3]!.x) / 2
+  frontMid.y = (furnitureCorners[2]!.y + furnitureCorners[3]!.y) / 2
+  writeRotationGrip(item, ROTATION_HANDLE_PX / ctx.camera.scale)
+
+  ctx.target.line(
+    worldToScreenX(ctx.camera, frontMid.x),
+    worldToScreenY(ctx.camera, frontMid.y),
+    worldToScreenX(ctx.camera, rotationGrip.x),
+    worldToScreenY(ctx.camera, rotationGrip.y),
+    styles.handle,
+  )
+  drawHandle(rotationGrip, ctx, styles.handle)
 }
 
 function drawHandle(at: Point, ctx: RenderContext, style: LineStyle): void {

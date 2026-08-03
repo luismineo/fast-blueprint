@@ -30,6 +30,7 @@ const glyphPrimitiveSchema = z.discriminatedUnion('kind', [
     r: z.number().min(0).max(1),
     startAngle: z.number(),
     endAngle: z.number(),
+    closed: z.boolean(),
   }),
 ]);
 

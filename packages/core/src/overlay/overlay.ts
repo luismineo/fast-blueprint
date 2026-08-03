@@ -89,6 +89,14 @@ export type GlyphPrimitive =
       readonly r: number;
       readonly startAngle: number;
       readonly endAngle: number;
+      /**
+       * Fecha o arco com um segmento reto do último ponto ao primeiro.
+       *
+       * `true` para bacia/roda/botão (arco pensado como forma fechada).
+       * `false` para arco de verdade — a folha de uma porta não tem segmento
+       * ligando a ponta do arco de volta ao eixo.
+       */
+      readonly closed: boolean;
     };
 
 /**

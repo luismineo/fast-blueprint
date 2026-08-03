@@ -47,8 +47,8 @@ export class CanvasTarget implements DrawTarget {
     this.ctx.restore()
   }
 
-  polyline(points: { x: number; y: number }[], style: LineStyle): void {
-    if (points.length < 2) return
+  polyline(points: { x: number; y: number }[], style: LineStyle, count = points.length): void {
+    if (count < 2) return
     this.ctx.save()
     this.ctx.globalAlpha = style.opacity ?? 1
     this.ctx.strokeStyle = style.color
@@ -56,7 +56,7 @@ export class CanvasTarget implements DrawTarget {
     this.ctx.setLineDash(style.dash ? [...style.dash] : EMPTY_DASH)
     this.ctx.beginPath()
     this.ctx.moveTo(points[0]!.x, points[0]!.y)
-    for (let i = 1; i < points.length; i++) {
+    for (let i = 1; i < count; i++) {
       this.ctx.lineTo(points[i]!.x, points[i]!.y)
     }
     this.ctx.stroke()

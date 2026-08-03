@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   applyCommand,
   createEmptyDocument,
+  type FurnitureId,
   type NodeId,
   type PlanDocument,
   type RoomId,
@@ -14,6 +15,7 @@ import type { RenderContext } from '../renderContext'
 
 const n = (id: string): NodeId => id as NodeId
 const ROOM = 'r1' as RoomId
+const SOFA = 'f1' as FurnitureId
 
 function oneRoom(): PlanDocument {
   return applyCommand(createEmptyDocument(), {
@@ -28,6 +30,23 @@ function oneRoom(): PlanDocument {
       loop: [n('a'), n('b'), n('c'), n('d')],
       name: 'Quarto',
       roomId: ROOM,
+    },
+  }).document
+}
+
+function withSofa(locked = false): PlanDocument {
+  return applyCommand(oneRoom(), {
+    type: 'AddFurniture',
+    payload: {
+      furnitureId: SOFA,
+      catalogId: null,
+      name: 'Sofá',
+      width: 2000,
+      depth: 900,
+      center: { x: 1600, y: 1250 },
+      rotation: 0,
+      clearance: 0,
+      locked,
     },
   }).document
 }
@@ -170,6 +189,71 @@ describe('pass selection', () => {
 
     selectionPass(ctx)
 
+    expect(target.polylines).toHaveLength(0)
+  })
+
+  it('móvel selecionado tem contorno na cor de seleção, 4 handles de canto e um de rotação com haste', () => {
+    const { ctx, target } = context({
+      doc: withSofa(),
+      selection: [{ kind: 'furniture', furnitureId: SOFA }],
+    })
+
+    selectionPass(ctx)
+
+    // 1 contorno + 4 cantos + 1 rotação.
+    expect(target.polylines).toHaveLength(6)
+    const outline = target.polylines[0]!
+    expect(outline.points).toHaveLength(5)
+    expect(outline.points[0]).toEqual(outline.points[4])
+    expect(outline.style.color).toBe(lightTheme.selection)
+
+    for (const handle of target.polylines.slice(1)) {
+      const xs = handle.points.map((p) => p.x)
+      const ys = handle.points.map((p) => p.y)
+      expect(Math.max(...xs) - Math.min(...xs)).toBe(8)
+      expect(Math.max(...ys) - Math.min(...ys)).toBe(8)
+    }
+
+    // Haste ligando a face frontal ao handle de rotação.
+    expect(target.lines).toHaveLength(1)
+  })
+
+  it('móvel travado mantém o contorno mas não desenha handle nenhum', () => {
+    const { ctx, target } = context({
+      doc: withSofa(true),
+      selection: [{ kind: 'furniture', furnitureId: SOFA }],
+    })
+
+    selectionPass(ctx)
+
+    expect(target.polylines).toHaveLength(1)
+    expect(target.lines).toHaveLength(0)
+  })
+
+  it('handle de rotação fica a 24 px da face frontal em qualquer zoom', () => {
+    for (const scale of [0.05, 1, 20]) {
+      const { ctx, target } = context({
+        doc: withSofa(),
+        selection: [{ kind: 'furniture', furnitureId: SOFA }],
+        camera: { tx: 0, ty: 0, scale },
+      })
+
+      selectionPass(ctx)
+
+      const [haste] = target.lines
+      const dx = haste!.x2 - haste!.x1
+      const dy = haste!.y2 - haste!.y1
+      expect(Math.hypot(dx, dy)).toBeCloseTo(24, 0)
+    }
+  })
+
+  it('referência de móvel que não resolve não quebra o pass', () => {
+    const { ctx, target } = context({
+      doc: withSofa(),
+      selection: [{ kind: 'furniture', furnitureId: 'zzz' as FurnitureId }],
+    })
+
+    expect(() => selectionPass(ctx)).not.toThrow()
     expect(target.polylines).toHaveLength(0)
   })
 })

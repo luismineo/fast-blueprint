@@ -1187,6 +1187,65 @@ function applyRenameRoom(
 // CreateWall e DeleteWall — spec 08 § Comandos do M3.5
 // ============================================================
 
+interface CreateWallPlan {
+  readonly newNodes: { id: NodeId; x: number; y: number }[];
+  readonly newWalls: { id: WallId; a: NodeId; b: NodeId }[];
+}
+
+function pairKey(a: string, b: string): string {
+  return a < b ? `${a}|${b}` : `${b}|${a}`
+}
+
+/**
+ * Resolve nós e paredes que `CreateWall` de fato criaria, sem mutar nada.
+ *
+ * Reusada por `validateCreateWall` (para saber se sobra algo depois de
+ * omitir segmento duplicado) e por `applyCreateWall` (para aplicar
+ * exatamente o que foi validado, sem recalcular dentro do produce e arriscar
+ * as duas contas divergirem).
+ */
+function planCreateWall(doc: PlanDocument, payload: CreateWallPayload): CreateWallPlan {
+  const nodeIdMap = new Map<string, NodeId>();
+  const newNodes: { id: NodeId; x: number; y: number }[] = [];
+  const position = new Map<NodeId, { x: number; y: number }>();
+  for (const node of doc.nodes) position.set(node.id, { x: node.x, y: node.y });
+
+  for (const n of payload.nodes) {
+    let existingId: NodeId | null = null;
+    for (const [id, pos] of position) {
+      if (pos.x === n.x && pos.y === n.y) {
+        existingId = id;
+        break;
+      }
+    }
+    if (existingId) {
+      nodeIdMap.set(n.id, existingId);
+    } else {
+      nodeIdMap.set(n.id, n.id);
+      position.set(n.id, { x: n.x, y: n.y });
+      newNodes.push({ id: n.id, x: n.x, y: n.y });
+    }
+  }
+
+  const existingPairs = new Set<string>();
+  for (const wall of doc.walls) existingPairs.add(pairKey(wall.a, wall.b));
+
+  const newWalls: { id: WallId; a: NodeId; b: NodeId }[] = [];
+  for (const seg of payload.segments) {
+    const a = nodeIdMap.get(seg.a) ?? seg.a;
+    const b = nodeIdMap.get(seg.b) ?? seg.b;
+
+    if (a === b) continue;
+    if (!position.has(a) || !position.has(b)) continue;
+    if (existingPairs.has(pairKey(a, b))) continue;
+
+    newWalls.push({ id: seg.wallId ?? generateWallId(), a, b });
+    existingPairs.add(pairKey(a, b));
+  }
+
+  return { newNodes, newWalls };
+}
+
 function applyCreateWall(
   doc: PlanDocument,
   payload: CreateWallPayload,
@@ -1195,60 +1254,27 @@ function applyCreateWall(
   const rejection = validateCreateWall(doc, payload);
   if (rejection) return rejected(doc, label, rejection);
 
+  const plan = planCreateWall(doc, payload);
+
+  // Um segmento que reproduz parede já existente é omitido, e o resto do
+  // comando é aplicado (08-arquitetura.md § Comandos do M3.5). Se a omissão
+  // não deixa nenhuma parede nova, "aplicar o resto" seria empilhar uma
+  // entrada de histórico vazia — rejeita como se `segments` tivesse chegado
+  // vazio.
+  if (plan.newWalls.length === 0) {
+    return rejected(doc, label, { code: 'EMPTY_WALL', ids: [] });
+  }
+
   const [nextDoc, patches, inversePatches] = produceWithPatches(doc, (draft) => {
-    const nodeIdMap = new Map<string, NodeId>();
-
-    for (const n of payload.nodes) {
-      const existing = draft.nodes.find(
-        (existing) => existing.x === n.x && existing.y === n.y,
-      );
-      if (existing) {
-        nodeIdMap.set(n.id, existing.id);
-      } else {
-        draft.nodes.push({
-          id: n.id,
-          x: n.x as Node['x'],
-          y: n.y as Node['y'],
-        });
-        nodeIdMap.set(n.id, n.id);
-      }
+    for (const n of plan.newNodes) {
+      draft.nodes.push({ id: n.id, x: n.x as Node['x'], y: n.y as Node['y'] });
     }
-
-    const position = new Map<NodeId, { x: number; y: number }>();
-    for (const node of draft.nodes) position.set(node.id, { x: node.x, y: node.y });
-
-    const existingPairs = new Set<string>();
-    for (const wall of draft.walls) {
-      existingPairs.add(pairKey(wall.a, wall.b));
-    }
-
-    for (const seg of payload.segments) {
-      const a = nodeIdMap.get(seg.a) ?? seg.a;
-      const b = nodeIdMap.get(seg.b) ?? seg.b;
-
-      if (a === b) continue;
-
-      const aPos = position.get(a);
-      const bPos = position.get(b);
-      if (!aPos || !bPos) continue;
-
-      if (existingPairs.has(pairKey(a, b))) continue;
-
-      const wallId = seg.wallId ?? generateWallId();
-      draft.walls.push({
-        id: wallId,
-        a,
-        b,
-      });
-      existingPairs.add(pairKey(a, b));
+    for (const wall of plan.newWalls) {
+      draft.walls.push({ id: wall.id, a: wall.a, b: wall.b });
     }
   });
 
   return applied(nextDoc, patches, inversePatches, label);
-}
-
-function pairKey(a: string, b: string): string {
-  return a < b ? `${a}|${b}` : `${b}|${a}`
 }
 
 function validateCreateWall(
