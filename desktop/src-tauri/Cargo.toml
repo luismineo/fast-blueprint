@@ -1,6 +1,6 @@
 [package]
 name = "planta"
-version = "0.0.0"
+version = "0.0.4"
 edition = "2021"
 description = "Planta - editor de planta baixa 2D (shell desktop chega no M5, specs/09-roadmap.md)"
 
